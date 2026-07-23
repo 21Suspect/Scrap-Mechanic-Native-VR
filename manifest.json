@@ -1,0 +1,140 @@
+﻿{
+    "formatVersion":  1,
+    "patchId":  "scrap-mechanic-native-vr",
+    "patchVersion":  "1.17.0-20260723",
+    "description":  "Minimal native OpenXR VR integration for Scrap Mechanic build 22163681",
+    "game":  {
+                 "appId":  "387990",
+                 "buildId":  "22163681",
+                 "executable":  "Release\\ScrapMechanic.exe",
+                 "executableSha256":  "9D8B5F97171413DB1C284FC36B983173CB08E272AF3DF427F7DCDA360A3FD1FE"
+             },
+    "legacyFiles":  [
+                         {
+                             "path":  "Data\\Objects\\Database\\ShapeSets\\interactive.json",
+                             "originalSha256":  [
+                                                    "1EDE232A2EB0FE5C326C97DDFA240CC0F5BD2218E6DAE8114D4DF01FC4597E63"
+                                                ],
+                             "module":  "legacy-cleanup"
+                         },
+                         {
+                             "path":  "Data\\Scripts\\game\\interactable\\VrHandControls.lua",
+                             "originalMayBeMissing":  true,
+                             "module":  "legacy-cleanup"
+                         },
+                         {
+                             "path":  "Survival\\Scripts\\game\\SurvivalImprovementConfig.lua",
+                             "originalMayBeMissing":  true,
+                             "module":  "legacy-cleanup"
+                         }
+                     ],
+    "files":  [
+                  {
+                      "path":  "Data\\Scripts\\game\\Lift.lua",
+                      "patchedSha256":  "841C4E0250ABE1ABD00BBA9EDCF47293847638BB40EFCCF77408D5B72A962737",
+                      "originalSha256":  [
+                                             "7F7BF1E0CF006DC9D55036FEC9E4685336DCBCF3A78E408E9F39E0A9F280E1F5"
+                                         ],
+                      "module":  "vr-tools"
+                  },
+                  {
+                      "path":  "NativeVR\\Start-NativeVR.ps1",
+                      "patchedSha256":  "6CEBF723518297CFC7126746CF06B9A53E7FB19E2926877F302381ECD8FD8E28",
+                      "originalMayBeMissing":  true,
+                      "module":  "vr-runtime"
+                  },
+                  {
+                      "path":  "Release\\dxgi.dll",
+                      "patchedSha256":  "EC9245D05C11751F2AC0D2256E6921AD8FB36BE9172EF6D587856591EB729A25",
+                      "originalMayBeMissing":  true,
+                      "module":  "vr-runtime"
+                  },
+                  {
+                      "path":  "Release\\openxr_loader.dll",
+                      "patchedSha256":  "F7D6EB54C79BD923E9F008B81B89D4B0B5893FD33599E9591FF62BECBA936DAC",
+                      "originalMayBeMissing":  true,
+                      "module":  "vr-runtime"
+                  },
+                  {
+                      "path":  "Release\\ReShade.ini",
+                      "patchedSha256":  "8778D481E7E815CFC8527B267F3E8003A867E8AAE5BF92D666CD5E44CC313226",
+                      "originalMayBeMissing":  true,
+                      "runtimeMutable":  true,
+                      "module":  "vr-runtime"
+                  },
+                  {
+                      "path":  "Release\\ScrapMechanicVR.ini",
+                      "patchedSha256":  "44B73B38570118696DE5C6581348EFADEE4B97D288BC601D694AD88D7576D857",
+                      "originalMayBeMissing":  true,
+                      "module":  "vr-runtime"
+                  },
+                  {
+                      "path":  "Release\\scrap_native_vr.addon64",
+                      "patchedSha256":  "EE3511DBBA61E38F052CA777A22944DDEE5275D8B0BAF3B6D4F176FF3EE1215F",
+                      "originalMayBeMissing":  true,
+                      "module":  "vr-runtime"
+                  },
+                  {
+                      "path":  "Survival\\Scripts\\game\\NativeVRConfig.lua",
+                      "patchedSha256":  "EB40319FD777E45F4689A355BE7A9593E556DCEB2368E1A4F2E48BAA8C85F9C3",
+                      "originalMayBeMissing":  true,
+                      "module":  "vr-gameplay"
+                  },
+                  {
+                      "path":  "Survival\\Scripts\\game\\SurvivalPlayer.lua",
+                      "patchedSha256":  "C8256E3B38C00EDDC796FAA8DA65F5B5A98203E5BDB5FAA9DF419686ED4762E5",
+                      "originalSha256":  [
+                                             "7842BDA71DB0388C882B3307E05C47DD42C89B6E9927A0E2876635768255244A"
+                                         ],
+                      "module":  "vr-gameplay"
+                  },
+                  {
+                      "path":  "Survival\\Scripts\\game\\interactables\\ElevatorButton.lua",
+                      "patchedSha256":  "4335070022EC7C62F11CA5D7B111DB91B8FDA1756156F1B6CCE3B83B0BBC19F2",
+                      "originalSha256":  [
+                                             "4BC6EF0298E89A0F9EC59C778482BBC7D4AAC737ECF88A5717E9ADDDAF207DC5"
+                                         ],
+                      "module":  "vr-interaction"
+                  },
+                  {
+                      "path":  "Survival\\Scripts\\game\\interactables\\ElevatorCallButton.lua",
+                      "patchedSha256":  "514CF786A7BF050A7C8108B19C1C48BB7845F9989DEFEB39ACE8576D1DEB9CF1",
+                      "originalSha256":  [
+                                             "C678655B31B3E7A6C3E089C513423F4F1EF667E376D3CF6B32E3812430446020"
+                                         ],
+                      "module":  "vr-interaction"
+                  },
+                  {
+                      "path":  "Survival\\Scripts\\game\\tools\\PotatoGatling.lua",
+                      "patchedSha256":  "E733C3BB1F3362FE0117C523924D6B2F87E20377EC346D5C7DDC75F144A876DB",
+                      "originalSha256":  [
+                                             "C2432735691E078E836BE50DFA5AB59A0F5C03BD1136E4CCE1A057D8AF3398B3"
+                                         ],
+                      "module":  "vr-tools"
+                  },
+                  {
+                      "path":  "Survival\\Scripts\\game\\tools\\PotatoRifle.lua",
+                      "patchedSha256":  "27116EB54C590C663240DBDE8208789B30218EC388FE3AB589B1AA04368C2485",
+                      "originalSha256":  [
+                                             "1808FF21E5D698742486D4CBFA261B92ABBC87116B58776D7CA49E67A9BC78B6"
+                                         ],
+                      "module":  "vr-tools"
+                  },
+                  {
+                      "path":  "Survival\\Scripts\\game\\tools\\PotatoShotgun.lua",
+                      "patchedSha256":  "88501D020825F8FC30E30A82F820813A6C1ED2494A2555298A0EDA3BF48A5858",
+                      "originalSha256":  [
+                                             "0CC5C12FBD970E53F3D49F3A219477AFFB76E7AE50BA905C5A1340588C3537F4"
+                                         ],
+                      "module":  "vr-tools"
+                  },
+                  {
+                      "path":  "Survival\\Scripts\\game\\tools\\Sledgehammer.lua",
+                      "patchedSha256":  "411CA3BE022B4CB15E62C89F7C95891C5BACA0FD17CA99495C77FDECF27A03C6",
+                      "originalSha256":  [
+                                             "9F6CA9AFD1708650FD5E2A3EAD70DD936AA960DC0665B729A8497C6BCF5F5648"
+                                         ],
+                      "module":  "vr-tools"
+                  }
+              ]
+}

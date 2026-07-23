@@ -1,0 +1,18 @@
+* text=auto
+
+*.ps1 text eol=crlf
+*.cs text eol=crlf
+*.manifest text eol=crlf
+*.lua text eol=lf
+*.cpp text eol=lf
+*.hpp text eol=lf
+*.h text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.ini text eol=crlf
+
+*.png binary
+*.dll binary
+*.addon64 binary

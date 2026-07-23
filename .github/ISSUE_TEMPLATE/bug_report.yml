@@ -1,0 +1,62 @@
+name: Bug report
+description: Report a reproducible VR, installer, input, or rendering problem
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Please remove tokens, account identifiers, personal paths, and save data before attaching logs or screenshots.
+  - type: input
+    id: version
+    attributes:
+      label: VR mod version
+      placeholder: 1.17.0-20260723
+    validations:
+      required: true
+  - type: input
+    id: game-build
+    attributes:
+      label: Scrap Mechanic Steam build
+      placeholder: "22163681"
+    validations:
+      required: true
+  - type: input
+    id: headset
+    attributes:
+      label: Headset and connection
+      placeholder: Meta Quest 3 via Quest Link
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: OpenXR runtime
+      placeholder: Meta Quest Link OpenXR
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Numbered steps that reproduce the problem from a fresh launch.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log tail
+      description: Paste only the relevant section of ScrapNativeVR.log or the installer log.
+      render: text
