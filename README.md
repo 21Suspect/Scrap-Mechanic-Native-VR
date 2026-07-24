@@ -7,7 +7,7 @@
 
 An experimental native OpenXR conversion for **Scrap Mechanic Survival**, built for Meta Quest 3 with Quest Link or Air Link. It adds stereoscopic rendering, tracked hands and tools, Touch-controller locomotion, optical hand tracking, VR interaction rays, spatial menus, seated camera support, and a guarded one-file installer.
 
-[![Scrap Mechanic running with tracked VR hands](docs/images/vr-hands-gameplay.png)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/raw/refs/heads/main/Scrap%20VR%20%281%29.mp4)
+![Scrap Mechanic VR demo](docs/images/scrap-vr-demo.gif)
 
 ## Download and install
 
