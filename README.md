@@ -1,5 +1,13 @@
 # Scrap Mechanic Native VR
 
+> ## Scrap Mechanic 1.0 / Chapter 2 beta is available
+>
+> **Most players should use the new [Chapter 2 / 1.0 beta](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/tree/chapter2-1.0), which supports current Steam build `24529696`.**
+>
+> [Download the Chapter 2 beta installer](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/raw/chapter2-1.0/dist/ScrapMechanicVR-Chapter2-Patcher.exe)
+>
+> The release documented below is the legacy version for old Steam build `22163681` and will not install on the current game. The Chapter 2 beta currently focuses on native stereo visuals and head tracking; controllers, hands, UI, and gameplay interaction are still in development.
+
 [![Latest release](https://img.shields.io/github/v/release/21Suspect/Scrap-Mechanic-Native-VR?display_name=tag&sort=semver)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/21Suspect/Scrap-Mechanic-Native-VR/total)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases)
 [![License: MIT](https://img.shields.io/badge/original_code-MIT-ffc124.svg)](LICENSE)
