@@ -4,6 +4,18 @@ This branch is a separate visual-only OpenXR implementation for the Scrap Mechan
 
 > Status: Quest 3 visual test snapshot, not a final stable release. Use only with the exact supported Steam build below. The user has confirmed the core stereo result in the headset, but performance, desktop mirroring, UI, and headset display-mode changes still need work.
 
+## Easy installation
+
+1. Close Scrap Mechanic.
+2. Download [ScrapMechanicVR-Chapter2-Patcher.exe](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/raw/chapter2-1.0/dist/ScrapMechanicVR-Chapter2-Patcher.exe).
+3. Verify its SHA-256 is `90F79D30AD1B747E024F87999C643F749524EDEC2047477A12C9069B406769B4`.
+4. Run it, confirm that Steam build `24529696` is detected, then select **Install VR Mod**.
+5. Keep Meta Quest Link active and Meta set as the OpenXR runtime, then use **Start Scrap Mechanic**.
+
+The patcher is currently unsigned, so Windows may show a SmartScreen warning. It refuses unsupported executable hashes, detects incompatible files from the legacy branch, verifies every payload file, and keeps transaction state under `%LOCALAPPDATA%\ScrapMechanicVR-Chapter2`. It also provides Verify, Restore/Reinstall, legacy cleanup, and Uninstall/Restore actions. Installation does not rewrite Scrap Mechanic's desktop resolution or save files.
+
+Do not copy or install files from `main` alongside this build. If the patcher reports legacy/conflicting VR files, use its guarded cleanup action, run Steam's **Verify integrity of game files**, and then install again.
+
 ## Exact compatibility
 
 - Steam app: `387990`
@@ -35,9 +47,9 @@ These statements refer to the user's headset observations for this exact snapsho
 - The new swapchain-reset handling survived PC-only fullscreen/windowed transitions, but the equivalent headset transition was interrupted before user confirmation. Treat fullscreen-with-HMD as unconfirmed.
 - Main-menu UI is currently absent in VR.
 - Hands, controllers, tools, weapons, locomotion, and gameplay interaction are intentionally out of scope for this snapshot.
-- No installer/repair/uninstall workflow from the legacy branch is reused here.
+- The Chapter 2 patcher has passed payload, extraction-cache, clean install, exact-payload adoption, verify, mutable-config, rollback, uninstall, and legacy-conflict tests. Installing it on another machine does not by itself prove headset compatibility.
 
-See [STATUS.md](STATUS.md) for the evidence boundary and [BUILD.md](BUILD.md) for build/deployment details.
+See [STATUS.md](STATUS.md) for the evidence boundary and [BUILD.md](BUILD.md) for build, manual deployment, and installer details.
 
 ## Repository separation
 

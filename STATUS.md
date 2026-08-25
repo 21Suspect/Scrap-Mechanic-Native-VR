@@ -13,6 +13,10 @@ Snapshot name: `chapter2-v0.1.0-test`
 
 The snapshot does not claim that unconfirmed items work. In particular, headset fullscreen/windowed switching remains unconfirmed even though the stale swapchain-reference fix passed PC-only transitions.
 
+## Installer status
+
+The separate Chapter 2 one-file patcher is ready for test distribution. It is not the legacy branch installer: it carries only this branch's seven-file visual payload, checks the exact Steam build/executable hash, blocks mixed legacy renderer files, and records reversible install state in a Chapter 2-specific local directory. Automated and isolated transaction tests passed; no installer result is counted as additional headset visual evidence.
+
 ## Rendering architecture
 
 - Exactly two high-level engine scene renders per OpenXR frame: left and right.

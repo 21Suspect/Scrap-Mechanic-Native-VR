@@ -32,3 +32,15 @@ The portable `ReShade.ini` points effect, texture, and intermediate-cache search
 - `ScrapMechanicVR.ini`: enables VR and disables the high-resolution PC diagnostic probe.
 
 Validate all payload hashes against `SHA256SUMS.txt` before copying them.
+
+## One-file installer
+
+The release manager is built from `installer/Program.cs`, embeds the exact `payload`, and calls the guarded transaction backend in `Patcher.ps1`.
+
+```powershell
+.\Build-OneFileInstaller.ps1
+```
+
+This produces `dist/ScrapMechanicVR-Chapter2-Patcher.exe`. The build first validates all seven payload hashes. The resulting executable validates its embedded manifest and native add-on before extracting, discovers the Steam installation and active 64-bit OpenXR runtime, and refuses any game executable other than the documented build.
+
+The current installer version is `0.1.2-chapter2-20260825`, SHA-256 `90F79D30AD1B747E024F87999C643F749524EDEC2047477A12C9069B406769B4`. Its backend was tested in isolated game trees for install, exact existing-payload adoption, verify, runtime-mutated configuration, rollback, uninstall/restore, empty-directory cleanup, and rejection of legacy files. The compiled EXE's extraction and environment self-test also passed against the supported installed game and Meta OpenXR runtime.

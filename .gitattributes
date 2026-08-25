@@ -1,6 +1,7 @@
 *.addon64 binary
 *.dll binary
 *.dll.a binary
+*.exe binary
 payload/Release/*.ini binary
 *.c text eol=lf
 *.cpp text eol=lf
