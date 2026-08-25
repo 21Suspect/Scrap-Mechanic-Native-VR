@@ -1,4 +1,4 @@
-# Scrap Mechanic Native VR — Chapter 2 / 1.0 branch
+# Scrap Mechanic Native VR Chapter 2 / 1.0 Beta
 
 This branch is a separate visual-only OpenXR implementation for the Scrap Mechanic Chapter 2 / 1.0 renderer. It does **not** use the legacy renderer addresses, native binary, installer, controller code, or gameplay patches from this repository's `main` branch.
 
@@ -16,7 +16,7 @@ This branch is a separate visual-only OpenXR implementation for the Scrap Mechan
 
 The add-on validates the executable image size, PE timestamp, and hook byte prefixes. If any exact-build check fails, it must not install the renderer hooks.
 
-## Human-confirmed in Quest 3
+## Confirmed in Quest 3
 
 - Two real engine-rendered eyes with correct depth and perspective.
 - Immediate six-degree-of-freedom head tracking.
