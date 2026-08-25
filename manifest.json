@@ -1,0 +1,46 @@
+{
+  "snapshot": "chapter2-v0.1.0-test",
+  "status": "quest-3-human-confirmed-visual-test-snapshot",
+  "legacyBranch": "main",
+  "chapter2Branch": "chapter2-1.0",
+  "game": {
+    "steamAppId": 387990,
+    "steamBuildId": 24529696,
+    "fileVersion": "1.0.5.876",
+    "executable": "Release/ScrapMechanic.exe",
+    "size": 28897280,
+    "sha256": "5D663BA2EC5DC8C7ABEFCC5C9344AE86F0A066C4069A91F54833524AC9A5B4F5"
+  },
+  "rendering": {
+    "eyeCount": 2,
+    "submittedWidthPerEye": 2064,
+    "submittedHeightPerEye": 2272,
+    "engineSourceWidth": 2565,
+    "engineSourceHeight": 2711,
+    "runtimeFov": "exact",
+    "rotationalGuardBand": 0,
+    "thirdSceneRender": false,
+    "mirrorSource": "already-rendered-left-eye"
+  },
+  "source": {
+    "path": "src/native_vr.cpp",
+    "sha256": "678F882BBE9DED0611D2EA01B2DF8DDC4F4BC391D258F499B50CC7CCB92C383A",
+    "reshadeApi": 18,
+    "reshadeCommit": "4a50d1eddace85734871d91792ff214f13f66c01",
+    "minhookCommit": "c3fcafdc10146beb5919319d0683e44e3c30d537",
+    "openxrHeadersCommit": "64f2b37c8c6da3d83c9b4d11865ba1fb752cb8ec",
+    "openxrLoaderCommit": "c07ad64839653712190e05dbd8cf460e1d239513"
+  },
+  "testedArtifact": {
+    "path": "payload/Release/smvr_native_vr_v1.addon64",
+    "size": 156672,
+    "sha256": "7CFB36E13C824641D3088213BF5C632FC91E3D99C3AE4993878FF66CD7B387F8"
+  },
+  "knownLimitations": [
+    "In-world performance is approximately 20 FPS on the test PC.",
+    "The PC eye mirror may freeze while the headset is active.",
+    "Fullscreen/windowed switching with an active HMD is not yet user-confirmed.",
+    "Main-menu UI is absent in VR.",
+    "Hands, controllers, tools, UI, locomotion, weapons, and gameplay interaction are out of scope."
+  ]
+}

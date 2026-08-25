@@ -1,0 +1,12 @@
+*.addon64 binary
+*.dll binary
+*.dll.a binary
+payload/Release/*.ini binary
+*.c text eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.hpp text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.ps1 text eol=lf
+*.txt text eol=lf

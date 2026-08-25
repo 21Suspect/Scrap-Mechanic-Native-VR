@@ -1,0 +1,8 @@
+/build/
+/out/
+*.log
+*.pdb
+*.ilk
+*.exp
+*.lib
+!third_party/openxr/lib/libopenxr_loader.dll.a
