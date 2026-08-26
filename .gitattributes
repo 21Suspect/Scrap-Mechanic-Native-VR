@@ -13,6 +13,11 @@
 *.yml text eol=lf
 *.ini text eol=crlf
 
+# Payload copies are SHA-256 gated by manifest.json. Keep those bytes
+# identical to the committed blobs or ValidatePayload fails after clone.
+payload/**/*.ps1 text eol=lf
+payload/**/*.ini text eol=lf
+
 *.png binary
 *.dll binary
 *.addon64 binary
