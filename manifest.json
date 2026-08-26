@@ -57,7 +57,7 @@
                   },
                   {
                       "path":  "Release\\ReShade.ini",
-                      "patchedSha256":  "8778D481E7E815CFC8527B267F3E8003A867E8AAE5BF92D666CD5E44CC313226",
+                      "patchedSha256":  "CCB7EFFB1EF60DA2D49F6EEDF86ADF3DF71D71EC12E23892C2DC33AC71C9023B",
                       "originalMayBeMissing":  true,
                       "runtimeMutable":  true,
                       "module":  "vr-runtime"
