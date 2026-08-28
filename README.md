@@ -12,6 +12,7 @@
 [![Downloads](https://img.shields.io/github/downloads/21Suspect/Scrap-Mechanic-Native-VR/total)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases)
 [![License: MIT](https://img.shields.io/badge/original_code-MIT-ffc124.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-45d6c7.svg)](#requirements)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy_Me_a_Coffee-Support-FFDD00?logo=buy-me-a-coffee&logoColor=000000)](https://buymeacoffee.com/21suspect)
 
 An experimental native OpenXR conversion for **Scrap Mechanic Survival**, built for Meta Quest 3 with Quest Link or Air Link. It adds stereoscopic rendering, tracked hands and tools, Touch-controller locomotion, optical hand tracking, VR interaction rays, spatial menus, seated camera support, and a guarded one-file installer.
 
@@ -133,6 +134,10 @@ See [Development and architecture](docs/DEVELOPMENT.md) before changing renderer
 ## Contributing
 
 Bug reports, headset compatibility results, documentation, and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and include the game build, headset/runtime, relevant log tail, and exact reproduction steps.
+
+## Support
+
+If you enjoy the project and want to support its development, you can [buy 21Suspect a coffee](https://buymeacoffee.com/21suspect).
 
 ## License and game-content notice
 
