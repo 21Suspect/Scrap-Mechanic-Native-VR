@@ -15,12 +15,18 @@
 #include <reshade.hpp>
 #include <MinHook.h>
 
+#include "feature_input.hpp"
+#include "feature_startup_menu.hpp"
+#include "vr_hands.hpp"
+#include "vr_tools.hpp"
+
 #include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cwchar>
 #include <cstring>
 #include <mutex>
 #include <string>
@@ -34,6 +40,8 @@ constexpr uintptr_t kRenderSetupRva = 0x858E20;
 constexpr uintptr_t kCameraBuildRva = 0x903F70;
 constexpr uintptr_t kFirstPersonCameraCallerRva = 0x861320;
 constexpr uintptr_t kViewmodelSkipBranchRva = 0x861324;
+constexpr uintptr_t kRaycastRva = 0x478340;
+constexpr uintptr_t kPlayerToolRaycastReturnRva = 0x456FF2;
 constexpr uint32_t kGameImageSize = 0x1C1D000;
 constexpr uint32_t kGameTimestamp = 0x6A7060DD;
 constexpr uintptr_t kFrameRendererOffset = 0x2A0;
@@ -59,15 +67,20 @@ constexpr uint8_t kCameraBuildPrefix[] = {
 };
 constexpr uint8_t kViewmodelConditionalBranch[] = { 0x0F,0x84,0x58,0x03,0x00,0x00 };
 constexpr uint8_t kViewmodelUnconditionalSkip[] = { 0xE9,0x59,0x03,0x00,0x00,0x90 };
+constexpr uint8_t kRaycastPrefix[] = {
+    0x48,0x8B,0xC4,0x48,0x89,0x58,0x10,0x48,0x89,0x70,0x18,0x48,0x89,0x78,0x20
+};
 
 using RenderSetupFn = void (__fastcall *)(void *, float, const float *, const float *, void *);
 using CameraBuildFn = void (__fastcall *)(void *, const float *, const float *, float, float, float);
+using RaycastFn = uint8_t (__fastcall *)(void *, void *, const float *, const float *, void *, void *);
 
 HMODULE g_module = nullptr;
 HMODULE g_game = nullptr;
 uintptr_t g_game_base = 0;
 std::atomic<void *> g_render_original{nullptr};
 std::atomic<void *> g_camera_build_original{nullptr};
+std::atomic<void *> g_raycast_original{nullptr};
 std::atomic<ID3D11Device *> g_device{nullptr};
 std::atomic<ID3D11DeviceContext *> g_context{nullptr};
 std::atomic<ID3D11Texture2D *> g_final_target{nullptr};
@@ -95,12 +108,37 @@ std::atomic<void *> g_last_render_manager{nullptr};
 std::atomic<bool> g_target_wrapper_diagnostic_logged{false};
 std::atomic<bool> g_highres_pc_probe_requested{false};
 std::atomic<bool> g_highres_pc_probe_done{false};
+bool g_feature_input_enabled = true;
+bool g_feature_optical_hands_enabled = true;
+bool g_feature_hands_enabled = true;
+bool g_feature_startup_menu_enabled = true;
+std::atomic<bool> g_hands_render_failure_logged{false};
+uint64_t g_hand_bridge_sequence = 0;
+uint64_t g_last_hand_bridge_publish_ms = 0;
+std::atomic<bool> g_hand_bridge_logged{false};
+bool g_previous_right_interaction = false;
+XrVector3f g_optical_hammer_previous{};
+uint64_t g_optical_hammer_previous_ms = 0;
+uint64_t g_optical_hammer_last_swing_ms = 0;
+uint64_t g_optical_hammer_swing_sequence = 0;
+XrVector3f g_optical_hammer_swing_direction{0.0f, 0.0f, -1.0f};
+uint32_t g_optical_hammer_click_publishes = 0;
+bool g_optical_hammer_armed = true;
+std::atomic<bool> g_optical_hammer_logged{false};
+bool g_right_hand_world_active = false;
+XrVector3f g_right_hand_world{};
+XrVector3f g_right_hand_forward{};
+XrVector3f g_right_hand_up{};
+uint64_t g_right_hand_world_ms = 0;
+std::atomic<bool> g_tool_raycast_logged{false};
 thread_local int g_active_eye = -1;
 thread_local uint32_t g_eye_camera_build_index = 0;
 std::mutex g_log_mutex;
 std::mutex g_xr_mutex;
 HANDLE g_log = INVALID_HANDLE_VALUE;
 std::wstring g_ini_path;
+features::InputBridge g_input;
+features::StartupMenuUi g_startup_menu;
 
 void log_line(const char *format, ...)
 {
@@ -249,6 +287,286 @@ XrVector3f rotate_vector(XrQuaternionf q, XrVector3f v)
     return {result.x,result.y,result.z};
 }
 
+bool world_to_view_matrix(const float *matrix);
+
+XrVector3f view_point_to_world(const float world_to_view[16], const XrVector3f &point)
+{
+    const XrVector3f translated{
+        point.x - world_to_view[12],
+        point.y - world_to_view[13],
+        point.z - world_to_view[14]
+    };
+    return {
+        world_to_view[0] * translated.x + world_to_view[1] * translated.y + world_to_view[2] * translated.z,
+        world_to_view[4] * translated.x + world_to_view[5] * translated.y + world_to_view[6] * translated.z,
+        world_to_view[8] * translated.x + world_to_view[9] * translated.y + world_to_view[10] * translated.z
+    };
+}
+
+XrVector3f view_vector_to_world(const float world_to_view[16], const XrVector3f &vector)
+{
+    return {
+        world_to_view[0] * vector.x + world_to_view[1] * vector.y + world_to_view[2] * vector.z,
+        world_to_view[4] * vector.x + world_to_view[5] * vector.y + world_to_view[6] * vector.z,
+        world_to_view[8] * vector.x + world_to_view[9] * vector.y + world_to_view[10] * vector.z
+    };
+}
+
+bool normalize_vector(XrVector3f &vector)
+{
+    const float length = std::sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+    if (!std::isfinite(length) || length < 0.0001f) return false;
+    vector.x /= length; vector.y /= length; vector.z /= length;
+    return true;
+}
+
+bool hand_bridge_paths(wchar_t (&path)[MAX_PATH], wchar_t (&temporary)[MAX_PATH], bool create_directory)
+{
+    wchar_t module_path[MAX_PATH]{};
+    if (!g_module || GetModuleFileNameW(g_module, module_path, MAX_PATH) == 0) return false;
+    wchar_t *slash = std::wcsrchr(module_path, L'\\');
+    if (!slash) return false;
+    *slash = L'\0';
+    wchar_t directory[MAX_PATH]{};
+    if (swprintf_s(directory, L"%s\\..\\Data\\NativeVR", module_path) < 0) return false;
+    if (create_directory) CreateDirectoryW(directory, nullptr);
+    if (swprintf_s(path, L"%s\\hand_physics.json", directory) < 0) return false;
+    if (swprintf_s(temporary, L"%s\\hand_physics.tmp", directory) < 0) return false;
+    return true;
+}
+
+bool write_atomic_file(const wchar_t *path, const wchar_t *temporary, const char *data, size_t length)
+{
+    HANDLE file = CreateFileW(temporary, GENERIC_WRITE, FILE_SHARE_READ, nullptr,
+        CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return false;
+    DWORD written = 0;
+    const bool wrote = WriteFile(file, data, static_cast<DWORD>(length), &written, nullptr) != FALSE &&
+        written == static_cast<DWORD>(length);
+    CloseHandle(file);
+    if (!wrote)
+    {
+        DeleteFileW(temporary);
+        return false;
+    }
+    if (!MoveFileExW(temporary, path, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+    {
+        DeleteFileW(temporary);
+        return false;
+    }
+    return true;
+}
+
+void remove_hand_bridge(bool reset_session = false)
+{
+    wchar_t path[MAX_PATH]{}, temporary[MAX_PATH]{};
+    if (hand_bridge_paths(path, temporary, false))
+    {
+        DeleteFileW(temporary);
+        DeleteFileW(path);
+    }
+    if (reset_session)
+    {
+        g_hand_bridge_sequence = 0;
+        g_previous_right_interaction = false;
+    }
+    g_last_hand_bridge_publish_ms = 0;
+    g_hand_bridge_logged.store(false, std::memory_order_release);
+    g_right_hand_world_active = false;
+    g_right_hand_world_ms = 0;
+}
+
+void remove_world_state_bridge()
+{
+    wchar_t hand_path[MAX_PATH]{}, hand_temporary[MAX_PATH]{};
+    if (!hand_bridge_paths(hand_path, hand_temporary, true)) return;
+    wchar_t *slash=std::wcsrchr(hand_path,L'\\');
+    if (!slash) return;
+    *slash=L'\0';
+    wchar_t path[MAX_PATH]{};
+    if (swprintf_s(path,L"%s\\world_state.json",hand_path)>=0)
+        DeleteFileW(path);
+}
+
+void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_view)
+{
+    if (!g_feature_hands_enabled || !world_to_view_matrix(game_world_to_view)) return;
+    const uint64_t now = GetTickCount64();
+
+    XrPosef poses[2]{};
+    bool optical[2]{}, interaction[2]{};
+    bool active[2]{
+        scrapvr::hands::get_pose(0, poses[0], optical[0], interaction[0]),
+        scrapvr::hands::get_pose(1, poses[1], optical[1], interaction[1])
+    };
+    if (!active[0] && !active[1])
+    {
+        // Tracking can be lost for a frame while the XR session remains alive.
+        // Keep the marker present so Lua knows VR is still authoritative and
+        // blocks a stale shot instead of silently falling back to the PC camera.
+        g_right_hand_world_active = false;
+        g_right_hand_world_ms = 0;
+        return;
+    }
+    XrVector3f world[2]{}, forward[2]{}, up[2]{};
+    const XrQuaternionf inverse_reference = conjugate(normalize(reference.orientation));
+    for (uint32_t hand = 0; hand < 2; ++hand)
+    {
+        if (!active[hand]) continue;
+        const XrVector3f delta{
+            poses[hand].position.x - reference.position.x,
+            poses[hand].position.y - reference.position.y,
+            poses[hand].position.z - reference.position.z
+        };
+        world[hand] = view_point_to_world(game_world_to_view,
+            rotate_vector(inverse_reference, delta));
+        const XrQuaternionf relative_orientation = quaternion_multiply(
+            inverse_reference, poses[hand].orientation);
+        forward[hand] = view_vector_to_world(game_world_to_view,
+            rotate_vector(relative_orientation, {0.0f, 0.0f, -1.0f}));
+        up[hand] = view_vector_to_world(game_world_to_view,
+            rotate_vector(relative_orientation, {0.0f, 1.0f, 0.0f}));
+    }
+    g_right_hand_world_active = active[1];
+    if (active[1])
+    {
+        g_right_hand_world = world[1];
+        g_right_hand_forward = forward[1];
+        g_right_hand_up = up[1];
+        g_right_hand_world_ms = now;
+    }
+
+    const bool hammer_active = scrapvr::tools::is_hammer_active();
+    if (active[1] && optical[1] && hammer_active)
+    {
+        if (g_optical_hammer_previous_ms != 0 && now > g_optical_hammer_previous_ms)
+        {
+            const uint64_t elapsed_ms = now - g_optical_hammer_previous_ms;
+            if (elapsed_ms >= 5 && elapsed_ms <= 100)
+            {
+                XrVector3f direction{
+                    poses[1].position.x - g_optical_hammer_previous.x,
+                    poses[1].position.y - g_optical_hammer_previous.y,
+                    poses[1].position.z - g_optical_hammer_previous.z
+                };
+                const float distance = std::sqrt(direction.x * direction.x + direction.y * direction.y +
+                    direction.z * direction.z);
+                const float speed = distance * (1000.0f / static_cast<float>(elapsed_ms));
+                if (speed < 0.55f) g_optical_hammer_armed = true;
+                if (g_optical_hammer_armed && speed >= 1.55f &&
+                    (g_optical_hammer_last_swing_ms == 0 || now - g_optical_hammer_last_swing_ms >= 450) &&
+                    normalize_vector(direction))
+                {
+                    XrVector3f world_direction = view_vector_to_world(game_world_to_view,
+                        rotate_vector(inverse_reference, direction));
+                    if (normalize_vector(world_direction))
+                    {
+                        g_optical_hammer_armed = false;
+                        g_optical_hammer_last_swing_ms = now;
+                        g_optical_hammer_swing_direction = world_direction;
+                        ++g_optical_hammer_swing_sequence;
+                        g_optical_hammer_click_publishes = 2;
+                        if (!g_optical_hammer_logged.exchange(true))
+                            log_line("VR_OPTICAL_HAMMER_SWING threshold_mps=1.55 rearm_mps=0.55 cooldown_ms=450");
+                    }
+                }
+            }
+        }
+        g_optical_hammer_previous = poses[1].position;
+        g_optical_hammer_previous_ms = now;
+        // Physical motion replaces pinch for the optical-hand hammer only.
+        interaction[1] = g_optical_hammer_click_publishes > 0;
+    }
+    else
+    {
+        g_optical_hammer_previous_ms = 0;
+        g_optical_hammer_armed = true;
+    }
+
+    // Keep the general hand bridge available for non-projectile VR interactions.
+    // Gun projectile origin and direction intentionally remain game-default.
+    const bool right_interaction_changed = interaction[1] != g_previous_right_interaction;
+    const uint64_t publish_interval_ms = interaction[1] ? 20u : 1000u;
+    if (!right_interaction_changed && now - g_last_hand_bridge_publish_ms < publish_interval_ms) return;
+
+    wchar_t path[MAX_PATH]{}, temporary[MAX_PATH]{};
+    if (!hand_bridge_paths(path, temporary, true)) return;
+    const bool optical_gun_trigger = optical[1] && !hammer_active && interaction[1];
+    const uint64_t hand_sequence = ++g_hand_bridge_sequence;
+    char json[1280]{};
+    const int length = std::snprintf(json, sizeof(json),
+        "{\"sequence\":%llu,\"opticalGunTrigger\":%s,\"hammerSwingSequence\":%llu,\"hammerSwingDirection\":{\"x\":%.5f,\"y\":%.5f,\"z\":%.5f},"
+        "\"left\":{\"active\":%s,\"interact\":%s,\"optical\":%s,\"x\":%.5f,\"y\":%.5f,\"z\":%.5f,\"fx\":%.5f,\"fy\":%.5f,\"fz\":%.5f,\"ux\":%.5f,\"uy\":%.5f,\"uz\":%.5f},"
+        "\"right\":{\"active\":%s,\"interact\":%s,\"optical\":%s,\"x\":%.5f,\"y\":%.5f,\"z\":%.5f,\"fx\":%.5f,\"fy\":%.5f,\"fz\":%.5f,\"ux\":%.5f,\"uy\":%.5f,\"uz\":%.5f}}",
+        static_cast<unsigned long long>(hand_sequence),
+        optical_gun_trigger ? "true" : "false",
+        static_cast<unsigned long long>(g_optical_hammer_swing_sequence),
+        g_optical_hammer_swing_direction.x, g_optical_hammer_swing_direction.y,
+        g_optical_hammer_swing_direction.z,
+        active[0] ? "true" : "false", interaction[0] ? "true" : "false", optical[0] ? "true" : "false",
+        world[0].x, world[0].y, world[0].z, forward[0].x, forward[0].y, forward[0].z,
+        up[0].x, up[0].y, up[0].z,
+        active[1] ? "true" : "false", interaction[1] ? "true" : "false", optical[1] ? "true" : "false",
+        world[1].x, world[1].y, world[1].z, forward[1].x, forward[1].y, forward[1].z,
+        up[1].x, up[1].y, up[1].z);
+    if (length <= 0 || static_cast<size_t>(length) >= sizeof(json)) return;
+    g_previous_right_interaction = interaction[1];
+    if (!write_atomic_file(path, temporary, json, static_cast<size_t>(length))) return;
+
+    g_last_hand_bridge_publish_ms = now;
+    if (g_optical_hammer_click_publishes > 0) --g_optical_hammer_click_publishes;
+    if (!g_hand_bridge_logged.exchange(true))
+    {
+        log_line("VR_HAND_BRIDGE_ACTIVE path=Data/NativeVR/hand_physics.json world_space=1 gun_projectile_override=0");
+    }
+}
+
+uint8_t __fastcall hk_raycast(void *world, void *unused, const float *origin,
+                              const float *delta, void *ignore, void *result)
+{
+    auto original = reinterpret_cast<RaycastFn>(g_raycast_original.load(std::memory_order_acquire));
+    if (!original) __fastfail(FAST_FAIL_INVALID_ARG);
+    const uintptr_t caller = reinterpret_cast<uintptr_t>(__builtin_return_address(0));
+    const uint64_t now = GetTickCount64();
+    if (g_enabled.load(std::memory_order_acquire) &&
+        caller == g_game_base + kPlayerToolRaycastReturnRva && g_right_hand_world_active &&
+        now - g_right_hand_world_ms <= 250 && origin && delta)
+    {
+        XrVector3f local_offset{0.0f, -0.035f, -0.120f};
+        scrapvr::tools::get_interaction_laser_offset(local_offset);
+        XrVector3f forward = g_right_hand_forward;
+        XrVector3f up = g_right_hand_up;
+        if (normalize_vector(forward))
+        {
+            const float projection = up.x * forward.x + up.y * forward.y + up.z * forward.z;
+            up.x -= forward.x * projection; up.y -= forward.y * projection; up.z -= forward.z * projection;
+            XrVector3f right{
+                forward.y * up.z - forward.z * up.y,
+                forward.z * up.x - forward.x * up.z,
+                forward.x * up.y - forward.y * up.x
+            };
+            const float range_squared = delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2];
+            if (normalize_vector(up) && normalize_vector(right) && std::isfinite(range_squared) &&
+                range_squared >= 0.01f && range_squared <= 400.0f)
+            {
+                const float redirected_origin[3]{
+                    g_right_hand_world.x + right.x * local_offset.x + up.x * local_offset.y - forward.x * local_offset.z,
+                    g_right_hand_world.y + right.y * local_offset.x + up.y * local_offset.y - forward.y * local_offset.z,
+                    g_right_hand_world.z + right.z * local_offset.x + up.z * local_offset.y - forward.z * local_offset.z
+                };
+                const float range = std::sqrt(range_squared);
+                const float redirected_delta[3]{forward.x * range, forward.y * range, forward.z * range};
+                if (!g_tool_raycast_logged.exchange(true))
+                    log_line("VR_ACTION_RAY_ACTIVE raycast_rva=%llx caller_rva=%llx calibrated_tool_origin=1",
+                        static_cast<unsigned long long>(kRaycastRva),
+                        static_cast<unsigned long long>(kPlayerToolRaycastReturnRva));
+                return original(world, unused, redirected_origin, redirected_delta, ignore, result);
+            }
+        }
+    }
+    return original(world, unused, origin, delta, ignore, result);
+}
+
 void quaternion_column_matrix(XrQuaternionf q, float matrix[16])
 {
     q = normalize(q);
@@ -377,9 +695,24 @@ struct EyeRenderMapping
     int32_t height = 0;
 };
 
+constexpr uint32_t kVrRenderTargetAlignment = 16;
+// A hidden culling margin was tested here, but the same foliage LOD transitions
+// are visible in the unmodified PC renderer at maximum foliage/draw distance.
+// Keep it disabled: it did not affect that engine-native behaviour and only
+// increased the two eye render costs. The aligned source target remains required
+// to avoid the confirmed odd-dimension post-process seam.
+constexpr uint32_t kVrCullingMarginPixels = 0;
+
+uint32_t align_up(uint32_t value, uint32_t alignment)
+{
+    if (alignment == 0 || value > UINT32_MAX - (alignment - 1)) return 0;
+    return (value + alignment - 1) / alignment * alignment;
+}
+
 bool build_eye_projection(const XrFovf &fov, const float *game_projection,
-                          uint32_t source_width, uint32_t source_height,
-                          float projection[16], EyeRenderMapping &mapping)
+                           uint32_t source_width, uint32_t source_height,
+                           uint32_t target_width, uint32_t target_height,
+                           float projection[16], EyeRenderMapping &mapping)
 {
     if (!perspective_matrix(game_projection)) return false;
     const float tan_left = std::tan(fov.angleLeft);
@@ -390,16 +723,26 @@ bool build_eye_projection(const XrFovf &fov, const float *game_projection,
         !std::isfinite(tan_down) || !std::isfinite(tan_up) ||
         tan_left >= -0.001f || tan_right <= 0.001f ||
         tan_down >= -0.001f || tan_up <= 0.001f ||
-        source_width < 16 || source_height < 16) return false;
+        source_width < 16 || source_height < 16 ||
+        target_width < 16 || target_height < 16 ||
+        target_width > source_width || target_height > source_height) return false;
 
     // Scrap Mechanic 1.0's cloud reconstruction and cascade-shadow setup assume
-    // a centered projection. Render the smallest centered frustum containing the
-    // runtime eye FOV, then crop the exact asymmetric tangent interval for OpenXR.
-    // This preserves the Quest projection after composition without exposing the
-    // derived engine passes to non-zero projection center terms.
-    const float symmetric_x = (std::max)(-tan_left, tan_right);
-    const float symmetric_y = (std::max)(-tan_down, tan_up);
-    if (symmetric_x < 0.001f || symmetric_y < 0.001f) return false;
+    // a centered projection. The first implementation used the smallest possible
+    // centered target (2565x2711 on Quest 3). Those odd dimensions flow through
+    // the engine's half/quarter-resolution post passes and produce a duplicated or
+    // missing center row/column. Keep the source target 16-pixel aligned and widen
+    // the centered frustum just enough that the exact runtime eye extent remains a
+    // 1:1 integer crop. This removes the odd-size post-process seam without a
+    // scaling pass, a third scene render, or a change to the submitted OpenXR FOV.
+    const float symmetric_x = (tan_right - tan_left) * static_cast<float>(source_width) /
+        (2.0f * static_cast<float>(target_width));
+    const float symmetric_y = (tan_up - tan_down) * static_cast<float>(source_height) /
+        (2.0f * static_cast<float>(target_height));
+    const float minimum_x = (std::max)(-tan_left, tan_right);
+    const float minimum_y = (std::max)(-tan_down, tan_up);
+    if (symmetric_x < minimum_x || symmetric_y < minimum_y ||
+        symmetric_x < 0.001f || symmetric_y < 0.001f) return false;
     std::memset(projection, 0, sizeof(float) * 16);
     projection[0] = 1.0f / symmetric_x;
     projection[5] = 1.0f / symmetric_y;
@@ -411,8 +754,6 @@ bool build_eye_projection(const XrFovf &fov, const float *game_projection,
     projection[15] = game_projection[15];
 
     const float ndc_left = tan_left / symmetric_x;
-    const float ndc_right = tan_right / symmetric_x;
-    const float ndc_down = tan_down / symmetric_y;
     const float ndc_up = tan_up / symmetric_y;
     const auto clamp_u32 = [](long value, uint32_t maximum) -> uint32_t {
         if (value < 0) return 0;
@@ -420,13 +761,13 @@ bool build_eye_projection(const XrFovf &fov, const float *game_projection,
         return static_cast<uint32_t>(value);
     };
     uint32_t left = clamp_u32(std::lround((ndc_left + 1.0f) * 0.5f * static_cast<float>(source_width)), source_width - 1);
-    uint32_t right = clamp_u32(std::lround((ndc_right + 1.0f) * 0.5f * static_cast<float>(source_width)), source_width);
     uint32_t top = clamp_u32(std::lround((1.0f - ndc_up) * 0.5f * static_cast<float>(source_height)), source_height - 1);
-    uint32_t bottom = clamp_u32(std::lround((1.0f - ndc_down) * 0.5f * static_cast<float>(source_height)), source_height);
-    if (right <= left + 8 || bottom <= top + 8) return false;
+    if (left > source_width - target_width || top > source_height - target_height) return false;
+    const uint32_t right = left + target_width;
+    const uint32_t bottom = top + target_height;
     mapping.source_box = {left, top, 0, right, bottom, 1};
-    mapping.width = static_cast<int32_t>(right - left);
-    mapping.height = static_cast<int32_t>(bottom - top);
+    mapping.width = static_cast<int32_t>(target_width);
+    mapping.height = static_cast<int32_t>(target_height);
     return true;
 }
 
@@ -458,6 +799,7 @@ struct EyeSwapchain
     uint32_t width = 0, height = 0;
     int64_t format = 0;
     std::vector<XrSwapchainImageD3D11KHR> images;
+    std::vector<ID3D11RenderTargetView *> render_targets;
 };
 
 bool choose_vr_source_size(const std::array<XrView,2> &views, const EyeSwapchain (&eyes)[2],
@@ -483,14 +825,110 @@ bool choose_vr_source_size(const std::array<XrView,2> &views, const EyeSwapchain
         else break;
     }
     if (width < eyes[0].width || height < eyes[0].height) return false;
-    return eye_crop_width(views[0].fov, width) == static_cast<int32_t>(eyes[0].width) &&
-        eye_crop_width(views[1].fov, width) == static_cast<int32_t>(eyes[1].width) &&
-        eye_crop_height(views[0].fov, height) == static_cast<int32_t>(eyes[0].height) &&
-        eye_crop_height(views[1].fov, height) == static_cast<int32_t>(eyes[1].height);
+    if (width > UINT32_MAX - 2 * kVrCullingMarginPixels ||
+        height > UINT32_MAX - 2 * kVrCullingMarginPixels) return false;
+    width = align_up(width + 2 * kVrCullingMarginPixels, kVrRenderTargetAlignment);
+    height = align_up(height + 2 * kVrCullingMarginPixels, kVrRenderTargetAlignment);
+    return width >= eyes[0].width && height >= eyes[0].height &&
+        width <= D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION &&
+        height <= D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION;
 }
 
 ID3D11Texture2D *refresh_present_frame_target(void *manager, uint32_t width, uint32_t height,
                                                DXGI_FORMAT format);
+
+// The mirror is also drawn immediately after the left-eye copy. The outer game
+// renderer still owns this context, so preserve every state slot touched by the
+// scaling pass. This keeps the direct pre-present path safe across window modes
+// without adding a third scene render.
+struct MirrorContextState
+{
+    ID3D11DeviceContext *context = nullptr;
+    ID3D11RenderTargetView *targets[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT]{};
+    ID3D11DepthStencilView *depth = nullptr;
+    ID3D11BlendState *blend = nullptr;
+    float blend_factor[4]{};
+    UINT sample_mask = 0xffffffffu;
+    ID3D11DepthStencilState *depth_state = nullptr;
+    UINT stencil_reference = 0;
+    ID3D11RasterizerState *rasterizer = nullptr;
+    D3D11_VIEWPORT viewports[D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE]{};
+    UINT viewport_count = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
+    D3D11_RECT scissors[D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE]{};
+    UINT scissor_count = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
+    ID3D11InputLayout *input_layout = nullptr;
+    D3D11_PRIMITIVE_TOPOLOGY topology = D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED;
+    ID3D11Buffer *vertex_buffer = nullptr;
+    UINT vertex_stride = 0, vertex_offset = 0;
+    ID3D11VertexShader *vertex_shader = nullptr;
+    ID3D11GeometryShader *geometry_shader = nullptr;
+    ID3D11HullShader *hull_shader = nullptr;
+    ID3D11DomainShader *domain_shader = nullptr;
+    ID3D11PixelShader *pixel_shader = nullptr;
+    ID3D11Buffer *vertex_constant = nullptr;
+    ID3D11ShaderResourceView *pixel_resource = nullptr;
+    ID3D11SamplerState *pixel_sampler = nullptr;
+
+    explicit MirrorContextState(ID3D11DeviceContext *value) : context(value)
+    {
+        context->OMGetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, targets, &depth);
+        context->OMGetBlendState(&blend, blend_factor, &sample_mask);
+        context->OMGetDepthStencilState(&depth_state, &stencil_reference);
+        context->RSGetState(&rasterizer);
+        context->RSGetViewports(&viewport_count, viewports);
+        context->RSGetScissorRects(&scissor_count, scissors);
+        context->IAGetInputLayout(&input_layout);
+        context->IAGetPrimitiveTopology(&topology);
+        context->IAGetVertexBuffers(0, 1, &vertex_buffer, &vertex_stride, &vertex_offset);
+        context->VSGetShader(&vertex_shader, nullptr, nullptr);
+        context->GSGetShader(&geometry_shader, nullptr, nullptr);
+        context->HSGetShader(&hull_shader, nullptr, nullptr);
+        context->DSGetShader(&domain_shader, nullptr, nullptr);
+        context->PSGetShader(&pixel_shader, nullptr, nullptr);
+        context->VSGetConstantBuffers(0, 1, &vertex_constant);
+        context->PSGetShaderResources(0, 1, &pixel_resource);
+        context->PSGetSamplers(0, 1, &pixel_sampler);
+        context->GSSetShader(nullptr, nullptr, 0);
+        context->HSSetShader(nullptr, nullptr, 0);
+        context->DSSetShader(nullptr, nullptr, 0);
+    }
+
+    ~MirrorContextState()
+    {
+        context->OMSetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, targets, depth);
+        context->OMSetBlendState(blend, blend_factor, sample_mask);
+        context->OMSetDepthStencilState(depth_state, stencil_reference);
+        context->RSSetState(rasterizer);
+        context->RSSetViewports(viewport_count, viewports);
+        context->RSSetScissorRects(scissor_count, scissors);
+        context->IASetInputLayout(input_layout);
+        context->IASetPrimitiveTopology(topology);
+        context->IASetVertexBuffers(0, 1, &vertex_buffer, &vertex_stride, &vertex_offset);
+        context->VSSetShader(vertex_shader, nullptr, 0);
+        context->GSSetShader(geometry_shader, nullptr, 0);
+        context->HSSetShader(hull_shader, nullptr, 0);
+        context->DSSetShader(domain_shader, nullptr, 0);
+        context->PSSetShader(pixel_shader, nullptr, 0);
+        context->VSSetConstantBuffers(0, 1, &vertex_constant);
+        context->PSSetShaderResources(0, 1, &pixel_resource);
+        context->PSSetSamplers(0, 1, &pixel_sampler);
+        if (pixel_sampler) pixel_sampler->Release();
+        if (pixel_resource) pixel_resource->Release();
+        if (vertex_constant) vertex_constant->Release();
+        if (pixel_shader) pixel_shader->Release();
+        if (domain_shader) domain_shader->Release();
+        if (hull_shader) hull_shader->Release();
+        if (geometry_shader) geometry_shader->Release();
+        if (vertex_shader) vertex_shader->Release();
+        if (vertex_buffer) vertex_buffer->Release();
+        if (input_layout) input_layout->Release();
+        if (rasterizer) rasterizer->Release();
+        if (depth_state) depth_state->Release();
+        if (blend) blend->Release();
+        if (depth) depth->Release();
+        for (auto *target : targets) if (target) target->Release();
+    }
+};
 
 struct OpenXrState
 {
@@ -501,6 +939,7 @@ struct OpenXrState
     XrSessionState state = XR_SESSION_STATE_UNKNOWN;
     bool running = false;
     bool initialized = false;
+    IDXGISwapChain *game_swapchain = nullptr;
     bool anchor_valid = false;
     bool eye_math_logged = false;
     XrPosef anchor_head{{0,0,0,1},{0,0,0}};
@@ -522,6 +961,15 @@ struct OpenXrState
     bool mirror_ready = false;
     bool mirror_logged = false;
     bool mirror_failed = false;
+    bool startup_desktop_ui_logged = false;
+    bool render_size_override_logged = false;
+    bool render_size_restore_logged = false;
+    uint64_t mirror_source_copies = 0;
+    uint64_t mirror_direct_draws = 0;
+    uint64_t mirror_present_draws = 0;
+    uint64_t mirror_manual_presents = 0;
+    uint64_t mirror_present_busy = 0;
+    bool mirror_manual_present_failed = false;
     uint8_t *render_size_base = nullptr;
     uint32_t original_render_width = 0;
     uint32_t original_render_height = 0;
@@ -533,6 +981,28 @@ struct OpenXrState
     bool render_size_overridden = false;
     uint32_t pending_desktop_width = 0;
     uint32_t pending_desktop_height = 0;
+    bool frame_pending = false;
+    bool pending_startup_menu_composited = false;
+    XrTime pending_display_time = 0;
+    std::array<XrView,2> pending_views{{{XR_TYPE_VIEW},{XR_TYPE_VIEW}}};
+    std::array<XrCompositionLayerProjectionView,2> pending_projection_views{{
+        {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW},
+        {XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW}
+    }};
+    uint32_t pending_indices[2]{};
+    bool pending_acquired[2]{};
+    bool pending_rendered[2]{};
+    double pending_eye_ms[2]{};
+    LARGE_INTEGER pending_render_begin{};
+    LARGE_INTEGER pending_frequency{};
+
+    void set_game_swapchain(IDXGISwapChain *value)
+    {
+        if (value == game_swapchain) return;
+        if (value) value->AddRef();
+        if (game_swapchain) game_swapchain->Release();
+        game_swapchain = value;
+    }
 
     void restore_render_size_override()
     {
@@ -558,8 +1028,12 @@ struct OpenXrState
                 sizeof(original_render_height));
             std::memcpy(render_size_base + kRenderScaleOffset, &original_render_scale,
                 sizeof(original_render_scale));
-            log_line("VR_RENDER_SIZE_RESTORED desktop=%ux%u scale=%.6f",
-                original_render_width, original_render_height, original_render_scale);
+            if (!render_size_restore_logged)
+            {
+                render_size_restore_logged=true;
+                log_line("VR_RENDER_SIZE_RESTORED desktop=%ux%u scale=%.6f",
+                    original_render_width, original_render_height, original_render_scale);
+            }
         }
         render_size_base = nullptr;
         override_render_width = override_render_height = 0;
@@ -608,8 +1082,12 @@ struct OpenXrState
             override_render_width = width;
             override_render_height = height;
             render_size_overridden = true;
-            log_line("VR_RENDER_SIZE_PERSISTENT desktop=%ux%u vr=%ux%u desktop_setting_unchanged=1",
-                original_render_width, original_render_height, width, height);
+            if (!render_size_override_logged)
+            {
+                render_size_override_logged=true;
+                log_line("VR_RENDER_SIZE_PERSISTENT desktop=%ux%u vr=%ux%u desktop_setting_unchanged=1",
+                    original_render_width, original_render_height, width, height);
+            }
         }
 
         constexpr float one = 1.0f;
@@ -746,7 +1224,8 @@ struct OpenXrState
         return true;
     }
 
-    bool mirror_left_eye(ID3D11Device *device, ID3D11DeviceContext *context, IDXGISwapChain *swapchain)
+    bool mirror_left_eye(ID3D11Device *device, ID3D11DeviceContext *context,
+                         IDXGISwapChain *swapchain, bool from_present_callback)
     {
         if (!mirror_ready || mirror_failed || !device || !context || !swapchain ||
             !mirror_view || !mirror_vertex_shader || !mirror_pixel_shader) return false;
@@ -807,6 +1286,7 @@ struct OpenXrState
             uv_transform[2] = (1.0f - uv_transform[0]) * 0.5f;
         }
 
+        MirrorContextState preserved_state(context);
         context->UpdateSubresource(mirror_constants, 0, nullptr, uv_transform, 0, 0);
         context->OMSetRenderTargets(1, &mirror_backbuffer_target, nullptr);
         context->OMSetBlendState(nullptr, nullptr, 0xffffffffu);
@@ -836,21 +1316,179 @@ struct OpenXrState
             log_line("DESKTOP_LEFT_EYE_MIRROR_ACTIVE source=%ux%u backbuffer=%ux%u third_scene_render=0",
                 eyes[0].width, eyes[0].height, description.Width, description.Height);
         }
+        uint64_t &draw_count = from_present_callback ? mirror_present_draws : mirror_direct_draws;
+        ++draw_count;
+        if (draw_count % 300 == 0)
+            log_line("DESKTOP_LEFT_EYE_MIRROR_PROGRESS route=%s draws=%llu source_copies=%llu",
+                from_present_callback ? "present_callback" : "direct_pre_present",
+                static_cast<unsigned long long>(draw_count),
+                static_cast<unsigned long long>(mirror_source_copies));
         return true;
+    }
+
+    // With the persistent VR render extent, Scrap Mechanic's internal present
+    // buffer remains eye-sized. The engine correctly refuses to copy that
+    // 2565x2711 resource into an unrelated desktop-sized backbuffer, which means
+    // it never reaches a useful desktop Present while the headset is active.
+    // The mirror pass above has already scaled the completed left eye into the
+    // real swapchain buffer, so present that buffer directly. This is one cheap
+    // desktop composite and one swapchain flip, never a third scene render.
+    // DO_NOT_WAIT keeps desktop refresh from throttling the OpenXR render loop.
+    bool present_left_eye_mirror()
+    {
+        if (!game_swapchain || !mirror_ready) return false;
+        const HRESULT hr = game_swapchain->Present(0, DXGI_PRESENT_DO_NOT_WAIT);
+        if (hr == DXGI_ERROR_WAS_STILL_DRAWING)
+        {
+            ++mirror_present_busy;
+            return true;
+        }
+        if (FAILED(hr))
+        {
+            if (!mirror_manual_present_failed)
+            {
+                mirror_manual_present_failed = true;
+                log_line("DESKTOP_LEFT_EYE_MIRROR_PRESENT_FAIL hr=%08x",
+                    static_cast<unsigned>(hr));
+            }
+            return false;
+        }
+        ++mirror_manual_presents;
+        if (mirror_manual_presents <= 4 || (mirror_manual_presents % 300) == 0)
+            log_line("DESKTOP_LEFT_EYE_MIRROR_PRESENT_OK count=%llu busy=%llu sync=0 do_not_wait=1 third_scene_render=0",
+                static_cast<unsigned long long>(mirror_manual_presents),
+                static_cast<unsigned long long>(mirror_present_busy));
+        return true;
+    }
+
+    bool finish_pending_frame(ID3D11DeviceContext *context, bool from_present_callback = false)
+    {
+        if (!frame_pending) return true;
+        const bool startup_menu_composited = pending_startup_menu_composited;
+        if (context && mirror_texture && pending_acquired[0])
+        {
+            context->CopyResource(mirror_texture, eyes[0].images[pending_indices[0]].texture);
+            mirror_ready = true;
+            ++mirror_source_copies;
+            ID3D11Device *device = g_device.load(std::memory_order_acquire);
+            if (device && game_swapchain)
+            {
+                // Only the game's real Present boundary is after its UI pass.
+                // Capturing here from the render hook reads an incomplete/stale
+                // backbuffer (and produced the cropped submenu artifacts). In
+                // startup-menu mode the frame is deferred to on_present, where
+                // the full desktop UI is copied before the VR mirror replaces it.
+                if (from_present_callback && g_feature_startup_menu_enabled &&
+                    g_startup_menu.visible())
+                    g_startup_menu.capture_native_menu(context,game_swapchain);
+                mirror_left_eye(device, context, game_swapchain, from_present_callback);
+            }
+        }
+        if (context) context->Flush();
+        if (!from_present_callback && mirror_ready && game_swapchain &&
+            !present_left_eye_mirror())
+        {
+            const uint64_t failures = g_mirror_present_failures.fetch_add(1, std::memory_order_relaxed) + 1;
+            if (!g_mirror_present_failure_logged.exchange(true, std::memory_order_acq_rel))
+                log_line("DESKTOP_LEFT_EYE_MIRROR_FAIL route=manual_present first=%llu",
+                    static_cast<unsigned long long>(failures));
+        }
+
+        XrResult release_failure = XR_SUCCESS;
+        for (uint32_t i = 0; i < 2; ++i)
+        {
+            if (!pending_acquired[i]) continue;
+            XrSwapchainImageReleaseInfo release{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
+            const XrResult result = xrReleaseSwapchainImage(eyes[i].handle, &release);
+            if (XR_FAILED(result) && XR_SUCCEEDED(release_failure)) release_failure = result;
+            pending_acquired[i] = false;
+        }
+
+        const bool both_rendered = pending_rendered[0] && pending_rendered[1];
+        XrCompositionLayerProjection layer{XR_TYPE_COMPOSITION_LAYER_PROJECTION};
+        layer.space = space;
+        layer.viewCount = 2;
+        layer.views = pending_projection_views.data();
+        const XrCompositionLayerBaseHeader *layers[] = {
+            reinterpret_cast<const XrCompositionLayerBaseHeader *>(&layer)
+        };
+        XrFrameEndInfo end{XR_TYPE_FRAME_END_INFO};
+        end.displayTime = pending_display_time;
+        end.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+        end.layerCount = both_rendered && XR_SUCCEEDED(release_failure) ? 1u : 0u;
+        end.layers = end.layerCount ? layers : nullptr;
+        const XrResult end_result = xrEndFrame(session, &end);
+        frame_pending = false;
+        pending_startup_menu_composited = false;
+        pending_display_time = 0;
+        pending_rendered[0] = pending_rendered[1] = false;
+
+        if (XR_FAILED(release_failure)) return fail("xrReleaseSwapchainImage", release_failure);
+        if (!both_rendered) return fail("both_eyes_not_rendered", XR_ERROR_RUNTIME_FAILURE);
+        if (XR_FAILED(end_result)) return fail("xrEndFrame", end_result);
+
+        LARGE_INTEGER frame_render_end{};
+        QueryPerformanceCounter(&frame_render_end);
+        const double render_ms = pending_frequency.QuadPart > 0
+            ? static_cast<double>(frame_render_end.QuadPart - pending_render_begin.QuadPart) * 1000.0 /
+                static_cast<double>(pending_frequency.QuadPart)
+            : 0.0;
+        const uint64_t completed = g_openxr_success_frames.fetch_add(1) + 1;
+        if (completed <= 10 || (completed % 120) == 0)
+            log_line("OPENXR_FRAME_SUCCESS frame=%llu left_rendered=1 right_rendered=1 xrEndFrame=0 render_ms=%.3f eye_ms=%.3f,%.3f startup_menu=%u",
+                static_cast<unsigned long long>(completed), render_ms,
+                pending_eye_ms[0], pending_eye_ms[1], startup_menu_composited ? 1u : 0u);
+        return true;
+    }
+
+    void abandon_pending_frame()
+    {
+        if (!frame_pending) return;
+        for (uint32_t i = 0; i < 2; ++i)
+        {
+            if (!pending_acquired[i]) continue;
+            XrSwapchainImageReleaseInfo release{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
+            xrReleaseSwapchainImage(eyes[i].handle, &release);
+            pending_acquired[i] = false;
+        }
+        XrFrameEndInfo end{XR_TYPE_FRAME_END_INFO};
+        end.displayTime = pending_display_time;
+        end.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+        xrEndFrame(session, &end);
+        frame_pending = false;
+        pending_display_time = 0;
+        pending_rendered[0] = pending_rendered[1] = false;
+        pending_startup_menu_composited = false;
+        g_startup_menu.reset_state();
+        log_line("VR_PENDING_FRAME_ABANDONED layers=0");
     }
 
     void destroy()
     {
+        abandon_pending_frame();
+        remove_hand_bridge(false);
         restore_render_size_override();
         restore_viewmodel_pass_patch();
         release_mirror();
         mirror_failed = false;
+        startup_desktop_ui_logged = false;
+        render_size_override_logged = false;
+        render_size_restore_logged = false;
+        g_startup_menu.shutdown();
+        g_input.shutdown();
+        scrapvr::hands::shutdown();
         if (running && session != XR_NULL_HANDLE) xrEndSession(session);
         running = false;
-        for (auto &eye : eyes) { if (eye.handle != XR_NULL_HANDLE) xrDestroySwapchain(eye.handle); eye = {}; }
+        for (auto &eye : eyes)
+        {
+            for (auto *target : eye.render_targets) if (target) target->Release();
+            if (eye.handle != XR_NULL_HANDLE) xrDestroySwapchain(eye.handle);
+            eye = {};
+        }
         if (space != XR_NULL_HANDLE) xrDestroySpace(space);
         if (session != XR_NULL_HANDLE) xrDestroySession(session);
         if (instance != XR_NULL_HANDLE) xrDestroyInstance(instance);
+        set_game_swapchain(nullptr);
         instance = XR_NULL_HANDLE; system = XR_NULL_SYSTEM_ID; session = XR_NULL_HANDLE; space = XR_NULL_HANDLE;
         initialized = false; anchor_valid = false; eye_math_logged = false; state = XR_SESSION_STATE_UNKNOWN;
         source_width = source_height = desktop_width = desktop_height = 0;
@@ -866,16 +1504,30 @@ struct OpenXrState
 
     bool initialize(ID3D11Device *device, const D3D11_TEXTURE2D_DESC &source)
     {
-        const char *extensions[] = { XR_KHR_D3D11_ENABLE_EXTENSION_NAME };
+        uint32_t extension_count = 0;
+        XrResult result = xrEnumerateInstanceExtensionProperties(nullptr, 0, &extension_count, nullptr);
+        if (XR_FAILED(result)) return fail("xrEnumerateInstanceExtensionProperties.count", result);
+        std::vector<XrExtensionProperties> extension_properties(
+            extension_count, {XR_TYPE_EXTENSION_PROPERTIES});
+        result = xrEnumerateInstanceExtensionProperties(
+            nullptr, extension_count, &extension_count, extension_properties.data());
+        if (XR_FAILED(result)) return fail("xrEnumerateInstanceExtensionProperties", result);
+        bool hand_tracking_supported = false;
+        for (const auto &extension : extension_properties)
+            if (std::strcmp(extension.extensionName, XR_EXT_HAND_TRACKING_EXTENSION_NAME) == 0)
+                hand_tracking_supported = true;
+        std::vector<const char *> extensions{XR_KHR_D3D11_ENABLE_EXTENSION_NAME};
+        if (g_feature_input_enabled && g_feature_optical_hands_enabled && hand_tracking_supported)
+            extensions.push_back(XR_EXT_HAND_TRACKING_EXTENSION_NAME);
         XrInstanceCreateInfo instance_info{XR_TYPE_INSTANCE_CREATE_INFO};
         strcpy_s(instance_info.applicationInfo.applicationName, "Scrap Mechanic Native VR v1");
         instance_info.applicationInfo.applicationVersion = 1;
         strcpy_s(instance_info.applicationInfo.engineName, "Scrap Mechanic 1.0");
         instance_info.applicationInfo.engineVersion = 876;
         instance_info.applicationInfo.apiVersion = XR_MAKE_VERSION(1,0,34);
-        instance_info.enabledExtensionCount = 1;
-        instance_info.enabledExtensionNames = extensions;
-        XrResult result = xrCreateInstance(&instance_info, &instance);
+        instance_info.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+        instance_info.enabledExtensionNames = extensions.data();
+        result = xrCreateInstance(&instance_info, &instance);
         if (XR_FAILED(result)) return fail("xrCreateInstance", result);
 
         XrInstanceProperties properties{XR_TYPE_INSTANCE_PROPERTIES};
@@ -920,6 +1572,18 @@ struct OpenXrState
         space_info.poseInReferenceSpace.orientation.w = 1.0f;
         result = xrCreateReferenceSpace(session, &space_info, &space);
         if (XR_FAILED(result)) return fail("xrCreateReferenceSpace", result);
+        features::InputConfig input_config{};
+        input_config.enabled = g_feature_input_enabled;
+        input_config.optical_hand_tracking = g_feature_optical_hands_enabled;
+        input_config.stick_deadzone = static_cast<float>(
+            GetPrivateProfileIntW(L"Features", L"StickDeadzonePercent", 30, g_ini_path.c_str())) / 100.0f;
+        input_config.horizontal_turn_speed = static_cast<float>(
+            GetPrivateProfileIntW(L"Features", L"HorizontalTurnSpeed", 36, g_ini_path.c_str()));
+        input_config.vertical_turn_speed = static_cast<float>(
+            GetPrivateProfileIntW(L"Features", L"VerticalTurnSpeed", 28, g_ini_path.c_str()));
+        if (!g_input.initialize(instance, session, space, input_config,
+                hand_tracking_supported && g_feature_optical_hands_enabled))
+            return fail("feature_input_initialize", XR_ERROR_INITIALIZATION_FAILED);
 
         uint32_t view_count = 0;
         result = xrEnumerateViewConfigurationViews(instance, system, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, 0, &view_count, nullptr);
@@ -976,6 +1640,42 @@ struct OpenXrState
             result = xrEnumerateSwapchainImages(eyes[i].handle, image_count, &image_count,
                 reinterpret_cast<XrSwapchainImageBaseHeader *>(eyes[i].images.data()));
             if (XR_FAILED(result)) return fail("xrEnumerateSwapchainImages", result);
+            if (g_feature_hands_enabled || g_feature_startup_menu_enabled)
+            {
+                eyes[i].render_targets.resize(image_count, nullptr);
+                for (uint32_t image = 0; image < image_count; ++image)
+                {
+                    D3D11_RENDER_TARGET_VIEW_DESC target_desc{};
+                    target_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+                    target_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+                    target_desc.Texture2D.MipSlice = 0;
+                    const HRESULT target_hr = device->CreateRenderTargetView(
+                        eyes[i].images[image].texture, &target_desc, &eyes[i].render_targets[image]);
+                    if (FAILED(target_hr) || !eyes[i].render_targets[image])
+                    {
+                        log_line("FAIL stage=eye_hand_render_target eye=%u image=%u hr=%08x",
+                            i, image, static_cast<unsigned>(target_hr));
+                        return false;
+                    }
+                }
+            }
+        }
+        if (g_feature_hands_enabled && !scrapvr::hands::initialize(device, log_line))
+        {
+            scrapvr::hands::shutdown();
+            g_feature_hands_enabled = false;
+            log_line("VR_FEATURE_HANDS_DISABLED reason=renderer_initialization_failed visual_stereo_continues=1");
+        }
+        std::wstring startup_menu_asset = g_ini_path;
+        const size_t startup_menu_separator = startup_menu_asset.find_last_of(L"\\/");
+        startup_menu_asset.resize(startup_menu_separator == std::wstring::npos ? 0 : startup_menu_separator + 1);
+        startup_menu_asset += L"ScrapMechanicVR-StartupMenu.png";
+        if (g_feature_startup_menu_enabled &&
+            !g_startup_menu.initialize(device, startup_menu_asset.c_str()))
+        {
+            g_startup_menu.shutdown();
+            g_feature_startup_menu_enabled = false;
+            log_line("VR_FEATURE_STARTUP_MENU_DISABLED reason=renderer_initialization_failed visual_stereo_continues=1");
         }
         if (!initialize_mirror(device))
         {
@@ -1004,19 +1704,33 @@ struct OpenXrState
             {
                 const auto &changed = *reinterpret_cast<const XrEventDataSessionStateChanged *>(&event);
                 state = changed.state;
+                g_input.on_session_state(state);
                 log_line("XR_SESSION_STATE state=%d", static_cast<int>(state));
                 if (state == XR_SESSION_STATE_READY && !running)
                 {
+                    remove_hand_bridge(false);
                     XrSessionBeginInfo begin{XR_TYPE_SESSION_BEGIN_INFO};
                     begin.primaryViewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
                     result = xrBeginSession(session, &begin);
-                    if (XR_SUCCEEDED(result)) { running = true; anchor_valid = false; log_line("XR_SESSION_RUNNING"); }
+                    if (XR_SUCCEEDED(result))
+                    {
+                        running = true; anchor_valid = false;
+                        g_startup_menu.reset_world_anchor();
+                        g_startup_menu.reset_state();
+                        log_line("XR_SESSION_RUNNING");
+                    }
                     else fail("xrBeginSession", result);
                 }
                 else if (state == XR_SESSION_STATE_STOPPING && running)
                 {
+                    // No frame may remain begun when the runtime transitions to
+                    // STOPPING. Close a deferred UI frame before ending session.
+                    abandon_pending_frame();
                     result = xrEndSession(session);
                     running = false; anchor_valid = false;
+                    g_startup_menu.reset_world_anchor();
+                    g_startup_menu.reset_state();
+                    remove_hand_bridge(false);
                     restore_render_size_override();
                     restore_viewmodel_pass_patch();
                     if (XR_FAILED(result)) fail("xrEndSession", result);
@@ -1024,6 +1738,9 @@ struct OpenXrState
                 else if (state == XR_SESSION_STATE_EXITING || state == XR_SESSION_STATE_LOSS_PENDING)
                 {
                     running = false;
+                    g_startup_menu.reset_world_anchor();
+                    g_startup_menu.reset_state();
+                    remove_hand_bridge(false);
                     restore_render_size_override();
                     restore_viewmodel_pass_patch();
                     g_failed.store(true); log_line("FAIL stage=session_exit_or_loss state=%d", static_cast<int>(state));
@@ -1035,7 +1752,6 @@ struct OpenXrState
     bool render_stereo(RenderSetupFn original, void *renderer, float scalar, const float *game_world_to_view,
                        const float *game_projection, void *settings, ID3D11DeviceContext *context, ID3D11Texture2D *source)
     {
-        poll_events();
         if (!running || g_failed.load())
         {
             restore_render_size_override();
@@ -1092,6 +1808,38 @@ struct OpenXrState
             return abort_frame("xrLocateViews", result);
         }
 
+        XrPosef head_pose = views[0].pose;
+        head_pose.position = {
+            (views[0].pose.position.x + views[1].pose.position.x) * 0.5f,
+            (views[0].pose.position.y + views[1].pose.position.y) * 0.5f,
+            (views[0].pose.position.z + views[1].pose.position.z) * 0.5f
+        };
+        if (g_feature_startup_menu_enabled) g_startup_menu.update_visibility();
+        g_input.set_startup_menu(g_feature_startup_menu_enabled && g_startup_menu.visible(),
+            g_feature_startup_menu_enabled && g_startup_menu.pointer_active());
+        scrapvr::tools::set_render_suppressed(
+            g_feature_startup_menu_enabled && g_startup_menu.visible());
+        if (!g_input.sync(frame_state.predictedDisplayTime, head_pose))
+            log_line("VR_FEATURE_INPUT_FRAME_INCONCLUSIVE visual_stereo_continues=1");
+        if (g_input.consume_recenter_request())
+        {
+            anchor_valid = false;
+            eye_math_logged = false;
+            g_startup_menu.reset_world_anchor();
+            log_line("VR_RECENTER_APPLIED camera_anchor_reset=1 render_path_unchanged=1");
+        }
+        for (uint32_t hand = 0; hand < 2; ++hand)
+        {
+            const auto &tracked = g_input.hand(hand);
+            scrapvr::hands::set_pose(hand, tracked.pose,
+                g_feature_hands_enabled && tracked.active, tracked.optical);
+            scrapvr::hands::set_finger_articulation(
+                hand, tracked.finger_curls.data(),
+                reinterpret_cast<const float (*)[3]>(tracked.finger_bends.data()),
+                tracked.precise_fingers);
+            scrapvr::hands::set_interaction(hand, tracked.interaction);
+            scrapvr::hands::set_firing(hand, tracked.firing);
+        }
         if (!frame_state.shouldRender)
         {
             restore_render_size_override();
@@ -1110,9 +1858,10 @@ struct OpenXrState
         {
             if (!choose_vr_source_size(views, eyes, source_width, source_height))
                 return abort_frame("recommended_resolution_mapping", XR_ERROR_VALIDATION_FAILURE);
-            log_line("VR_RENDER_RESOLUTION desktop=%ux%u engine_offscreen=%ux%u submitted=%ux%u,%ux%u policy=runtime_recommended_exact guard_band=0",
+            log_line("VR_RENDER_RESOLUTION desktop=%ux%u engine_offscreen=%ux%u submitted=%ux%u,%ux%u policy=runtime_recommended_exact guard_band=0 source_alignment=%u hidden_culling_margin=%u",
                 desktop_width, desktop_height, source_width, source_height,
-                eyes[0].width, eyes[0].height, eyes[1].width, eyes[1].height);
+                eyes[0].width, eyes[0].height, eyes[1].width, eyes[1].height,
+                kVrRenderTargetAlignment, kVrCullingMarginPixels);
         }
 
         if (!anchor_valid)
@@ -1125,9 +1874,18 @@ struct OpenXrState
                 (views[0].pose.position.z + views[1].pose.position.z) * 0.5f
             };
             anchor_valid = true;
+            if (g_feature_startup_menu_enabled) g_startup_menu.set_world_anchor(anchor_head);
             log_line("CAMERA_ANCHOR view_translation=%.4f,%.4f,%.4f reference_yaw=(%.6f,%.6f,%.6f,%.6f)",
                 anchor_game.m[12], anchor_game.m[13], anchor_game.m[14], anchor_head.orientation.x,
                 anchor_head.orientation.y, anchor_head.orientation.z, anchor_head.orientation.w);
+        }
+        publish_hand_bridge(anchor_head, game_world_to_view);
+        if (g_feature_startup_menu_enabled)
+        {
+            g_startup_menu.update_pointer(
+                g_input.pointer_pose(1), g_input.pointer_pose_active(1));
+            g_startup_menu.update_interaction(
+                g_input.ui_select_down(), g_input.ui_scroll_axis());
         }
 
         uint32_t indices[2]{};
@@ -1170,7 +1928,7 @@ struct OpenXrState
             EyeRenderMapping mapping{};
             if (!build_tracking_view(anchor_head, views[i].pose, tracking_view) ||
                 !build_eye_projection(views[i].fov, game_projection, source_width, source_height,
-                    eye_projection, mapping))
+                    eyes[i].width, eyes[i].height, eye_projection, mapping))
                 return abort_frame("eye_camera_build", XR_ERROR_VALIDATION_FAILURE);
             if (mapping.width != static_cast<int32_t>(eyes[i].width) ||
                 mapping.height != static_cast<int32_t>(eyes[i].height))
@@ -1196,12 +1954,6 @@ struct OpenXrState
                 return abort_frame("present_target_reacquire", XR_ERROR_RUNTIME_FAILURE);
             context->CopySubresourceRegion(eyes[i].images[indices[i]].texture, 0, 0, 0, 0,
                 eye_source, 0, &mapping.source_box);
-            if (i == 0 && mirror_texture)
-            {
-                context->CopySubresourceRegion(mirror_texture, 0, 0, 0, 0,
-                    eye_source, 0, &mapping.source_box);
-                mirror_ready = true;
-            }
             LARGE_INTEGER eye_end{};
             QueryPerformanceCounter(&eye_end);
             if (performance_frequency.QuadPart > 0)
@@ -1217,10 +1969,11 @@ struct OpenXrState
 
             if (!eye_math_logged)
             {
-                log_line("EYE_CAMERA eye=%u pose_pos=%.6f,%.6f,%.6f pose_q=%.6f,%.6f,%.6f,%.6f runtime_fov=%.6f,%.6f,%.6f,%.6f submitted_fov=runtime_exact guard_band=0 view_t=%.6f,%.6f,%.6f projection=%.6f,%.6f,%.6f,%.6f depth=%.6f,%.6f,%.6f,%.6f crop=%u,%u,%u,%u extent=%d,%d temporal_scalar=%.6f",
+                log_line("EYE_CAMERA eye=%u pose_pos=%.6f,%.6f,%.6f pose_q=%.6f,%.6f,%.6f,%.6f runtime_fov=%.6f,%.6f,%.6f,%.6f submitted_fov=runtime_exact guard_band=0 hidden_culling_margin=%u view_t=%.6f,%.6f,%.6f projection=%.6f,%.6f,%.6f,%.6f depth=%.6f,%.6f,%.6f,%.6f crop=%u,%u,%u,%u extent=%d,%d temporal_scalar=%.6f",
                     i, views[i].pose.position.x, views[i].pose.position.y, views[i].pose.position.z,
                     views[i].pose.orientation.x, views[i].pose.orientation.y, views[i].pose.orientation.z, views[i].pose.orientation.w,
                     views[i].fov.angleLeft, views[i].fov.angleRight, views[i].fov.angleUp, views[i].fov.angleDown,
+                    kVrCullingMarginPixels,
                     eye_world_to_view[12], eye_world_to_view[13], eye_world_to_view[14],
                     eye_projection[0], eye_projection[5], eye_projection[8], eye_projection[9],
                     eye_projection[10], eye_projection[11], eye_projection[14], eye_projection[15],
@@ -1228,45 +1981,73 @@ struct OpenXrState
                     mapping.source_box.bottom, mapping.width, mapping.height, eye_scalar);
             }
         }
-        eye_math_logged = true;
-        context->Flush();
-        XrResult release_failure = XR_SUCCESS;
-        for (uint32_t i = 0; i != 2; ++i)
+        // Keep every feature overlay outside the two engine scene calls. The
+        // startup menu is a deterministic world-space asset, not a captured
+        // renderer surface, so it can be composited immediately with no deferred
+        // Present hook and no third scene render. Hands render afterwards and
+        // therefore remain visually in front while pointing.
+        bool startup_menu_composited = false;
+        if (g_feature_startup_menu_enabled && g_startup_menu.visible())
         {
-            if (acquired[i])
+            ID3D11RenderTargetView *menu_targets[2]{};
+            uint32_t menu_widths[2]{eyes[0].width,eyes[1].width};
+            uint32_t menu_heights[2]{eyes[0].height,eyes[1].height};
+            for (uint32_t eye=0; eye<2; ++eye)
+                if (indices[eye]<eyes[eye].render_targets.size())
+                    menu_targets[eye]=eyes[eye].render_targets[indices[eye]];
+            startup_menu_composited=g_startup_menu.render(context,views.data(),menu_targets,
+                menu_widths,menu_heights);
+        }
+        // Keep every feature overlay outside the two engine scene calls. In
+        // particular, no hand/tool D3D state can leak from the left overlay into
+        // the right engine render (clouds, shadows and post passes stay symmetric).
+        if (g_feature_hands_enabled &&
+            (g_input.hand(0).active || g_input.hand(1).active))
+        {
+            for (uint32_t i = 0; i < 2; ++i)
             {
-                XrSwapchainImageReleaseInfo release{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
-                result = xrReleaseSwapchainImage(eyes[i].handle, &release);
-                if (XR_FAILED(result) && XR_SUCCEEDED(release_failure)) release_failure = result;
-                acquired[i] = false;
+                if (indices[i] >= eyes[i].render_targets.size() ||
+                    !scrapvr::hands::render(context, eyes[i].render_targets[indices[i]],
+                        eyes[i].width, eyes[i].height, views[i]))
+                {
+                    if (!g_hands_render_failure_logged.exchange(true))
+                        log_line("VR_FEATURE_HANDS_RENDER_FAILED eye=%u visual_stereo_continues=1", i);
+                }
             }
         }
-        if (XR_FAILED(release_failure)) return abort_frame("xrReleaseSwapchainImage", release_failure);
-        if (!rendered[0] || !rendered[1]) return fail("both_eyes_not_rendered", XR_ERROR_RUNTIME_FAILURE);
+        eye_math_logged = true;
+        frame_pending = true;
+        pending_display_time = frame_state.predictedDisplayTime;
+        pending_startup_menu_composited = startup_menu_composited;
+        pending_views = views;
+        pending_projection_views = projection_views;
+        pending_render_begin = frame_render_begin;
+        pending_frequency = performance_frequency;
+        for (uint32_t i = 0; i < 2; ++i)
+        {
+            pending_indices[i] = indices[i];
+            pending_acquired[i] = acquired[i];
+            acquired[i] = false;
+            pending_rendered[i] = rendered[i];
+            pending_eye_ms[i] = eye_render_ms[i];
+        }
 
-        XrCompositionLayerProjection layer{XR_TYPE_COMPOSITION_LAYER_PROJECTION};
-        layer.space = space;
-        layer.viewCount = 2;
-        layer.views = projection_views.data();
-        const XrCompositionLayerBaseHeader *layers[] = {reinterpret_cast<const XrCompositionLayerBaseHeader *>(&layer)};
-        XrFrameEndInfo end{XR_TYPE_FRAME_END_INFO};
-        end.displayTime = frame_state.predictedDisplayTime;
-        end.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
-        end.layerCount = 1;
-        end.layers = layers;
-        result = xrEndFrame(session, &end);
-        if (XR_FAILED(result)) return fail("xrEndFrame", result);
-        LARGE_INTEGER frame_render_end{};
-        QueryPerformanceCounter(&frame_render_end);
-        const double render_ms = performance_frequency.QuadPart > 0
-            ? static_cast<double>(frame_render_end.QuadPart - frame_render_begin.QuadPart) * 1000.0 /
-                static_cast<double>(performance_frequency.QuadPart)
-            : 0.0;
-        const uint64_t completed = g_openxr_success_frames.fetch_add(1) + 1;
-        if (completed <= 10 || (completed % 120) == 0)
-            log_line("OPENXR_FRAME_SUCCESS frame=%llu left_rendered=1 right_rendered=1 xrEndFrame=0 render_ms=%.3f eye_ms=%.3f,%.3f",
-                static_cast<unsigned long long>(completed), render_ms, eye_render_ms[0], eye_render_ms[1]);
-        return true;
+        if (g_feature_startup_menu_enabled && g_startup_menu.visible())
+        {
+            // The game draws its native menus after this renderer call. Restore
+            // the desktop extent for that UI/present phase, then let the ReShade
+            // Present callback capture the completed 1920x1080 UI. The following
+            // VR frame reapplies the Quest render extent for both eye renders.
+            restore_render_size_override();
+            if (!startup_desktop_ui_logged)
+            {
+                startup_desktop_ui_logged=true;
+                log_line("VR_STARTUP_MENU_DESKTOP_UI_PHASE desktop=%ux%u vr_source=%ux%u deferred_to_present=1",
+                    desktop_width,desktop_height,source_width,source_height);
+            }
+            return true;
+        }
+        return finish_pending_frame(context, false);
     }
 };
 
@@ -1585,8 +2366,17 @@ void __fastcall hk_render_setup(void *renderer, float scalar, const float *world
         D3D11_TEXTURE2D_DESC desc{}; target->GetDesc(&desc);
         if (!g_xr.initialize(device, desc))
         {
+            // Initialization may already own an instance, session, swapchains, or
+            // input action spaces. Release the partial transaction before leaving
+            // the hook so a later process/session can never hit XR_LIMIT_REACHED.
+            g_xr.destroy();
             return;
         }
+    }
+    // Close any prior frame before processing a possible STOPPING transition.
+    if (g_xr.frame_pending)
+    {
+        if (!g_xr.finish_pending_frame(context)) return;
     }
     g_xr.poll_events();
     if (!g_xr.running)
@@ -1693,8 +2483,13 @@ void on_present(reshade::api::command_queue *, reshade::api::swapchain *swapchai
     if (!native_swapchain || !device || !context) return;
 
     std::lock_guard lock(g_xr_mutex);
-    if (!g_xr.initialized || !g_xr.running || !g_xr.mirror_ready) return;
-    if (!g_xr.mirror_left_eye(device, context, native_swapchain))
+    g_xr.set_game_swapchain(native_swapchain);
+    if (!g_xr.initialized || !g_xr.running) return;
+    const bool completed_pending=g_xr.frame_pending;
+    if (completed_pending && !g_xr.finish_pending_frame(context, true)) return;
+    if (completed_pending) return;
+    if (!g_xr.mirror_ready) return;
+    if (!g_xr.mirror_left_eye(device, context, native_swapchain, true))
     {
         const uint64_t failures = g_mirror_present_failures.fetch_add(1, std::memory_order_relaxed) + 1;
         if (!g_mirror_present_failure_logged.exchange(true, std::memory_order_acq_rel))
@@ -1707,6 +2502,8 @@ void on_destroy_swapchain(reshade::api::swapchain *swapchain, bool resize)
 {
     if (!swapchain) return;
     std::lock_guard lock(g_xr_mutex);
+    if (g_xr.frame_pending) g_xr.abandon_pending_frame();
+    g_startup_menu.reset_state();
     // IDXGISwapChain::ResizeBuffers requires every direct and indirect reference
     // to the old backbuffers to be released. The PC left-eye mirror owns an RTV
     // and canonical IUnknown for the current buffer, so release those at ReShade's
@@ -1714,6 +2511,7 @@ void on_destroy_swapchain(reshade::api::swapchain *swapchain, bool resize)
     // alive at their exact runtime-recommended extent.
     g_xr.release_mirror_backbuffer();
     g_xr.mirror_ready = false;
+    g_xr.set_game_swapchain(nullptr);
     // The renderer bootstrap also retains the desktop backbuffer's canonical
     // IUnknown solely for resource-identity matching. It is another DXGI buffer
     // reference and must be dropped before ResizeBuffers. The next render hook
@@ -1732,6 +2530,7 @@ void on_init_swapchain(reshade::api::swapchain *swapchain, bool resize)
     DXGI_SWAP_CHAIN_DESC desc{};
     const HRESULT hr = native_swapchain ? native_swapchain->GetDesc(&desc) : E_POINTER;
     std::lock_guard lock(g_xr_mutex);
+    g_xr.set_game_swapchain(native_swapchain);
     if (SUCCEEDED(hr) && desc.BufferDesc.Width != 0 && desc.BufferDesc.Height != 0)
     {
         if (resize)
@@ -1764,10 +2563,13 @@ bool validate_build()
         nt->OptionalHeader.SizeOfImage != kGameImageSize || nt->FileHeader.TimeDateStamp != kGameTimestamp) return false;
     const void *entry = reinterpret_cast<const void *>(g_game_base + kRenderSetupRva);
     const void *camera_entry = reinterpret_cast<const void *>(g_game_base + kCameraBuildRva);
+    const void *raycast_entry = reinterpret_cast<const void *>(g_game_base + kRaycastRva);
     const void *viewmodel_branch = reinterpret_cast<const void *>(g_game_base + kViewmodelSkipBranchRva);
     return readable(entry, sizeof(kRenderPrefix)) && std::memcmp(entry, kRenderPrefix, sizeof(kRenderPrefix)) == 0 &&
         readable(camera_entry, sizeof(kCameraBuildPrefix)) &&
         std::memcmp(camera_entry, kCameraBuildPrefix, sizeof(kCameraBuildPrefix)) == 0 &&
+        readable(raycast_entry, sizeof(kRaycastPrefix)) &&
+        std::memcmp(raycast_entry, kRaycastPrefix, sizeof(kRaycastPrefix)) == 0 &&
         readable(viewmodel_branch, sizeof(kViewmodelConditionalBranch)) &&
         std::memcmp(viewmodel_branch, kViewmodelConditionalBranch, sizeof(kViewmodelConditionalBranch)) == 0;
 }
@@ -1777,8 +2579,10 @@ bool install_hook()
     if (MH_Initialize() != MH_OK) return false;
     void *render_target = reinterpret_cast<void *>(g_game_base + kRenderSetupRva);
     void *camera_target = reinterpret_cast<void *>(g_game_base + kCameraBuildRva);
+    void *raycast_target = reinterpret_cast<void *>(g_game_base + kRaycastRva);
     void *render_original = nullptr;
     void *camera_original = nullptr;
+    void *raycast_original = nullptr;
     if (MH_CreateHook(render_target, reinterpret_cast<void *>(hk_render_setup), &render_original) != MH_OK || !render_original)
     {
         MH_Uninitialize();
@@ -1790,13 +2594,24 @@ bool install_hook()
         MH_Uninitialize();
         return false;
     }
-    g_render_original.store(render_original, std::memory_order_release);
-    g_camera_build_original.store(camera_original, std::memory_order_release);
-    if (MH_EnableHook(MH_ALL_HOOKS) != MH_OK)
+    if (MH_CreateHook(raycast_target, reinterpret_cast<void *>(hk_raycast), &raycast_original) != MH_OK ||
+        !raycast_original)
     {
         MH_RemoveHook(camera_target);
         MH_RemoveHook(render_target);
+        MH_Uninitialize();
+        return false;
+    }
+    g_render_original.store(render_original, std::memory_order_release);
+    g_camera_build_original.store(camera_original, std::memory_order_release);
+    g_raycast_original.store(raycast_original, std::memory_order_release);
+    if (MH_EnableHook(MH_ALL_HOOKS) != MH_OK)
+    {
+        MH_RemoveHook(raycast_target);
+        MH_RemoveHook(camera_target);
+        MH_RemoveHook(render_target);
         g_camera_build_original.store(nullptr, std::memory_order_release);
+        g_raycast_original.store(nullptr, std::memory_order_release);
         g_render_original.store(nullptr, std::memory_order_release);
         MH_Uninitialize();
         return false;
@@ -1818,6 +2633,14 @@ void initialize_paths()
     g_highres_pc_probe_requested.store(
         GetPrivateProfileIntW(L"Diagnostic", L"HighResolutionProbe", 0, g_ini_path.c_str()) == 1,
         std::memory_order_release);
+    g_feature_input_enabled =
+        GetPrivateProfileIntW(L"Features", L"Input", 1, g_ini_path.c_str()) == 1;
+    g_feature_optical_hands_enabled =
+        GetPrivateProfileIntW(L"Features", L"OpticalHandTracking", 1, g_ini_path.c_str()) == 1;
+    g_feature_hands_enabled =
+        GetPrivateProfileIntW(L"Features", L"Hands", 1, g_ini_path.c_str()) == 1;
+    g_feature_startup_menu_enabled =
+        GetPrivateProfileIntW(L"Features", L"StartupMenuUI", 1, g_ini_path.c_str()) == 1;
 }
 } // namespace smvr
 
@@ -1828,6 +2651,8 @@ extern "C" __declspec(dllexport) BOOL AddonInit(HMODULE addon_module, HMODULE re
 {
     smvr::g_module = addon_module;
     smvr::initialize_paths();
+    smvr::remove_hand_bridge(true);
+    smvr::remove_world_state_bridge();
     smvr::log_line("SMVR_V1_START enabled=%u game_build=24529696 exe_sha256=5D663BA2...A5B4F5", smvr::g_enabled.load() ? 1u : 0u);
     if (!smvr::validate_build()) { smvr::log_line("FAIL stage=validate_build"); return FALSE; }
     if (!reshade::register_addon(addon_module, reshade_module))
@@ -1855,7 +2680,11 @@ extern "C" __declspec(dllexport) BOOL AddonInit(HMODULE addon_module, HMODULE re
         smvr::restore_viewmodel_pass_patch();
         return FALSE;
     }
-    smvr::log_line("HOOK_INSTALLED rva=%llx", static_cast<unsigned long long>(smvr::kRenderSetupRva));
+    smvr::log_line("HOOKS_INSTALLED render_rva=%llx camera_rva=%llx raycast_rva=%llx tool_caller_rva=%llx",
+        static_cast<unsigned long long>(smvr::kRenderSetupRva),
+        static_cast<unsigned long long>(smvr::kCameraBuildRva),
+        static_cast<unsigned long long>(smvr::kRaycastRva),
+        static_cast<unsigned long long>(smvr::kPlayerToolRaycastReturnRva));
     return TRUE;
 }
 
@@ -1870,6 +2699,7 @@ extern "C" __declspec(dllexport) void AddonUninit(HMODULE addon_module, HMODULE 
     MH_DisableHook(MH_ALL_HOOKS);
     MH_RemoveHook(MH_ALL_HOOKS);
     smvr::g_camera_build_original.store(nullptr, std::memory_order_release);
+    smvr::g_raycast_original.store(nullptr, std::memory_order_release);
     smvr::g_render_original.store(nullptr, std::memory_order_release);
     MH_Uninitialize();
     if (!smvr::restore_viewmodel_pass_patch()) smvr::g_failed.store(true, std::memory_order_release);

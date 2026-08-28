@@ -5,4 +5,6 @@
 *.ilk
 *.exp
 *.lib
+__pycache__/
+*.py[cod]
 !third_party/openxr/lib/libopenxr_loader.dll.a

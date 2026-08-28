@@ -12,25 +12,26 @@ using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyTitle("Scrap Mechanic VR Chapter 2 Patcher")]
-[assembly: AssemblyDescription("One-file installer, launcher, verifier, and restorer for the Scrap Mechanic Chapter 2 VR visual snapshot")]
+[assembly: AssemblyTitle("Scrap Mechanic VR Chapter 2 Beta Patcher")]
+[assembly: AssemblyDescription("Installer, verifier, repair manager, and restorer for Scrap Mechanic Chapter 2 VR")]
 [assembly: AssemblyCompany("Scrap Mechanic VR Community Project")]
 [assembly: AssemblyProduct("Scrap Mechanic VR Chapter 2")]
-[assembly: AssemblyVersion("0.1.2.0")]
-[assembly: AssemblyFileVersion("0.1.2.0")]
+[assembly: AssemblyVersion("0.3.0.0")]
+[assembly: AssemblyFileVersion("0.3.0.0")]
 
 namespace ScrapMechanicVRPatcher
 {
     internal static class BuildInfo
     {
-        internal const string Version = "0.1.2-chapter2-20260825";
+        internal const string Version = "0.3.0-chapter2-beta-20260829";
         internal const string GameBuild = "24529696";
         internal const string GameExeHash = "5D663BA2EC5DC8C7ABEFCC5C9344AE86F0A066C4069A91F54833524AC9A5B4F5";
-        internal const string AddonHash = "7CFB36E13C824641D3088213BF5C632FC91E3D99C3AE4993878FF66CD7B387F8";
+        internal const string AddonHash = "F2A9476A481F55D3BF2C5BFB98239091FA82D0B09C39F48D91A1FF123C392CF1";
         internal const string DxgiHash = "EC9245D05C11751F2AC0D2256E6921AD8FB36BE9172EF6D587856591EB729A25";
         internal const string LoaderHash = "018C6519AFBDEADE6DA9E7D59C406068DD58674D87A65AE27353484A05E6674A";
-        internal const string ManifestHash = "1949886B4F5A61F55B6C2A5556C26E172F00A0FBE506CB611BB08B3E50C7EDD0";
-        internal const int ManagedFileCount = 7;
+        internal const string ManifestHash = "17410376C239C21DD1BB251BAD3F1C46FA119EB4900891451FBF251428FBF9A8";
+        internal const string PatcherHash = "1EFFC0087C231808CDB825918D710C2577B0B664564EE6B5200386AA9A8684C2";
+        internal const int ManagedFileCount = 28;
         internal const string ResourceName = "ScrapMechanicVR.Payload.zip";
     }
 
@@ -85,6 +86,7 @@ namespace ScrapMechanicVRPatcher
             string manifest = Path.Combine(PackageDirectory, "manifest.json");
             string addon = Path.Combine(PackageDirectory, "payload", "Release", "smvr_native_vr_v1.addon64");
             return File.Exists(PatcherPath) && File.Exists(manifest) && File.Exists(addon) &&
+                   String.Equals(Hashing.Sha256(PatcherPath), BuildInfo.PatcherHash, StringComparison.OrdinalIgnoreCase) &&
                    String.Equals(Hashing.Sha256(manifest), BuildInfo.ManifestHash, StringComparison.OrdinalIgnoreCase) &&
                    String.Equals(Hashing.Sha256(addon), BuildInfo.AddonHash, StringComparison.OrdinalIgnoreCase);
         }
@@ -114,9 +116,11 @@ namespace ScrapMechanicVRPatcher
 
                 string stagedManifest = Path.Combine(temporaryDirectory, "manifest.json");
                 string stagedAddon = Path.Combine(temporaryDirectory, "payload", "Release", "smvr_native_vr_v1.addon64");
-                if (!File.Exists(Path.Combine(temporaryDirectory, "Patcher.ps1")) ||
+                string stagedPatcher = Path.Combine(temporaryDirectory, "Patcher.ps1");
+                if (!File.Exists(stagedPatcher) ||
                     !File.Exists(stagedManifest) ||
                     !File.Exists(stagedAddon) ||
+                    !String.Equals(Hashing.Sha256(stagedPatcher), BuildInfo.PatcherHash, StringComparison.OrdinalIgnoreCase) ||
                     !String.Equals(Hashing.Sha256(stagedManifest), BuildInfo.ManifestHash, StringComparison.OrdinalIgnoreCase) ||
                     !String.Equals(Hashing.Sha256(stagedAddon), BuildInfo.AddonHash, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("The embedded VR payload failed its integrity check.");
@@ -497,7 +501,7 @@ namespace ScrapMechanicVRPatcher
 
         internal MainForm()
         {
-            Text = "Scrap Mechanic VR Chapter 2 - Installer and Launcher";
+            Text = "Scrap Mechanic VR Chapter 2 - Beta";
             ClientSize = new Size(900, 700);
             MinimumSize = new Size(916, 739);
             StartPosition = FormStartPosition.CenterScreen;
@@ -523,7 +527,7 @@ namespace ScrapMechanicVRPatcher
             Controls.Add(brand);
 
             Label title = new Label();
-            title.Text = "Scrap Mechanic Native VR — Chapter 2";
+            title.Text = "Scrap Mechanic Native VR — Chapter 2 Beta";
             title.Font = new Font("Segoe UI Semibold", 21F, FontStyle.Bold);
             title.ForeColor = PrimaryText;
             title.AutoSize = true;
@@ -531,7 +535,7 @@ namespace ScrapMechanicVRPatcher
             Controls.Add(title);
 
             Label subtitle = new Label();
-            subtitle.Text = "VISUAL TEST SNAPSHOT  /  SCRAP MECHANIC 1.0  /  META QUEST 3";
+            subtitle.Text = "CHAPTER 2 BETA  /  SCRAP MECHANIC 1.0  /  META QUEST 3";
             subtitle.AutoSize = true;
             subtitle.Font = new Font("Segoe UI Semibold", 8.5F, FontStyle.Bold);
             subtitle.ForeColor = MutedText;
@@ -786,9 +790,9 @@ namespace ScrapMechanicVRPatcher
             bool installed = compatible && GameLocator.LooksInstalled(root);
             bool managedInstall = compatible && GameLocator.HasManagedInstall(root);
             modStatus.Text = installed && managedInstall
-                ? "●  VR MOD   Chapter 2 snapshot installed — " + BuildInfo.ManagedFileCount + " managed files"
+                ? "●  VR MOD   Unconfirmed feature candidate installed — " + BuildInfo.ManagedFileCount + " managed files"
                 : installed
-                    ? "●  VR MOD   Matching manual snapshot found — Install will adopt it safely"
+                    ? "●  VR MOD   Matching manual feature candidate found — Install will adopt it safely"
                 : managedInstall
                     ? "●  VR MOD   Installation is incomplete or modified — Restore & Reinstall is available"
                     : "●  VR MOD   Not installed";
@@ -820,7 +824,7 @@ namespace ScrapMechanicVRPatcher
         {
             string root = gamePath.Text.Trim();
             if (MessageBox.Show(this,
-                "Install the verified VR snapshot into:\n\n" + root +
+                "Install the Chapter 2 VR beta into:\n\n" + root +
                 "\n\nAny existing managed installation will be restored first. Modified managed files are preserved under LocalAppData before originals are restored. ScrapMechanic.exe and saves are never modified.",
                 "Install Scrap Mechanic VR — Chapter 2", MessageBoxButtons.OKCancel, MessageBoxIcon.Information) != DialogResult.OK)
                 return;
@@ -837,7 +841,7 @@ namespace ScrapMechanicVRPatcher
                 Shortcuts.Install(root);
                 Append("Installation completed and desktop/Start Menu launchers were created.");
                 MessageBox.Show(this,
-                    "The Chapter 2 visual VR snapshot is installed.\n\nStart Meta Quest Link, connect the headset, then use the new 'Start Scrap Mechanic VR - Chapter 2' shortcut.",
+                    "The Chapter 2 VR beta is installed.\n\nStart Meta Quest Link, connect the headset, then use the new 'Start Scrap Mechanic VR - Chapter 2' shortcut.",
                     "Installation complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Win32Exception ex)

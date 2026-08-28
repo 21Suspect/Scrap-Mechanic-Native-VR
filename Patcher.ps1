@@ -150,6 +150,21 @@ function Assert-GameClosed {
     }
 }
 
+function Clear-CompiledDataCache([string]$Root) {
+    # Scrap Mechanic 1.0 does not invalidate this bundle when loose Lua files
+    # are replaced. Leaving it in place makes the engine execute the previous
+    # cached player callbacks, so the active-item bridge never reaches native
+    # VR. This generated cache is rebuilt on the next launch.
+    $cache = Join-Path $Root 'Cache\Bundle\core_data.cbo'
+    if (Test-Path -LiteralPath $cache -PathType Leaf) {
+        Remove-Item -LiteralPath $cache -Force
+        if (Test-Path -LiteralPath $cache) {
+            throw "Could not invalidate the compiled game-data cache: $cache"
+        }
+        Write-Host 'Invalidated Cache\Bundle\core_data.cbo; Scrap Mechanic will rebuild it on next launch.' -ForegroundColor Green
+    }
+}
+
 function Get-NormalizedRoot([string]$Path) {
     if ([string]::IsNullOrWhiteSpace($Path)) { return $null }
     try {
@@ -297,6 +312,8 @@ function Install-Patch([string]$Root, $Manifest) {
             Write-Host "Installed $($entry.path)"
         }
 
+        Clear-CompiledDataCache $Root
+
         $state = [ordered]@{
             patchId = [string]$Manifest.patchId
             patchVersion = [string]$Manifest.patchVersion
@@ -419,6 +436,8 @@ function Repair-PatchTargets([string]$Root, $Manifest) {
     else {
         Write-Host 'No stale VR-managed files needed removal.' -ForegroundColor Green
     }
+
+    Clear-CompiledDataCache $Root
 
     if ($needsSteam.Count -gt 0) {
         Write-Host "Steam must restore $($needsSteam.Count) original game file(s):" -ForegroundColor Yellow
@@ -635,6 +654,7 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
             Write-Host "Removed $($record.path)"
         }
     }
+    Clear-CompiledDataCache $Root
     Remove-Item -LiteralPath $statePath -Force
     foreach ($relativeDirectory in @($Manifest.directories) | Sort-Object Length -Descending) {
         $directory = Join-Path $Root $relativeDirectory

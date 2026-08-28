@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "patchId": "scrap-mechanic-native-vr-chapter2",
-  "patchVersion": "0.1.2-installer-20260825",
-  "description": "Visual-only native OpenXR VR snapshot for Scrap Mechanic Chapter 2 / 1.0",
+  "patchVersion": "0.3.0-chapter2-beta-20260829",
+  "description": "Chapter 2 beta for Scrap Mechanic 1.0.5.876 with native OpenXR stereo rendering, tracked Quest hands and tools, calibrated Chapter 2 weapon visuals, stock projectile behavior, white barrel lasers, an exact world-locked copy of the live native menu, controller and hand-tracking UI input through Scrap Mechanic's private input-event queue, and transparent native menu fade composition without Windows mouse simulation",
   "game": {
     "appId": "387990",
     "buildId": "24529696",
@@ -48,16 +48,175 @@
     },
     {
       "path": "Release\\ScrapMechanicVR.ini",
-      "patchedSha256": "844190C4EF4CAF3BC17F1F84E861F936DF21496E32324337EC6EC01CAE553D7F",
+      "patchedSha256": "2C7EB5FE1CEED68B3CCBEAB98E35550B7BDB84E09DA49455D00626A2B6C14BE3",
       "originalMayBeMissing": true,
       "runtimeMutable": true,
       "module": "chapter2-vr-config"
     },
     {
       "path": "Release\\smvr_native_vr_v1.addon64",
-      "patchedSha256": "7CFB36E13C824641D3088213BF5C632FC91E3D99C3AE4993878FF66CD7B387F8",
+      "patchedSha256": "F2A9476A481F55D3BF2C5BFB98239091FA82D0B09C39F48D91A1FF123C392CF1",
       "originalMayBeMissing": true,
       "module": "chapter2-native-openxr"
+    },
+    {
+      "path": "Release\\ScrapMechanicVR-StartupMenu.png",
+      "patchedSha256": "7AA0BFC116336D2C8BDB9377AA254B4001352EBE1F43AE88D776941D494E6191",
+      "originalMayBeMissing": true,
+      "module": "chapter2-vr-startup-menu"
+    },
+    {
+      "path": "Release\\ScrapMechanicVR-ClayCalibration.exe",
+      "patchedSha256": "F73FE2BD1619A0A26CDB54FD9382A74167EC9B7B55B8711158E43EBC7B01374E",
+      "originalMayBeMissing": true,
+      "module": "chapter2-clay-live-calibrator"
+    },
+    {
+      "path": "Release\\ScrapMechanicVR-ClayCalibration.ini",
+      "patchedSha256": "B2B600FC8174426D0C6A3836588405A8ECB593814B5151AF875C8790FF91E52F",
+      "originalMayBeMissing": true,
+      "runtimeMutable": true,
+      "module": "chapter2-clay-live-calibration"
+    },
+    {
+      "path": "Survival\\Scripts\\game\\Chapter2VR.lua",
+      "patchedSha256": "3954CFA7F96A997E26F5B5F5F14C9C9893BF9E31411A87745A1F5D35721DDD91",
+      "originalMayBeMissing": true,
+      "module": "chapter2-gameplay-bridge"
+    },
+    {
+      "path": "Survival\\Scripts\\game\\NativeVRConfig.lua",
+      "patchedSha256": "31EF810E6BB6EC1062BA97AE6738660013D294F100CDBC0449F18351FFA11633",
+      "originalMayBeMissing": true,
+      "module": "chapter2-gameplay-config"
+    },
+    {
+      "path": "Data\\Scripts\\game\\CreativePlayer.lua",
+      "patchedSha256": "837E10A5D616EBB695C2D97B5A5F0F2E86D9246774ADE0EF69EAF1FB248A3E46",
+      "originalSha256": [
+        "990D04427B2F6CD18B5F50655CD7139244C378DEA74FE4D35E7E86F9A19346A1"
+      ],
+      "module": "chapter2-vr-creative-player"
+    },
+    {
+      "path": "Data\\Gui\\Resolutions\\1280x720\\MainMenu\\gui_mainmenu_logo.png",
+      "patchedSha256": "C761339EBD5E30E4D3A05EDDDFD2F5A7CCB93A082A1E7DB39401985AE22646E4",
+      "originalSha256": [
+        "AD40995CAA7498C67B88AAE06BADB402D3746312CCD4995DEF1D81978DD70190"
+      ],
+      "module": "chapter2-vr-desktop-logo"
+    },
+    {
+      "path": "Data\\Gui\\Resolutions\\1920x1080\\MainMenu\\gui_mainmenu_logo.png",
+      "patchedSha256": "E15A08A45ECBACEFFE35D8533092F692CC96FCDB7A7B843D7C4AD1764686E604",
+      "originalSha256": [
+        "6A37A80C5ECA354E1C87D1CA7AD7D07900549F3358D0BB1BE3434FD75E08DB61"
+      ],
+      "module": "chapter2-vr-desktop-logo"
+    },
+    {
+      "path": "Data\\Gui\\Resolutions\\2560x1440\\MainMenu\\gui_mainmenu_logo.png",
+      "patchedSha256": "06A16301BD1D84132608CEE35095B7F32535D62BE7E70A9E8643AAA6B62FC48D",
+      "originalSha256": [
+        "B79D70423DFDD6445AC52DDE36555EA75589F2796DEBDAB825031DE3724739C3"
+      ],
+      "module": "chapter2-vr-desktop-logo"
+    },
+    {
+      "path": "Data\\Gui\\Resolutions\\3840x2160\\MainMenu\\gui_mainmenu_logo.png",
+      "patchedSha256": "9F2E6CB512182135DB446A016458B289EB15272A37196552CAF69DC634B9F504",
+      "originalSha256": [
+        "CD02F74FF72E151AF66912B652400D4CFF2F02DA0801145D943AE42EA82EAB24"
+      ],
+      "module": "chapter2-vr-desktop-logo"
+    },
+    {
+      "path": "Data\\Scripts\\game\\Lift.lua",
+      "patchedSha256": "F25D6EFC16DFC2A3468415E219877811C3E773432ABAD3EA170E2C1BAAC32E1C",
+      "originalSha256": [
+        "DE2AEDF154B5038CA3C190BB238E369014293A95B50BC74B18F58748A770914B"
+      ],
+      "module": "chapter2-vr-lift"
+    },
+    {
+      "path": "Survival\\Scripts\\game\\SurvivalPlayer.lua",
+      "patchedSha256": "1A88F5492318E34FEACDC3D0D5DBF2D6BB68440ABD3249BF61FC824711BCFF71",
+      "originalSha256": [
+        "E63BCD36B3DAB7445A3BDF4663BDC94A2AD5ADEBEF4B61F825B704C18B697A4F"
+      ],
+      "module": "chapter2-vr-player"
+    },
+    {
+      "path": "Survival\\Scripts\\game\\interactables\\ElevatorButton.lua",
+      "patchedSha256": "CACFB093F8D255F36DCC49861F060F496CCC42563696D05715A1C9C456B59EAA",
+      "originalSha256": [
+        "9110316FD8C40D952C4DFCEA5784D51A788E475B62F2D468FA89A2F132BD7EF4"
+      ],
+      "module": "chapter2-vr-interaction"
+    },
+    {
+      "path": "Survival\\Scripts\\game\\interactables\\ElevatorCallButton.lua",
+      "patchedSha256": "70D6D101CA7D11D2E175C993B9E113D13B8D24DFDD4F76FE6D3D6A95C36732FF",
+      "originalSha256": [
+        "73D2FC0801044860650E8BD466ADFAD3F6C6AE34BB31154FBEAF114930B1F375"
+      ],
+      "module": "chapter2-vr-interaction"
+    },
+    {
+      "path": "Survival\\Scripts\\game\\tools\\Sledgehammer.lua",
+      "patchedSha256": "CB4660ED8682415453F943FC819B5AAA50D18823B19E520452484CFC05709AA5",
+      "originalSha256": [
+        "97A2276EBE249FC49B8A702F8B78D12226D37192DF5BAACD526B653B4088C9BA"
+      ],
+      "module": "chapter2-vr-tools"
+    },
+    {
+      "path": "Survival\\Scripts\\game\\tools\\PotatoRifle.lua",
+      "patchedSha256": "47CBA003A163FB15D37A62BC927FB011D67E4AB8572831E4A5B46E9D3A3F6BFD",
+      "originalSha256": [
+        "7171B88E820B473D0FBE4AA9239C0C8B1CE760A1D726777041543F85D9B5CF24"
+      ],
+      "module": "chapter2-vr-weapons"
+    },
+    {
+      "path": "Survival\\Scripts\\game\\tools\\PotatoShotgun.lua",
+      "patchedSha256": "395D05FFD99A7C736D1EE52D165091AC4FB6321C2937EE58DA7E4B3C6C0CF087",
+      "originalSha256": [
+        "CDA6C48343C575CF12E48C09AF4243750B2F6E969EBD6641132DBBE41A579C04"
+      ],
+      "module": "chapter2-vr-weapons"
+    },
+    {
+      "path": "Survival\\Scripts\\game\\tools\\PotatoGatling.lua",
+      "patchedSha256": "CF697AAD4C698DFC1027AF07048A136E59E5FBACCF6ABC87A4B188BF186BEEEB",
+      "originalSha256": [
+        "9968041EE2BDEC0D20F5CC848A568683870D4B71B29F16A8B1C3C2E87D67B06B"
+      ],
+      "module": "chapter2-vr-weapons"
+    },
+    {
+      "path": "Survival\\Scripts\\game\\tools\\ScrapPotatoRifle.lua",
+      "patchedSha256": "68FC80CA2154EE714DA486973F77BE82BCE3B6A026CE4F9F4A47B5A1560F9BF6",
+      "originalSha256": [
+        "639CC94E6E0DF5D10A532DC54B306D0307E126C595A5379B16EAF61F49CCFB40"
+      ],
+      "module": "chapter2-vr-weapons"
+    },
+    {
+      "path": "Survival\\Scripts\\game\\tools\\PotatoLauncher.lua",
+      "patchedSha256": "D2EFCF241A0006429B6DA60F894DAC932849CB2C569ACCBE713EB6E15DB176AD",
+      "originalSha256": [
+        "D819DE13E42708FC9A28CAD4C12865839F10A83B6E018F591D3359DDBAC60A36"
+      ],
+      "module": "chapter2-vr-weapons"
+    },
+    {
+      "path": "Survival\\Scripts\\game\\tools\\ClayRifle.lua",
+      "patchedSha256": "580BAE887E51A926FC5E647107FF8EB010FD5E4EC95011B38D54C19E0A185E4A",
+      "originalSha256": [
+        "2303E03C184E187530CEA093F2352C86CA3B5EF3515CE39482EC3B416D9D98BC"
+      ],
+      "module": "chapter2-vr-weapons"
     }
   ],
   "legacyFiles": [
@@ -77,60 +236,6 @@
       "path": "NativeVR\\Start-NativeVR.ps1",
       "patchedSha256": "6CEBF723518297CFC7126746CF06B9A53E7FB19E2926877F302381ECD8FD8E28",
       "originalMayBeMissing": true,
-      "module": "legacy-build-22163681"
-    },
-    {
-      "path": "Survival\\Scripts\\game\\NativeVRConfig.lua",
-      "patchedSha256": "EB40319FD777E45F4689A355BE7A9593E556DCEB2368E1A4F2E48BAA8C85F9C3",
-      "originalMayBeMissing": true,
-      "module": "legacy-build-22163681"
-    },
-    {
-      "path": "Data\\Scripts\\game\\Lift.lua",
-      "patchedSha256": "841C4E0250ABE1ABD00BBA9EDCF47293847638BB40EFCCF77408D5B72A962737",
-      "originalSha256": ["DE2AEDF154B5038CA3C190BB238E369014293A95B50BC74B18F58748A770914B"],
-      "module": "legacy-build-22163681"
-    },
-    {
-      "path": "Survival\\Scripts\\game\\SurvivalPlayer.lua",
-      "patchedSha256": "C8256E3B38C00EDDC796FAA8DA65F5B5A98203E5BDB5FAA9DF419686ED4762E5",
-      "originalSha256": ["E63BCD36B3DAB7445A3BDF4663BDC94A2AD5ADEBEF4B61F825B704C18B697A4F"],
-      "module": "legacy-build-22163681"
-    },
-    {
-      "path": "Survival\\Scripts\\game\\interactables\\ElevatorButton.lua",
-      "patchedSha256": "4335070022EC7C62F11CA5D7B111DB91B8FDA1756156F1B6CCE3B83B0BBC19F2",
-      "originalSha256": ["9110316FD8C40D952C4DFCEA5784D51A788E475B62F2D468FA89A2F132BD7EF4"],
-      "module": "legacy-build-22163681"
-    },
-    {
-      "path": "Survival\\Scripts\\game\\interactables\\ElevatorCallButton.lua",
-      "patchedSha256": "514CF786A7BF050A7C8108B19C1C48BB7845F9989DEFEB39ACE8576D1DEB9CF1",
-      "originalSha256": ["73D2FC0801044860650E8BD466ADFAD3F6C6AE34BB31154FBEAF114930B1F375"],
-      "module": "legacy-build-22163681"
-    },
-    {
-      "path": "Survival\\Scripts\\game\\tools\\PotatoGatling.lua",
-      "patchedSha256": "E733C3BB1F3362FE0117C523924D6B2F87E20377EC346D5C7DDC75F144A876DB",
-      "originalSha256": ["9968041EE2BDEC0D20F5CC848A568683870D4B71B29F16A8B1C3C2E87D67B06B"],
-      "module": "legacy-build-22163681"
-    },
-    {
-      "path": "Survival\\Scripts\\game\\tools\\PotatoRifle.lua",
-      "patchedSha256": "27116EB54C590C663240DBDE8208789B30218EC388FE3AB589B1AA04368C2485",
-      "originalSha256": ["7171B88E820B473D0FBE4AA9239C0C8B1CE760A1D726777041543F85D9B5CF24"],
-      "module": "legacy-build-22163681"
-    },
-    {
-      "path": "Survival\\Scripts\\game\\tools\\PotatoShotgun.lua",
-      "patchedSha256": "88501D020825F8FC30E30A82F820813A6C1ED2494A2555298A0EDA3BF48A5858",
-      "originalSha256": ["CDA6C48343C575CF12E48C09AF4243750B2F6E969EBD6641132DBBE41A579C04"],
-      "module": "legacy-build-22163681"
-    },
-    {
-      "path": "Survival\\Scripts\\game\\tools\\Sledgehammer.lua",
-      "patchedSha256": "411CA3BE022B4CB15E62C89F7C95891C5BACA0FD17CA99495C77FDECF27A03C6",
-      "originalSha256": ["97A2276EBE249FC49B8A702F8B78D12226D37192DF5BAACD526B653B4088C9BA"],
       "module": "legacy-build-22163681"
     }
   ]

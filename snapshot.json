@@ -1,8 +1,10 @@
 {
-  "snapshot": "chapter2-v0.1.0-test",
-  "status": "quest-3-human-confirmed-visual-test-snapshot",
+  "snapshot": "chapter2-v0.3.0-beta",
+  "status": "quest-3-user-confirmed-chapter2-beta",
   "legacyBranch": "main",
   "chapter2Branch": "chapter2-1.0",
+  "localFeatureBranch": "chapter2-feature-port",
+  "localFeatureStatus": "promoted-to-chapter2-beta-after-headset-testing",
   "game": {
     "steamAppId": 387990,
     "steamBuildId": 24529696,
@@ -24,7 +26,7 @@
   },
   "source": {
     "path": "src/native_vr.cpp",
-    "sha256": "678F882BBE9DED0611D2EA01B2DF8DDC4F4BC391D258F499B50CC7CCB92C383A",
+    "sha256": "6F6FEB0E08F2838A6B3CF408BA765AB53AC0ECD3AE1A650A7B35E72585B250B1",
     "reshadeApi": 18,
     "reshadeCommit": "4a50d1eddace85734871d91792ff214f13f66c01",
     "minhookCommit": "c3fcafdc10146beb5919319d0683e44e3c30d537",
@@ -33,14 +35,72 @@
   },
   "testedArtifact": {
     "path": "payload/Release/smvr_native_vr_v1.addon64",
-    "size": 156672,
-    "sha256": "7CFB36E13C824641D3088213BF5C632FC91E3D99C3AE4993878FF66CD7B387F8"
+    "size": 4016128,
+    "sha256": "F2A9476A481F55D3BF2C5BFB98239091FA82D0B09C39F48D91A1FF123C392CF1"
+  },
+  "localCandidateArtifact": {
+    "version": "0.3.0-chapter2-beta-20260829",
+    "path": "payload/Release/smvr_native_vr_v1.addon64",
+    "size": 4016128,
+    "sha256": "F2A9476A481F55D3BF2C5BFB98239091FA82D0B09C39F48D91A1FF123C392CF1",
+    "headsetConfirmed": true,
+    "source": {
+      "nativeVrSha256": "6F6FEB0E08F2838A6B3CF408BA765AB53AC0ECD3AE1A650A7B35E72585B250B1",
+      "featureInputSha256": "77DDB941B0027344939565BAE98336A5851583B201D944C4BB65D30C859601AE",
+      "featureInputHeaderSha256": "6BB69293658A3D8938BF922FEC9A555CEF9900873B81F7A8FE77BF4162CFC8E4",
+      "engineInputSha256": "7E42A655339628C71657FA5CE9F1E0328865570D1F0D0516762D66E52DCCFC43",
+      "engineInputHeaderSha256": "45E786AC11CFB4D0E0F4FF1E8A93C8E39D42E2CD4ACC97F44ACED7050528B500",
+      "startupMenuSha256": "E4D99874D9633C8B63A268E58F3A3B9993ECD0A5F440348034F4180741A6522C",
+      "startupMenuHeaderSha256": "58BC5DB102FBD784006828A7601A76B39BD160BBC9F96A8E8DDF6158018C2B61",
+      "vrHandsSha256": "3242E7B46BA8D02C9DA30570672B0081E211895FCD4E2AFCE536AED47D6CB426",
+      "vrToolsSha256": "AB2522B84F16A1B02337CC342C9794D880B3A54C590A3CB16907336F926D93CA",
+      "mechanicHandsAssetSha256": "2FBD78C8DFDE75EE5990A64BCB030B05213CC984B23C5A178506498CDD0354FC",
+      "nativeToolAssetSha256": "EC2DC32C3933895B71D9469A859A28E938E55165DAA1AE42313EC1C973B96CEB",
+      "chapter2ToolAssetSha256": "8DFD5A51BFFEC3F45E3FE57F714354E7CB24AB3C38BF1461BB16BF3E43DB1183",
+      "mechanicHandsGeneratorSha256": "2795AD1C628BA0EDF689D86C7D4B13C14BD5022D5AE8086D138AA9B8EBAEE181",
+      "chapter2ToolGeneratorSha256": "74BADC890EF7652F85EF9EA54EBEEED7A10B3D098B6B742C76A7122F7BF3793A",
+      "chapter2GameplayBridgeSha256": "3954CFA7F96A997E26F5B5F5F14C9C9893BF9E31411A87745A1F5D35721DDD91",
+      "clayCalibrationHelperSourceSha256": "1258A507DCD596E64D3DD101255C5538551AEF3E872313D64BB34A0FD3A40A17",
+      "weaponScriptSha256": {
+        "PotatoRifle.lua": "47CBA003A163FB15D37A62BC927FB011D67E4AB8572831E4A5B46E9D3A3F6BFD",
+        "PotatoShotgun.lua": "395D05FFD99A7C736D1EE52D165091AC4FB6321C2937EE58DA7E4B3C6C0CF087",
+        "PotatoGatling.lua": "CF697AAD4C698DFC1027AF07048A136E59E5FBACCF6ABC87A4B188BF186BEEEB",
+        "ScrapPotatoRifle.lua": "68FC80CA2154EE714DA486973F77BE82BCE3B6A026CE4F9F4A47B5A1560F9BF6",
+        "PotatoLauncher.lua": "D2EFCF241A0006429B6DA60F894DAC932849CB2C569ACCBE713EB6E15DB176AD",
+        "ClayRifle.lua": "580BAE887E51A926FC5E647107FF8EB010FD5E4EC95011B38D54C19E0A185E4A"
+      }
+    }
+  },
+  "localCandidateValidation": {
+    "date": "2026-08-29",
+    "pcVrEnabled": false,
+    "durationSeconds": 0,
+    "samples": 0,
+    "nonresponsiveSamples": 0,
+    "processRestarts": 0,
+    "normalExit": false,
+    "addonFailed": false,
+    "stereoFrames": 0,
+    "xrSuccessFrames": 0,
+    "metaRuntimeLoaded": false,
+    "installerManagedFiles": 28,
+    "headsetConfirmed": true,
+    "clayCalibrationHeadsetConfirmed": true,
+    "weaponAimHeadsetConfirmed": false
   },
   "knownLimitations": [
-    "In-world performance is approximately 20 FPS on the test PC.",
-    "The PC eye mirror may freeze while the headset is active.",
-    "Fullscreen/windowed switching with an active HMD is not yet user-confirmed.",
-    "Main-menu UI is absent in VR.",
-    "Hands, controllers, tools, UI, locomotion, weapons, and gameplay interaction are out of scope."
-  ]
+    "Gun projectiles intentionally retain stock Scrap Mechanic 1.0 PC-crosshair origin and direction; white VR barrel lasers are visual only.",
+    "The desktop left-eye mirror may freeze while the HMD is active even though headset rendering continues.",
+    "Fullscreen/windowed switching with an active HMD is less thoroughly confirmed than normal windowed play.",
+    "The floating native UI covers the startup/main-menu flow; a complete in-world spatial HUD and backpack rework is not included.",
+    "The beta is locked to Steam build 24529696 and the installer is unsigned."
+  ],
+  "localInstaller": {
+    "version": "0.3.0-chapter2-beta-20260829",
+    "path": "dist/ScrapMechanicVR-Chapter2-Patcher.exe",
+    "size": 6857728,
+    "sha256": "E434B408B30ECE40A22690C1E1D0AFD039D49AC5C4E5878408FF8BD9199E1F7C",
+    "selfTest": "PASS",
+    "published": true
+  }
 }

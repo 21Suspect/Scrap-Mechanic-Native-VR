@@ -16,8 +16,45 @@ target_include_directories(minhook
   PRIVATE third_party/minhook/src third_party/minhook/src/hde
 )
 
-add_library(smvr_native_vr_v1 SHARED src/native_vr.cpp)
+set(SMVR_RUNTIME_SOURCES
+  src/native_vr.cpp
+  src/feature_engine_input.cpp
+  src/feature_input.cpp
+  src/feature_startup_menu.cpp
+  source/NativeVR/src/vr_hands.cpp
+  source/NativeVR/src/vr_tools.cpp
+)
+
+# VR pointer input must enter through Scrap Mechanic's private event queue.
+# Fail configuration if a Windows mouse-injection path is ever reintroduced.
+set(SMVR_FORBIDDEN_MOUSE_TOKENS
+  "INPUT_MOUSE"
+  "MOUSEEVENTF_"
+  "mouse_event("
+  "SetCursorPos("
+  "PostMessageW("
+  "PostMessageA("
+  "WM_MOUSEMOVE"
+  "WM_LBUTTON"
+  "WM_RBUTTON"
+  "WM_MBUTTON"
+  "WM_XBUTTON"
+  "WM_MOUSEWHEEL"
+)
+foreach(source IN LISTS SMVR_RUNTIME_SOURCES)
+  file(READ "${CMAKE_CURRENT_SOURCE_DIR}/${source}" source_text)
+  foreach(token IN LISTS SMVR_FORBIDDEN_MOUSE_TOKENS)
+    string(FIND "${source_text}" "${token}" token_offset)
+    if(NOT token_offset EQUAL -1)
+      message(FATAL_ERROR
+        "Windows mouse simulation is forbidden: found '${token}' in ${source}")
+    endif()
+  endforeach()
+endforeach()
+
+add_library(smvr_native_vr_v1 SHARED ${SMVR_RUNTIME_SOURCES})
 target_include_directories(smvr_native_vr_v1 PRIVATE
+  source/NativeVR/src
   third_party/reshade
   third_party/openxr/include
   third_party/minhook/include
@@ -29,7 +66,7 @@ target_compile_definitions(smvr_native_vr_v1 PRIVATE
 )
 target_compile_options(smvr_native_vr_v1 PRIVATE -Wall -Wextra)
 target_link_libraries(smvr_native_vr_v1 PRIVATE
-  minhook d3d11 dxgi
+  minhook d3d11 dxgi windowscodecs ole32
   "${CMAKE_CURRENT_SOURCE_DIR}/third_party/openxr/lib/libopenxr_loader.dll.a"
 )
 set_target_properties(smvr_native_vr_v1 PROPERTIES
