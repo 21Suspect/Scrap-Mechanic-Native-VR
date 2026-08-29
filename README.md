@@ -6,6 +6,8 @@
 >
 > [Download the Chapter 2 beta installer](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/raw/chapter2-1.0/dist/ScrapMechanicVR-Chapter2-Patcher.exe)
 >
+> [Watch the Chapter 2 VR Mod showcase on YouTube](https://www.youtube.com/watch?v=jzslO2oT12I)
+>
 > The release documented below is the legacy version for old Steam build `22163681` and will not install on the current game. The Chapter 2 beta currently focuses on native stereo visuals and head tracking; controllers, hands, UI, and gameplay interaction are still in development.
 
 [![Latest release](https://img.shields.io/github/v/release/21Suspect/Scrap-Mechanic-Native-VR?display_name=tag&sort=semver)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases/latest)
