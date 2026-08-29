@@ -1,17 +1,10 @@
-# Scrap Mechanic Native VR
+# Scrap Mechanic Native VR — Legacy pre-1.0 build
 
-> ## Scrap Mechanic 1.0 / Chapter 2 beta is available
+> This branch is preserved for the old Scrap Mechanic Steam build `22163681`.
 >
-> **Most players should use the new [Chapter 2 / 1.0 beta](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/tree/chapter2-1.0), which supports current Steam build `24529696`.**
->
-> [Download the Chapter 2 beta installer](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/raw/chapter2-1.0/dist/ScrapMechanicVR-Chapter2-Patcher.exe)
->
-> [Watch the Chapter 2 VR Mod showcase on YouTube](https://www.youtube.com/watch?v=jzslO2oT12I)
->
-> The release documented below is the legacy version for old Steam build `22163681` and will not install on the current game. The Chapter 2 beta currently focuses on native stereo visuals and head tracking; controllers, hands, UI, and gameplay interaction are still in development.
+> Players on the current Chapter 2 / 1.0 game should use the **[current VR mod on `main`](https://github.com/21Suspect/Scrap-Mechanic-Native-VR)** and its **[one-click installer](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/raw/refs/heads/main/dist/ScrapMechanicVR-Installer.exe)**.
 
-[![Latest release](https://img.shields.io/github/v/release/21Suspect/Scrap-Mechanic-Native-VR?display_name=tag&sort=semver)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/21Suspect/Scrap-Mechanic-Native-VR/total)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases)
+[![Legacy release](https://img.shields.io/badge/legacy-v1.17.0-777777.svg)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases/tag/v1.17.0)
 [![License: MIT](https://img.shields.io/badge/original_code-MIT-ffc124.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-45d6c7.svg)](#requirements)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy_Me_a_Coffee-Support-FFDD00?logo=buy-me-a-coffee&logoColor=000000)](https://buymeacoffee.com/21suspect)
@@ -22,7 +15,7 @@ An experimental native OpenXR conversion for **Scrap Mechanic Survival**, built 
 
 ## Download and install
 
-> [Download the latest `ScrapMechanicVR-Patcher.exe`](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases/latest/download/ScrapMechanicVR-Patcher.exe)
+> [Download legacy `ScrapMechanicVR-Patcher.exe` v1.17.0](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases/download/v1.17.0/ScrapMechanicVR-Patcher.exe)
 
 The current release supports **Steam build `22163681` only**. The installer deliberately refuses unknown game builds instead of applying unsafe renderer hooks.
 
