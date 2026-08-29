@@ -2,7 +2,7 @@
 
 This branch is the native OpenXR VR mod for Scrap Mechanic Chapter 2 / 1.0. It is separate from the legacy implementation on `main` and must not be mixed with files from that branch.
 
-> Beta release `0.3.1`: tested on Meta Quest 3 through Quest Link with Scrap Mechanic `1.0.5.876`, Steam build `24529696`. Other game builds are rejected by the installer.
+> Beta release `0.4.0`: tested on Meta Quest 3 through Quest Link with Scrap Mechanic `1.0.5.876`, Steam build `24529696`. Other game builds are rejected by the installer.
 
 ## Video showcase
 
@@ -12,7 +12,7 @@ This branch is the native OpenXR VR mod for Scrap Mechanic Chapter 2 / 1.0. It i
 
 1. Close Scrap Mechanic.
 2. Download [ScrapMechanicVR-Chapter2-Patcher.exe](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/raw/chapter2-1.0/dist/ScrapMechanicVR-Chapter2-Patcher.exe).
-3. Verify the installer SHA-256: `259A1A22CDD902C42842EB8F45B7CAB9192A00E904BD71BCEC27EEC52B881A3D`.
+3. Verify the installer SHA-256: `B17CD0AE6F28BA3B951690675D8AED94370B2BD42B9B4BE1CE2D850D960C4D45`.
 4. Run it, confirm Steam build `24529696`, and select **Install VR Mod**.
 5. Keep Quest Link active, set Meta as the active OpenXR runtime, and select **Start Scrap Mechanic**.
 
@@ -41,20 +41,21 @@ The installer is currently unsigned, so Windows may show a SmartScreen warning. 
 - The Chapter 2 creative-mode hammer UUID uses the same tracked mesh and physical swing path as the survival hammer.
 - User-tuned clay-gun grip, moving-part pivots, and rotation axes, plus the included live calibration helper.
 - Thin white aiming lasers on VR guns and tools.
-- World-locked main-menu and submenu display using the game's exact live native UI, including hover states and confirmation dialogs.
-- The native menu is cached between interaction-driven refreshes so the floating UI remains visible without rebuilding desktop- and headset-sized render targets on every menu frame.
+- World-locked startup and in-game spatial menus using the game's exact live native UI, including backpack, pause, settings, crafting/container screens, hover states, transitions, and confirmation dialogs.
+- Adaptive native-menu capture: approximately 24 FPS while interacting or animating, 12.5 FPS while pointed at a stationary panel, and 6.25 FPS while fully idle. Panel stereo, head tracking, laser input, and haptics remain at the full headset rate.
 - Right-hand laser interaction for controllers and optical hands. Input is queued directly into Scrap Mechanic's own input manager; Windows mouse simulation is never used.
 - Native menu fade/blur backgrounds are keyed transparent so the 3D menu scene remains visible.
+- Restrained native OpenXR controller haptics for UI hover/click feedback, tools, weapons, use, menus, and recentering. Optical hand tracking correctly produces no vibration.
 - Chapter 2 VR Mod logo on both the VR and desktop main menus.
 - Guarded one-file installer, verification, repair, and uninstall workflow.
 
 ## Known limitations
 
 - Gun projectiles intentionally use Scrap Mechanic's stock PC crosshair origin and direction. Earlier experimental VR-barrel projectile rewrites were removed because they were unreliable; the white barrel lasers are visual aiming guides only.
-- The `0.3.1` interaction-driven native-menu cache is included as a beta performance change and has not yet completed a separate headset confirmation pass.
+- The `0.4.0` adaptive in-game spatial-UI cadence and OpenXR haptics are beta changes awaiting a separate headset confirmation pass after packaging.
 - The desktop mirror can freeze on its first left-eye frame while the headset is active. Headset rendering continues normally.
 - Fullscreen/windowed switching with an active headset has not completed the same level of user testing as normal windowed play.
-- The floating native UI currently covers the startup/main-menu flow. A complete in-world spatial HUD/backpack rework is not included.
+- Modal startup and in-game menus are spatialized; the always-visible gameplay HUD itself is not yet rebuilt as independent 3D elements.
 - This is a beta tied to one exact game executable. A Scrap Mechanic update requires a new compatible build.
 - The installer is not code-signed.
 

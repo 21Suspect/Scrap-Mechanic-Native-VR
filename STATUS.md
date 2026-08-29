@@ -1,6 +1,6 @@
 # Chapter 2 beta status
 
-Release: `0.3.1-chapter2-beta-20260829`
+Release: `0.4.0-chapter2-beta-20260829`
 
 Branch: `chapter2-1.0`
 
@@ -17,6 +17,7 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 - Both survival and Chapter 2 creative-mode hammer UUIDs use the tracked hammer and physical swing path.
 - World-locked native startup menu with the Chapter 2 VR Mod logo, exact live Scrap Mechanic submenus, native hover/click behavior, controller/hand-tracking laser input, and transparent native fade/blur backgrounds.
 - UI input is sent through Scrap Mechanic's own private input-event queue. The mod does not synthesize Windows mouse motion or mouse-button events.
+- In-world modal menus, including backpack and pause/settings flows, use the same live native spatial panel and were confirmed functional before the adaptive refresh optimization.
 
 ## Rendering architecture
 
@@ -27,26 +28,28 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 - The user's desktop resolution setting is not rewritten for the VR render size.
 - The first-person viewmodel patch is active only while OpenXR reports `shouldRender=true` and is restored on stop, idle, session loss, disable, and add-on destruction.
 - The menu compositor captures the game's live native UI before mirror composition and removes the native full-screen fade/blur matte for transparent presentation in the VR world.
-- In `0.3.1`, the captured native menu is cached between interaction-driven refreshes instead of forcing desktop/headset render-target resizing on every menu frame. This performance change is build- and installer-verified but still awaiting its own headset confirmation pass.
+- In `0.4.0`, the captured native menu uses a non-postponing adaptive scheduler: 24 FPS during motion/transitions, 12.5 FPS while stationary on-panel, and 6.25 FPS while fully idle. The stereo panel, head pose, laser, input, and haptics continue at the full OpenXR frame rate.
 
 ## Gameplay status
 
 - Quest Touch and optional Meta optical hand tracking are integrated.
 - Locomotion, turning, jump, crouch, sprint, use, hotbar, backpack, pause, seated zoom, and recenter paths are present.
 - Mechanic gloves, tools, weapons, lasers, physical hammer, touch controls, and the clay calibration helper are included.
+- Restrained OpenXR Touch-controller haptics cover UI hover/click, tools, weapons, use, menus, and recenter actions, with hard amplitude/duration caps and no optical-hand vibration.
 - Gun projectiles and muzzle effects deliberately use stock Scrap Mechanic 1.0 calculations. The unsuccessful experimental tracked-barrel projectile override was removed, so the PC crosshair still determines shot direction. Gun lasers are visual only.
 
 ## Known limitations
 
 - The desktop left-eye mirror may freeze after the headset becomes active; this does not stop headset rendering.
 - Fullscreen/windowed switching with an active HMD is not as thoroughly confirmed as normal windowed operation.
-- Startup/main-menu UI is covered, but a complete spatial in-world HUD/backpack implementation is not included.
+- Modal startup and in-game menus are spatialized, but the persistent gameplay HUD is not yet decomposed into independent 3D widgets.
+- The adaptive spatial-UI cadence and OpenXR haptic tuning are build-verified beta changes awaiting their post-package headset confirmation pass.
 - Compatibility is locked to one executable hash and must be updated after a game patch.
 - The installer is unsigned.
 
 ## Installer status
 
-The public one-file installer is `dist/ScrapMechanicVR-Chapter2-Patcher.exe`, version `0.3.1-chapter2-beta-20260829`. It embeds and validates all 28 managed payload files, rejects unsupported game executable hashes, backs up replaced files, invalidates the game's generated Lua cache when necessary, detects legacy-mod conflicts, and supports install, verify, repair/restore, and uninstall.
+The public one-file installer is `dist/ScrapMechanicVR-Chapter2-Patcher.exe`, version `0.4.0-chapter2-beta-20260829`. It embeds and validates all 28 managed payload files, rejects unsupported game executable hashes, backs up replaced files, invalidates the game's generated Lua cache when necessary, detects legacy-mod conflicts, and supports install, verify, repair/restore, and uninstall.
 
 The installer and payload hashes are recorded in `SHA256SUMS.txt`. The former local-only feature-port installer has been retired to avoid ambiguity.
 

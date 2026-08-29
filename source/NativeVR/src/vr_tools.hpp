@@ -14,6 +14,7 @@
 namespace scrapvr::tools
 {
 	using LogFunction = void (*)(const char *format, ...);
+	enum class HapticProfile { none, hammer, tool, gun };
 
 	bool initialize(ID3D11Device *device, LogFunction log);
 	bool render(
@@ -30,6 +31,7 @@ namespace scrapvr::tools
 	// tools whose real engine hit-test must follow the visible VR laser.
 	bool get_interaction_laser_offset(XrVector3f &offset);
 	bool is_hammer_active();
+	HapticProfile active_haptic_profile();
 	bool is_player_seated();
 	bool is_player_first_person();
 	void set_render_suppressed(bool suppressed);

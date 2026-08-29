@@ -1,5 +1,5 @@
 {
-  "snapshot": "chapter2-v0.3.1-beta",
+  "snapshot": "chapter2-v0.4.0-beta",
   "status": "chapter2-beta-patch-current-state",
   "legacyBranch": "main",
   "chapter2Branch": "chapter2-1.0",
@@ -26,7 +26,7 @@
   },
   "source": {
     "path": "src/native_vr.cpp",
-    "sha256": "5B0CA4FC1816FAB1AFB072900C579E67A39DBF8BA1A70212CEE9533E72451D68",
+    "sha256": "10EB05BB5DE68D80AF01FBC6150C5AC0FCEAFD09A090079BD99FD03D3349D317",
     "reshadeApi": 18,
     "reshadeCommit": "4a50d1eddace85734871d91792ff214f13f66c01",
     "minhookCommit": "c3fcafdc10146beb5919319d0683e44e3c30d537",
@@ -35,25 +35,25 @@
   },
   "testedArtifact": {
     "path": "payload/Release/smvr_native_vr_v1.addon64",
-    "size": 4016640,
-    "sha256": "4ED7EEA9409145FD7CAB406FF1A51C56E49B019B9D48B248E7C5051EB8E877AC"
+    "size": 4021760,
+    "sha256": "D8E6D070BEE66A7626944FC82291558445EEAA8BDD0B2A1DC2A2D86CF187747F"
   },
   "localCandidateArtifact": {
-    "version": "0.3.1-chapter2-beta-20260829",
+    "version": "0.4.0-chapter2-beta-20260829",
     "path": "payload/Release/smvr_native_vr_v1.addon64",
-    "size": 4016640,
-    "sha256": "4ED7EEA9409145FD7CAB406FF1A51C56E49B019B9D48B248E7C5051EB8E877AC",
+    "size": 4021760,
+    "sha256": "D8E6D070BEE66A7626944FC82291558445EEAA8BDD0B2A1DC2A2D86CF187747F",
     "headsetConfirmed": false,
     "source": {
-      "nativeVrSha256": "5B0CA4FC1816FAB1AFB072900C579E67A39DBF8BA1A70212CEE9533E72451D68",
-      "featureInputSha256": "77DDB941B0027344939565BAE98336A5851583B201D944C4BB65D30C859601AE",
-      "featureInputHeaderSha256": "6BB69293658A3D8938BF922FEC9A555CEF9900873B81F7A8FE77BF4162CFC8E4",
+      "nativeVrSha256": "10EB05BB5DE68D80AF01FBC6150C5AC0FCEAFD09A090079BD99FD03D3349D317",
+      "featureInputSha256": "7A4428412E97C8F2201B5D801DE3DBBCA33C640D1FC9617114310EFD7888B1CC",
+      "featureInputHeaderSha256": "84060E6B481DF53B06685B476341247E7B0D7822660AFEBBE56056012C0F5D83",
       "engineInputSha256": "7E42A655339628C71657FA5CE9F1E0328865570D1F0D0516762D66E52DCCFC43",
       "engineInputHeaderSha256": "45E786AC11CFB4D0E0F4FF1E8A93C8E39D42E2CD4ACC97F44ACED7050528B500",
-      "startupMenuSha256": "1CF9D7C8BB3D701A2ABFA28A012C2F06F2D17341DC0F615A5EBBD610F478B39B",
-      "startupMenuHeaderSha256": "491452F3118FD8EDC6CE77F1D4BE143392C02F1D4EA78A3279B82F29EFBC86FE",
+      "startupMenuSha256": "24E690991F4DEE5798CD220B7B8DF4E640EE25DE3FDFD732824A4A5F31F5C898",
+      "startupMenuHeaderSha256": "8A60E95601D458403AE6738975AC614BE5A4C31BD27BF1C72DC2A536D1321E3D",
       "vrHandsSha256": "3242E7B46BA8D02C9DA30570672B0081E211895FCD4E2AFCE536AED47D6CB426",
-      "vrToolsSha256": "A3882F86C8436C32808DB58DC415B7A0D7D69FEC6FF0E1F8B93DEA6C3EC03743",
+      "vrToolsSha256": "E52B32FAA4C6D8E7B865C9CAE4195F27BA36927E1ECCC8D921F4F9DE5EEF6D7E",
       "mechanicHandsAssetSha256": "2FBD78C8DFDE75EE5990A64BCB030B05213CC984B23C5A178506498CDD0354FC",
       "nativeToolAssetSha256": "EC2DC32C3933895B71D9469A859A28E938E55165DAA1AE42313EC1C973B96CEB",
       "chapter2ToolAssetSha256": "8DFD5A51BFFEC3F45E3FE57F714354E7CB24AB3C38BF1461BB16BF3E43DB1183",
@@ -92,14 +92,15 @@
     "Gun projectiles intentionally retain stock Scrap Mechanic 1.0 PC-crosshair origin and direction; white VR barrel lasers are visual only.",
     "The desktop left-eye mirror may freeze while the HMD is active even though headset rendering continues.",
     "Fullscreen/windowed switching with an active HMD is less thoroughly confirmed than normal windowed play.",
-    "The floating native UI covers the startup/main-menu flow; a complete in-world spatial HUD and backpack rework is not included.",
+    "Modal startup and in-game menus are spatialized; the persistent gameplay HUD is not yet decomposed into independent 3D widgets.",
+    "The adaptive spatial-UI cadence and restrained OpenXR haptics are beta changes awaiting their post-package headset confirmation pass.",
     "The beta is locked to Steam build 24529696 and the installer is unsigned."
   ],
   "localInstaller": {
-    "version": "0.3.1-chapter2-beta-20260829",
+    "version": "0.4.0-chapter2-beta-20260829",
     "path": "dist/ScrapMechanicVR-Chapter2-Patcher.exe",
-    "size": 6856192,
-    "sha256": "259A1A22CDD902C42842EB8F45B7CAB9192A00E904BD71BCEC27EEC52B881A3D",
+    "size": 6857728,
+    "sha256": "B17CD0AE6F28BA3B951690675D8AED94370B2BD42B9B4BE1CE2D850D960C4D45",
     "selfTest": "PASS",
     "published": true
   }

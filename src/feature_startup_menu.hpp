@@ -17,6 +17,8 @@
 
 namespace smvr::features
 {
+enum class UiHapticEvent { none, hover, click };
+
 class StartupMenuUi
 {
 public:
@@ -30,7 +32,7 @@ public:
     };
 
     bool initialize(ID3D11Device *device, const wchar_t *asset_path);
-    void update_visibility();
+    void update_visibility(bool game_ui_open_intent);
     void set_world_anchor(const XrPosef &player_anchor);
     void reset_world_anchor();
     void update_pointer(const XrPosef &right_hand, bool active);
@@ -45,12 +47,17 @@ public:
     bool visible() const { return visible_; }
     bool pointer_active() const { return dynamic_mode_ ? pointer_on_panel_ : hovered_button_ != 0; }
     bool dynamic_mode() const { return dynamic_mode_; }
+    bool in_game_mode() const { return in_game_mode_; }
     bool native_capture_due() const;
+    UiHapticEvent consume_haptic_event();
 
 private:
     bool load_asset(const wchar_t *asset_path);
     bool poll_world_active();
+    bool modal_cursor_visible() const;
     void request_native_capture(uint64_t delay_ms);
+    void keep_native_capture_active(uint64_t duration_ms);
+    uint64_t native_capture_interval(uint64_t now) const;
     void draw_menu(ID3D11DeviceContext *context, ID3D11RenderTargetView *target,
                    uint32_t width, uint32_t height, const XrView &view);
     void draw_laser(ID3D11DeviceContext *context, ID3D11RenderTargetView *target,
@@ -90,6 +97,8 @@ private:
     uint64_t world_state_poll_ms_ = 0;
     uint64_t native_capture_due_ms_ = 0;
     uint64_t native_capture_followup_ms_ = 0;
+    uint64_t native_capture_last_ms_ = 0;
+    uint64_t native_capture_active_until_ms_ = 0;
     std::wstring world_state_path_;
     int native_capture_pointer_x_ = 0;
     int native_capture_pointer_y_ = 0;
@@ -109,5 +118,7 @@ private:
     bool input_route_logged_ = false;
     bool native_capture_requested_ = true;
     bool native_capture_pointer_valid_ = false;
+    bool in_game_mode_ = false;
+    UiHapticEvent pending_haptic_event_ = UiHapticEvent::none;
 };
 } // namespace smvr::features

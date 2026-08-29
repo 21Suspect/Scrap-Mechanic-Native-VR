@@ -1575,6 +1575,11 @@ struct OpenXrState
         features::InputConfig input_config{};
         input_config.enabled = g_feature_input_enabled;
         input_config.optical_hand_tracking = g_feature_optical_hands_enabled;
+        input_config.haptics =
+            GetPrivateProfileIntW(L"Features", L"Haptics", 1, g_ini_path.c_str()) == 1;
+        input_config.haptic_strength = static_cast<float>(
+            GetPrivateProfileIntW(L"Features", L"HapticStrengthPercent", 65,
+                g_ini_path.c_str())) / 100.0f;
         input_config.stick_deadzone = static_cast<float>(
             GetPrivateProfileIntW(L"Features", L"StickDeadzonePercent", 30, g_ini_path.c_str())) / 100.0f;
         input_config.horizontal_turn_speed = static_cast<float>(
@@ -1814,7 +1819,13 @@ struct OpenXrState
             (views[0].pose.position.y + views[1].pose.position.y) * 0.5f,
             (views[0].pose.position.z + views[1].pose.position.z) * 0.5f
         };
-        if (g_feature_startup_menu_enabled) g_startup_menu.update_visibility();
+        if (g_feature_startup_menu_enabled)
+        {
+            g_startup_menu.update_visibility(g_input.game_ui_open_intent());
+            XrPosef menu_head=head_pose;
+            menu_head.orientation=yaw_only(head_pose.orientation);
+            g_startup_menu.set_world_anchor(menu_head);
+        }
         g_input.set_startup_menu(g_feature_startup_menu_enabled && g_startup_menu.visible(),
             g_feature_startup_menu_enabled && g_startup_menu.pointer_active());
         scrapvr::tools::set_render_suppressed(
@@ -1886,6 +1897,17 @@ struct OpenXrState
                 g_input.pointer_pose(1), g_input.pointer_pose_active(1));
             g_startup_menu.update_interaction(
                 g_input.ui_select_down(), g_input.ui_scroll_axis());
+            switch (g_startup_menu.consume_haptic_event())
+            {
+            case features::UiHapticEvent::hover:
+                g_input.pulse_haptic(1,0.07f,10,65.0f);
+                break;
+            case features::UiHapticEvent::click:
+                g_input.pulse_haptic(1,0.14f,20,85.0f);
+                break;
+            default:
+                break;
+            }
         }
 
         uint32_t indices[2]{};

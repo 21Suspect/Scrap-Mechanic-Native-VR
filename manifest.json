@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "patchId": "scrap-mechanic-native-vr-chapter2",
-  "patchVersion": "0.3.1-chapter2-beta-20260829",
-  "description": "Chapter 2 beta for Scrap Mechanic 1.0.5.876 with native OpenXR stereo rendering, tracked Quest hands and tools, Chapter 2 creative-hammer recognition, calibrated weapon visuals with stock projectile behavior, white barrel lasers, a cached world-locked copy of the live native menu, controller and hand-tracking UI input through Scrap Mechanic's private input-event queue, and transparent native menu fade composition without Windows mouse simulation",
+  "patchVersion": "0.4.0-chapter2-beta-20260829",
+  "description": "Chapter 2 beta for Scrap Mechanic 1.0.5.876 with native OpenXR stereo rendering, tracked Quest hands and tools, Chapter 2 creative-hammer recognition, calibrated weapon visuals with stock projectile behavior, white barrel lasers, adaptive world-locked startup and in-game spatial UI, controller and hand-tracking UI input through Scrap Mechanic's private input-event queue, transparent native menu fade composition, and restrained OpenXR controller haptics without Windows mouse simulation",
   "game": {
     "appId": "387990",
     "buildId": "24529696",
@@ -48,14 +48,14 @@
     },
     {
       "path": "Release\\ScrapMechanicVR.ini",
-      "patchedSha256": "2C7EB5FE1CEED68B3CCBEAB98E35550B7BDB84E09DA49455D00626A2B6C14BE3",
+      "patchedSha256": "0E915E2854A0CCE817CB9499A22527F3E14CF921EBCEFF4C812B357E4E027C74",
       "originalMayBeMissing": true,
       "runtimeMutable": true,
       "module": "chapter2-vr-config"
     },
     {
       "path": "Release\\smvr_native_vr_v1.addon64",
-      "patchedSha256": "4ED7EEA9409145FD7CAB406FF1A51C56E49B019B9D48B248E7C5051EB8E877AC",
+      "patchedSha256": "D8E6D070BEE66A7626944FC82291558445EEAA8BDD0B2A1DC2A2D86CF187747F",
       "originalMayBeMissing": true,
       "module": "chapter2-native-openxr"
     },

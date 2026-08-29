@@ -735,6 +735,16 @@ namespace scrapvr::tools
 		return g_active_tool == Tool::hammer;
 	}
 
+	HapticProfile active_haptic_profile()
+	{
+		poll_active_tool();
+		if (g_active_tool == Tool::hammer) return HapticProfile::hammer;
+		if (is_gun(g_active_tool)) return HapticProfile::gun;
+		if (g_active_tool == Tool::connect || g_active_tool == Tool::paint ||
+			g_active_tool == Tool::weld) return HapticProfile::tool;
+		return HapticProfile::none;
+	}
+
 	bool is_player_seated()
 	{
 		poll_active_tool();

@@ -164,7 +164,8 @@ bool InputBridge::initialize(XrInstance instance, XrSession session, XrSpace bas
     }
     create_optical_trackers(hand_tracking_extension_enabled && config_.optical_hand_tracking);
     initialized_ = true;
-    log_line("VR_FEATURE_INPUT_READY touch=1 poses=1 locomotion=1 turn=1 buttons=1 recenter=1 optical_hands=%u",
+    log_line("VR_FEATURE_INPUT_READY touch=1 poses=1 locomotion=1 turn=1 buttons=1 recenter=1 haptics=%u strength=%.2f optical_hands=%u",
+        config_.haptics ? 1u : 0u, config_.haptic_strength,
         optical_trackers_[0] != XR_NULL_HANDLE && optical_trackers_[1] != XR_NULL_HANDLE ? 1u : 0u);
     return true;
 }
@@ -206,11 +207,13 @@ bool InputBridge::create_actions()
         !create(XR_ACTION_TYPE_BOOLEAN_INPUT, "primary_button", "Primary Button", 2, hand_paths_, primary_button_action_) ||
         !create(XR_ACTION_TYPE_BOOLEAN_INPUT, "secondary_button", "Secondary Button", 2, hand_paths_, secondary_button_action_) ||
         !create(XR_ACTION_TYPE_BOOLEAN_INPUT, "stick_click", "Thumbstick Click", 2, hand_paths_, stick_click_action_) ||
-        !create(XR_ACTION_TYPE_BOOLEAN_INPUT, "menu_button", "Menu Button", 1, &hand_paths_[0], menu_button_action_))
+        !create(XR_ACTION_TYPE_BOOLEAN_INPUT, "menu_button", "Menu Button", 1, &hand_paths_[0], menu_button_action_) ||
+        !create(XR_ACTION_TYPE_VIBRATION_OUTPUT, "haptic_output", "Subtle Haptic Feedback", 2,
+            hand_paths_, haptic_action_))
         return false;
 
     XrPath profile = XR_NULL_PATH;
-    XrPath binding_paths[17]{};
+    XrPath binding_paths[19]{};
     if (!path("/interaction_profiles/oculus/touch_controller", profile) ||
         !path("/user/hand/left/input/grip/pose", binding_paths[0]) ||
         !path("/user/hand/right/input/grip/pose", binding_paths[1]) ||
@@ -228,9 +231,11 @@ bool InputBridge::create_actions()
         !path("/user/hand/right/input/b/click", binding_paths[13]) ||
         !path("/user/hand/left/input/thumbstick/click", binding_paths[14]) ||
         !path("/user/hand/right/input/thumbstick/click", binding_paths[15]) ||
-        !path("/user/hand/left/input/menu/click", binding_paths[16])) return false;
+        !path("/user/hand/left/input/menu/click", binding_paths[16]) ||
+        !path("/user/hand/left/output/haptic", binding_paths[17]) ||
+        !path("/user/hand/right/output/haptic", binding_paths[18])) return false;
 
-    const XrActionSuggestedBinding bindings[17]{
+    const XrActionSuggestedBinding bindings[19]{
         {grip_pose_action_, binding_paths[0]}, {grip_pose_action_, binding_paths[1]},
         {aim_pose_action_, binding_paths[2]}, {aim_pose_action_, binding_paths[3]},
         {trigger_action_, binding_paths[4]}, {trigger_action_, binding_paths[5]},
@@ -239,7 +244,8 @@ bool InputBridge::create_actions()
         {primary_button_action_, binding_paths[10]}, {primary_button_action_, binding_paths[11]},
         {secondary_button_action_, binding_paths[12]}, {secondary_button_action_, binding_paths[13]},
         {stick_click_action_, binding_paths[14]}, {stick_click_action_, binding_paths[15]},
-        {menu_button_action_, binding_paths[16]}
+        {menu_button_action_, binding_paths[16]},
+        {haptic_action_, binding_paths[17]}, {haptic_action_, binding_paths[18]}
     };
     XrInteractionProfileSuggestedBinding suggested{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
     suggested.interactionProfile = profile;
@@ -324,6 +330,51 @@ void InputBridge::set_startup_menu(bool visible, bool pointer_active)
 {
     startup_menu_visible_ = visible;
     startup_menu_pointer_active_ = visible && pointer_active;
+}
+
+bool InputBridge::game_ui_open_intent() const
+{
+    return game_ui_open_intent_until_ms_ != 0 &&
+        GetTickCount64() < game_ui_open_intent_until_ms_;
+}
+
+bool InputBridge::pulse_haptic(uint32_t hand, float amplitude, uint32_t duration_ms,
+                               float frequency)
+{
+    if (!initialized_ || !config_.haptics || hand >= kHandCount || hands_[hand].optical ||
+        session_ == XR_NULL_HANDLE || haptic_action_ == XR_NULL_HANDLE ||
+        session_state_ != XR_SESSION_STATE_FOCUSED)
+        return false;
+    const uint64_t now=GetTickCount64();
+    if (now-last_haptic_ms_[hand] < 12) return false;
+
+    XrHapticActionInfo info{XR_TYPE_HAPTIC_ACTION_INFO};
+    info.action=haptic_action_;
+    info.subactionPath=hand_paths_[hand];
+    XrHapticVibration vibration{XR_TYPE_HAPTIC_VIBRATION};
+    vibration.amplitude=std::clamp(amplitude*std::clamp(config_.haptic_strength,0.0f,1.0f),
+        0.0f,0.35f);
+    vibration.duration=static_cast<XrDuration>(std::clamp(duration_ms,8u,45u))*1000000;
+    vibration.frequency=frequency;
+    const XrResult result=xrApplyHapticFeedback(session_,&info,
+        reinterpret_cast<const XrHapticBaseHeader *>(&vibration));
+    if (XR_FAILED(result))
+    {
+        if (!haptic_failure_logged_)
+        {
+            haptic_failure_logged_=true;
+            log_line("VR_HAPTIC_UNAVAILABLE hand=%u xr=%d",hand,static_cast<int>(result));
+        }
+        return false;
+    }
+    last_haptic_ms_[hand]=now;
+    if (!haptic_ready_logged_)
+    {
+        haptic_ready_logged_=true;
+        log_line("VR_HAPTIC_ACTIVE output=openxr amplitude_cap=0.35 duration_cap_ms=45 strength=%.2f",
+            config_.haptic_strength);
+    }
+    return true;
 }
 
 bool InputBridge::get_boolean(XrAction action, uint32_t hand, bool &value)
@@ -638,6 +689,12 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
 
     const bool recenter_down = left_click && right_click;
     const uint64_t now = GetTickCount64();
+    const bool menu_pressed=menu && !menu_was_down_;
+    if (!startup_menu_visible_ && menu_pressed)
+    {
+        game_ui_open_intent_until_ms_=now+1200;
+        pulse_haptic(0,0.10f,18,75.0f);
+    }
     if (recenter_down)
     {
         if (recenter_hold_start_ms_ == 0) recenter_hold_start_ms_ = now;
@@ -646,6 +703,8 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
             recenter_latched_ = true;
             recenter_requested_ = true;
             locomotion_reference_valid_ = false;
+            pulse_haptic(0,0.16f,32,85.0f);
+            pulse_haptic(1,0.16f,32,85.0f);
             log_line("VR_RECENTER_REQUESTED source=both_thumbsticks hold_ms=%llu",
                 static_cast<unsigned long long>(now - recenter_hold_start_ms_));
         }
@@ -689,6 +748,8 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     }
     const bool right_trigger = hands_[1].optical ? optical_pinch_down_[1] : trigger[1] > 0.55f;
     const bool left_trigger = hands_[0].optical ? optical_pinch_down_[0] : trigger[0] > 0.55f;
+    const bool right_trigger_pressed=right_trigger && !right_primary_was_down_;
+    const bool left_trigger_pressed=left_trigger && !left_primary_was_down_;
     if (startup_menu_visible_)
     {
         // While the dedicated startup panel is present, controller input belongs
@@ -728,6 +789,10 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         hands_[0].interaction = hands_[0].firing = false;
         hands_[1].interaction = hands_[1].firing = false;
         x_was_down_ = y_was_down_ = xy_chord_latched_ = false;
+        right_primary_was_down_=right_trigger;
+        left_primary_was_down_=left_trigger;
+        menu_was_down_=menu;
+        b_was_down_=b;
         return;
     }
     ui_select_down_ = false;
@@ -765,6 +830,28 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     send_key(VK_SPACE, a, key_jump_);
     send_key('E', b, key_use_);
     send_key(VK_ESCAPE, menu, key_menu_);
+    if (b && !b_was_down_) pulse_haptic(1,0.08f,14,70.0f);
+
+    if (right_trigger_pressed)
+    {
+        switch (scrapvr::tools::active_haptic_profile())
+        {
+        case scrapvr::tools::HapticProfile::gun:
+            pulse_haptic(1,0.18f,24,105.0f);
+            break;
+        case scrapvr::tools::HapticProfile::hammer:
+            pulse_haptic(1,0.13f,20,75.0f);
+            break;
+        case scrapvr::tools::HapticProfile::tool:
+            pulse_haptic(1,0.10f,17,80.0f);
+            break;
+        default:
+            pulse_haptic(1,0.07f,12,70.0f);
+            break;
+        }
+    }
+    if (left_trigger_pressed)
+        pulse_haptic(0,0.07f,12,70.0f);
 
     const bool player_seated = scrapvr::tools::is_player_seated();
     const bool player_first_person = scrapvr::tools::is_player_first_person();
@@ -776,6 +863,11 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     send_key('C', player_seated && y, key_zoom_out_);
     if (!player_seated)
     {
+        if (x && y && !xy_chord_latched_)
+        {
+            game_ui_open_intent_until_ms_=now+1200;
+            pulse_haptic(0,0.10f,18,75.0f);
+        }
         if (x && y) xy_chord_latched_ = true;
         send_key('I', x && y, key_inventory_);
         if (!x && x_was_down_ && !xy_chord_latched_) send_mouse_wheel(WHEEL_DELTA);
@@ -789,6 +881,11 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     x_was_down_ = x;
     y_was_down_ = y;
     if (!x && !y) xy_chord_latched_ = false;
+
+    right_primary_was_down_=right_trigger;
+    left_primary_was_down_=left_trigger;
+    menu_was_down_=menu;
+    b_was_down_=b;
 
     send_mouse_button(0,right_trigger,mouse_attack_);
     send_mouse_button(1,left_trigger,mouse_secondary_);
@@ -840,6 +937,7 @@ void InputBridge::release_injected_input()
     controller_ui_trigger_was_down_ = false;
     ui_scroll_axis_ = 0.0f;
     x_was_down_ = y_was_down_ = xy_chord_latched_ = false;
+    right_primary_was_down_=left_primary_was_down_=menu_was_down_=b_was_down_=false;
 }
 
 bool InputBridge::consume_recenter_request()
@@ -874,6 +972,10 @@ void InputBridge::reset_runtime_state()
     controller_ui_trigger_was_down_ = false;
     ui_scroll_axis_ = 0.0f;
     startup_menu_scroll_last_ms_ = 0;
+    game_ui_open_intent_until_ms_=0;
+    last_haptic_ms_[0]=last_haptic_ms_[1]=0;
+    right_primary_was_down_=left_primary_was_down_=menu_was_down_=b_was_down_=false;
+    haptic_ready_logged_=haptic_failure_logged_=false;
     for (HandState &hand_state : hands_) hand_state = {};
 }
 
@@ -898,10 +1000,21 @@ void InputBridge::shutdown()
             tracker = XR_NULL_HANDLE;
         }
     }
+    if (session_ != XR_NULL_HANDLE && haptic_action_ != XR_NULL_HANDLE)
+    {
+        for (uint32_t hand=0; hand<kHandCount; ++hand)
+        {
+            XrHapticActionInfo info{XR_TYPE_HAPTIC_ACTION_INFO};
+            info.action=haptic_action_;
+            info.subactionPath=hand_paths_[hand];
+            xrStopHapticFeedback(session_,&info);
+        }
+    }
     if (action_set_ != XR_NULL_HANDLE) xrDestroyActionSet(action_set_);
     action_set_ = XR_NULL_HANDLE;
     grip_pose_action_ = aim_pose_action_ = trigger_action_ = thumbstick_action_ = squeeze_action_ = XR_NULL_HANDLE;
-    primary_button_action_ = secondary_button_action_ = stick_click_action_ = menu_button_action_ = XR_NULL_HANDLE;
+    primary_button_action_ = secondary_button_action_ = stick_click_action_ = menu_button_action_ =
+        haptic_action_ = XR_NULL_HANDLE;
     hand_paths_[0] = hand_paths_[1] = XR_NULL_PATH;
     create_hand_tracker_ = nullptr;
     destroy_hand_tracker_ = nullptr;

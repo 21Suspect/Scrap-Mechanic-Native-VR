@@ -19,6 +19,8 @@ struct InputConfig
 {
     bool enabled = true;
     bool optical_hand_tracking = true;
+    bool haptics = true;
+    float haptic_strength = 0.65f;
     float stick_deadzone = 0.30f;
     float horizontal_turn_speed = 36.0f;
     float vertical_turn_speed = 28.0f;
@@ -49,6 +51,8 @@ public:
     void on_session_state(XrSessionState state);
     void set_startup_menu(bool visible, bool pointer_active);
     bool sync(XrTime display_time, const XrPosef &head_pose);
+    bool pulse_haptic(uint32_t hand, float amplitude, uint32_t duration_ms,
+                      float frequency = XR_FREQUENCY_UNSPECIFIED);
     void release_injected_input();
     bool consume_recenter_request();
     void shutdown();
@@ -59,6 +63,7 @@ public:
     bool pointer_pose_active(uint32_t index) const { return pointer_pose_active_[index < 2 ? index : 0]; }
     bool ui_select_down() const { return ui_select_down_; }
     float ui_scroll_axis() const { return ui_scroll_axis_; }
+    bool game_ui_open_intent() const;
 
 private:
     bool create_actions();
@@ -89,6 +94,7 @@ private:
     XrAction secondary_button_action_ = XR_NULL_HANDLE;
     XrAction stick_click_action_ = XR_NULL_HANDLE;
     XrAction menu_button_action_ = XR_NULL_HANDLE;
+    XrAction haptic_action_ = XR_NULL_HANDLE;
     XrPath hand_paths_[2]{XR_NULL_PATH, XR_NULL_PATH};
     XrSpace hand_spaces_[2]{XR_NULL_HANDLE, XR_NULL_HANDLE};
     XrSpace aim_spaces_[2]{XR_NULL_HANDLE, XR_NULL_HANDLE};
@@ -138,6 +144,14 @@ private:
     bool input_suspended_logged_ = false;
     bool sync_failure_logged_ = false;
     bool controller_ui_trigger_was_down_ = false;
+    bool right_primary_was_down_ = false;
+    bool left_primary_was_down_ = false;
+    bool menu_was_down_ = false;
+    bool b_was_down_ = false;
+    uint64_t game_ui_open_intent_until_ms_ = 0;
+    uint64_t last_haptic_ms_[2]{};
+    bool haptic_ready_logged_ = false;
+    bool haptic_failure_logged_ = false;
     bool hand_pose_logged_[2]{};
     bool aim_pose_logged_[2]{};
     bool optical_hand_logged_[2]{};
