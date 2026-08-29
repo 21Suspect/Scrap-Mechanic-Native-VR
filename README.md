@@ -4,6 +4,10 @@ This branch is the native OpenXR VR mod for Scrap Mechanic Chapter 2 / 1.0. It i
 
 > Beta release: tested on Meta Quest 3 through Quest Link with Scrap Mechanic `1.0.5.876`, Steam build `24529696`. Other game builds are rejected by the installer.
 
+## Video showcase
+
+[Watch the Scrap Mechanic Chapter 2 Native VR Mod on YouTube](https://www.youtube.com/watch?v=jzslO2oT12I)
+
 ## Easy installation
 
 1. Close Scrap Mechanic.
