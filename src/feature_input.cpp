@@ -314,6 +314,7 @@ void InputBridge::on_session_state(XrSessionState state)
 {
     session_state_ = state;
     if (!config_.enabled) return;
+    input_rearm_required_ = true;
     if (state == XR_SESSION_STATE_FOCUSED)
     {
         focus_game_window();
@@ -689,6 +690,17 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
 
     const bool recenter_down = left_click && right_click;
     const uint64_t now = GetTickCount64();
+    if (input_rearm_required_)
+    {
+        const bool neutral = !a && !b && !x && !y && !left_click && !right_click && !menu &&
+            trigger[0] < 0.20f && trigger[1] < 0.20f && !optical_pinch_down_[0] &&
+            !optical_pinch_down_[1] && std::fabs(move.x) < 0.20f && std::fabs(move.y) < 0.20f &&
+            std::fabs(turn.x) < 0.20f && std::fabs(turn.y) < 0.20f;
+        release_injected_input();
+        if (!neutral) return;
+        input_rearm_required_ = false;
+        log_line("VR_INPUT_REARMED controls_neutral=1 session_focused=1");
+    }
     const bool menu_pressed=menu && !menu_was_down_;
     if (!startup_menu_visible_ && menu_pressed)
     {
@@ -973,6 +985,7 @@ void InputBridge::reset_runtime_state()
     ui_scroll_axis_ = 0.0f;
     startup_menu_scroll_last_ms_ = 0;
     game_ui_open_intent_until_ms_=0;
+    input_rearm_required_=true;
     last_haptic_ms_[0]=last_haptic_ms_[1]=0;
     right_primary_was_down_=left_primary_was_down_=menu_was_down_=b_was_down_=false;
     haptic_ready_logged_=haptic_failure_logged_=false;

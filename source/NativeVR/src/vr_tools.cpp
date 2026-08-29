@@ -77,6 +77,9 @@ namespace scrapvr::tools
 		bool g_player_first_person = false;
 		bool g_render_suppressed = false;
 		ULONGLONG g_last_poll = 0;
+		ULONGLONG g_player_state_last_valid_ms = 0;
+		uint64_t g_player_state_sequence = 0;
+		bool g_player_state_sequence_valid = false;
 		ULONGLONG g_gatling_animation_ms = 0;
 		float g_gatling_angle = 0.0f;
 		float g_gatling_speed = 0.0f;
@@ -402,8 +405,8 @@ namespace scrapvr::tools
 				{ -0.020f, -0.035f, -0.055f, -0.152f, -0.035f, -0.280f }, // connect
 				{ -0.015f, -0.040f, -0.060f, -0.120f, -0.040f, -0.295f }, // paint
 				{ -0.030f, -0.035f, -0.065f, -0.035f, -0.035f, -0.225f }, // weld
-				// These offsets only place the visible white pointers at the barrel tips.
-				// They do not affect the game's projectile origin or firing direction.
+				// Gun offsets are the single calibrated barrel-tip source used by the
+				// Chapter 2 projectile bridge. The old visible ray was debug-only.
 				{ -0.020f, -0.035f, -0.060f, -0.198f, -0.035f, -0.466f }, // spudgun
 				{ -0.020f, -0.035f, -0.060f, -0.199f, -0.035f, -0.503f }, // shotgun
 				{ -0.020f, -0.035f, -0.060f, -0.198f, -0.035f, -0.509f }, // gatling
@@ -455,57 +458,117 @@ namespace scrapvr::tools
 			}
 		}
 
+		bool json_bool(const std::string &text, const char *name, bool &value)
+		{
+			const std::string marker = std::string("\"") + name + "\"";
+			auto position = text.find(marker);
+			if (position == std::string::npos) return false;
+			position = text.find(':', position + marker.size());
+			if (position == std::string::npos) return false;
+			do { ++position; } while (position < text.size() &&
+				(text[position] == ' ' || text[position] == '\t' || text[position] == '\r' || text[position] == '\n'));
+			if (text.compare(position, 4, "true") == 0) { value = true; return true; }
+			if (text.compare(position, 5, "false") == 0) { value = false; return true; }
+			return false;
+		}
+
+		bool json_string(const std::string &text, const char *name, std::string &value)
+		{
+			const std::string marker = std::string("\"") + name + "\"";
+			auto position = text.find(marker);
+			if (position == std::string::npos) return false;
+			position = text.find(':', position + marker.size());
+			if (position == std::string::npos) return false;
+			position = text.find('"', position + 1);
+			if (position == std::string::npos) return false;
+			const auto end = text.find('"', position + 1);
+			if (end == std::string::npos) return false;
+			value = text.substr(position + 1, end - position - 1);
+			return true;
+		}
+
+		bool json_uint64(const std::string &text, const char *name, uint64_t &value)
+		{
+			const std::string marker = std::string("\"") + name + "\"";
+			auto position = text.find(marker);
+			if (position == std::string::npos) return false;
+			position = text.find(':', position + marker.size());
+			if (position == std::string::npos) return false;
+			do { ++position; } while (position < text.size() &&
+				(text[position] == ' ' || text[position] == '\t' || text[position] == '\r' || text[position] == '\n'));
+			if (position >= text.size() || text[position] < '0' || text[position] > '9') return false;
+			uint64_t parsed = 0;
+			while (position < text.size() && text[position] >= '0' && text[position] <= '9')
+			{
+				const uint64_t digit = static_cast<uint64_t>(text[position] - '0');
+				if (parsed > (UINT64_MAX - digit) / 10) return false;
+				parsed = parsed * 10 + digit;
+				++position;
+			}
+			value = parsed;
+			return true;
+		}
+
+		void apply_player_state(Tool tool, bool seated, bool first_person)
+		{
+			if (tool != g_active_tool) { g_active_tool = tool; if (g_log) g_log("VR TOOL ACTIVE: %s", tool_name(tool)); }
+			if (seated != g_player_seated)
+			{
+				g_player_seated = seated;
+				if (g_log) g_log("VR SEAT INPUT MODE: %s", seated ? "zoom X/C" : "hotbar X/Y");
+			}
+			if (first_person != g_player_first_person)
+			{
+				g_player_first_person = first_person;
+				if (g_log) g_log("VR CAMERA VIEW: %s", first_person ? "first person" : "third person");
+			}
+		}
+
 		void poll_active_tool()
 		{
-			const ULONGLONG now = GetTickCount64(); if (now - g_last_poll < 150) return; g_last_poll = now;
-			WIN32_FIND_DATAW data = {}; HANDLE search = FindFirstFileW((g_game_root + L"\\Logs\\game-*.log").c_str(), &data);
-			if (search == INVALID_HANDLE_VALUE) return;
-			std::wstring newest; FILETIME newest_time = {};
-			do
-			{
-				if (!(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && CompareFileTime(&data.ftLastWriteTime, &newest_time) > 0)
-				{ newest_time = data.ftLastWriteTime; newest = data.cFileName; }
-			} while (FindNextFileW(search, &data));
-			FindClose(search); if (newest.empty()) return;
-			HANDLE file = CreateFileW((g_game_root + L"\\Logs\\" + newest).c_str(), GENERIC_READ,
+			const ULONGLONG now = GetTickCount64();
+			if (now - g_last_poll < 75) return;
+			g_last_poll = now;
+			HANDLE file = CreateFileW((g_game_root + L"\\Data\\NativeVR\\player_state.json").c_str(), GENERIC_READ,
 				FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-			if (file == INVALID_HANDLE_VALUE) return;
-			LARGE_INTEGER size = {}; GetFileSizeEx(file, &size); const DWORD take = static_cast<DWORD>(std::min<LONGLONG>(size.QuadPart, 65536));
-			LARGE_INTEGER offset = {}; offset.QuadPart = size.QuadPart - take; SetFilePointerEx(file, offset, nullptr, FILE_BEGIN);
-			std::string text(take, '\0'); DWORD read = 0; ReadFile(file, text.data(), take, &read, nullptr); CloseHandle(file); text.resize(read);
-			const std::string tool_marker = "SCRAPVR_NATIVE_TOOL ";
-			const auto tool_found = text.rfind(tool_marker);
-			if (tool_found != std::string::npos)
+			bool new_packet = false;
+			if (file != INVALID_HANDLE_VALUE)
 			{
-				const auto end = text.find_first_of("\r\n", tool_found);
-				const Tool next = parse_tool(text.substr(tool_found, end - tool_found));
-				if (next != g_active_tool) { g_active_tool = next; if (g_log) g_log("VR TOOL ACTIVE: %s", tool_name(next)); }
-			}
-			const std::string seat_marker = "SCRAPVR_SEATED ";
-			const auto seat_found = text.rfind(seat_marker);
-			if (seat_found != std::string::npos)
-			{
-				const bool seated = seat_found + seat_marker.size() < text.size() &&
-					text[seat_found + seat_marker.size()] == '1';
-				if (seated != g_player_seated)
+				char bytes[2048]{}; DWORD read = 0;
+				const bool read_ok = ReadFile(file, bytes, sizeof(bytes) - 1, &read, nullptr) != FALSE;
+				CloseHandle(file);
+				if (read_ok && read > 0)
 				{
-					g_player_seated = seated;
-					if (g_log) g_log("VR SEAT INPUT MODE: %s", seated ? "zoom X/C" : "hotbar X/Y");
+					const std::string text(bytes, read);
+					bool active = false, seated = false, first_person = false;
+					uint64_t sequence = 0;
+					std::string item;
+					if (json_uint64(text, "sequence", sequence) &&
+						(!g_player_state_sequence_valid || sequence != g_player_state_sequence) &&
+						json_bool(text, "active", active))
+					{
+						if (!active)
+						{
+							apply_player_state(Tool::none, false, false);
+							new_packet = true;
+						}
+						else if (json_bool(text, "seated", seated) && json_bool(text, "firstPerson", first_person) &&
+							json_string(text, "activeItem", item))
+						{
+							apply_player_state(parse_tool(item), seated, first_person);
+							new_packet = true;
+						}
+						if (new_packet)
+						{
+							g_player_state_sequence = sequence;
+							g_player_state_sequence_valid = true;
+							g_player_state_last_valid_ms = now;
+						}
+					}
 				}
 			}
-			const std::string first_person_marker = "SCRAPVR_FIRST_PERSON ";
-			const auto first_person_found = text.rfind(first_person_marker);
-			if (first_person_found != std::string::npos)
-			{
-				const bool first_person =
-					first_person_found + first_person_marker.size() < text.size() &&
-					text[first_person_found + first_person_marker.size()] == '1';
-				if (first_person != g_player_first_person)
-				{
-					g_player_first_person = first_person;
-					if (g_log) g_log("VR CAMERA VIEW: %s", first_person ? "first person" : "third person");
-				}
-			}
+			if (g_player_state_last_valid_ms == 0 || now - g_player_state_last_valid_ms > 1000)
+				apply_player_state(Tool::none, false, false);
 		}
 
 		float scale_for(Tool tool)
@@ -696,7 +759,7 @@ namespace scrapvr::tools
 		}
 
 		if (g_active_tool == Tool::connect || g_active_tool == Tool::paint ||
-			g_active_tool == Tool::weld || is_gun(g_active_tool))
+			g_active_tool == Tool::weld)
 		{
 			Vertex laser[2] = {
 				{ calibration.laser_x, calibration.laser_y, calibration.laser_z, 0, 0, 1, 0, 0 },
@@ -716,17 +779,41 @@ namespace scrapvr::tools
 			context->PSSetShader(g_pixel_shader, nullptr, 0);
 		}
 		ID3D11ShaderResourceView *none = nullptr; context->PSSetShaderResources(0, 1, &none);
-		if (!g_render_logged && g_log) { g_render_logged = true; g_log("NATIVE VR TOOLS VISIBLE: selected tool and white gun-barrel pointer share the tracked-hand stereo pose and depth buffer"); }
+		if (!g_render_logged && g_log) { g_render_logged = true; g_log("NATIVE VR TOOLS VISIBLE: selected tool uses the tracked-hand stereo pose and depth buffer; white pointers are limited to interaction tools"); }
 		return true;
 	}
 
 	bool get_interaction_laser_offset(XrVector3f &offset)
 	{
+		poll_active_tool();
 		if (g_active_tool != Tool::connect && g_active_tool != Tool::paint &&
 			g_active_tool != Tool::weld)
 			return false;
 		const auto &calibration = calibration_for(g_active_tool);
 		offset = { calibration.laser_x, calibration.laser_y, calibration.laser_z };
+		return true;
+	}
+
+	bool get_gun_muzzle_offset(XrVector3f &offset, const char *&item_uuid)
+	{
+		poll_active_tool();
+		if (!is_gun(g_active_tool))
+		{
+			item_uuid = nullptr;
+			return false;
+		}
+		const auto &calibration = calibration_for(g_active_tool);
+		offset = { calibration.laser_x, calibration.laser_y, calibration.laser_z };
+		switch (g_active_tool)
+		{
+		case Tool::rifle: item_uuid = "c5ea0c2f-185b-48d6-b4df-45c386a575cc"; break;
+		case Tool::shotgun: item_uuid = "f6250bf4-9726-406f-a29a-945c06e460e5"; break;
+		case Tool::gatling: item_uuid = "9fde0601-c2ba-4c70-8d5c-2a7a9fdd122b"; break;
+		case Tool::scrap: item_uuid = "d51ec758-057b-4263-bd16-7a731e149480"; break;
+		case Tool::launcher: item_uuid = "a2a2bb33-a841-4b23-88da-b758063d9206"; break;
+		case Tool::clay: item_uuid = "6993e5df-6852-4e84-88ae-df49f765e784"; break;
+		default: item_uuid = nullptr; return false;
+		}
 		return true;
 	}
 
@@ -771,7 +858,8 @@ namespace scrapvr::tools
 		g_clay_calibration = ClayCalibration{}; g_clay_calibration_path.clear();
 		g_clay_calibration_poll_ms = 0; g_clay_calibration_write_time = {}; g_clay_calibration_loaded = false;
 		g_player_seated = false; g_player_first_person = false;
-		g_render_suppressed = false; g_last_poll = 0;
+		g_render_suppressed = false; g_last_poll = 0; g_player_state_last_valid_ms = 0;
+		g_player_state_sequence = 0; g_player_state_sequence_valid = false;
 		g_gatling_animation_ms = 0; g_gatling_angle = 0.0f; g_gatling_speed = 0.0f; g_gatling_spin_logged = false;
 		g_initialized = false; g_render_logged = false;
 	}

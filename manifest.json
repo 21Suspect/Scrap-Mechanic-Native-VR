@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "patchId": "scrap-mechanic-native-vr-chapter2",
-  "patchVersion": "0.4.0-chapter2-beta-20260829",
-  "description": "Chapter 2 beta for Scrap Mechanic 1.0.5.876 with native OpenXR stereo rendering, tracked Quest hands and tools, Chapter 2 creative-hammer recognition, calibrated weapon visuals with stock projectile behavior, white barrel lasers, adaptive world-locked startup and in-game spatial UI, controller and hand-tracking UI input through Scrap Mechanic's private input-event queue, transparent native menu fade composition, and restrained OpenXR controller haptics without Windows mouse simulation",
+  "patchVersion": "1.0.0-chapter2-20260830",
+  "description": "Scrap Mechanic Chapter 2 native OpenXR VR with tracked Quest hands and tools, VR barrel-aimed gunfire, spatial live game menus, native queued UI input, transparent menu composition, and restrained controller haptics",
   "game": {
     "appId": "387990",
     "buildId": "24529696",
@@ -55,7 +55,7 @@
     },
     {
       "path": "Release\\smvr_native_vr_v1.addon64",
-      "patchedSha256": "D8E6D070BEE66A7626944FC82291558445EEAA8BDD0B2A1DC2A2D86CF187747F",
+      "patchedSha256": "74295E66FF9A84BAB56E0D10C00B82FD259D359BCA3189DF23118D968297174B",
       "originalMayBeMissing": true,
       "module": "chapter2-native-openxr"
     },
@@ -80,7 +80,7 @@
     },
     {
       "path": "Survival\\Scripts\\game\\Chapter2VR.lua",
-      "patchedSha256": "B1C1D55D293E586DE2B64DE4F3001CD36045B918E032B76E8E49F4E0471AAFB7",
+      "patchedSha256": "C39115B5E83D8D4E04DDB9FC4F8D933A3935DEA148BE8F93F8517DDF7A0D968D",
       "originalMayBeMissing": true,
       "module": "chapter2-gameplay-bridge"
     },
@@ -172,7 +172,7 @@
     },
     {
       "path": "Survival\\Scripts\\game\\tools\\PotatoRifle.lua",
-      "patchedSha256": "47CBA003A163FB15D37A62BC927FB011D67E4AB8572831E4A5B46E9D3A3F6BFD",
+      "patchedSha256": "1396BD5877CF37C6C72167604D144F6D6E7899416A92BD28362A74B47A2157E1",
       "originalSha256": [
         "7171B88E820B473D0FBE4AA9239C0C8B1CE760A1D726777041543F85D9B5CF24"
       ],
@@ -180,7 +180,7 @@
     },
     {
       "path": "Survival\\Scripts\\game\\tools\\PotatoShotgun.lua",
-      "patchedSha256": "395D05FFD99A7C736D1EE52D165091AC4FB6321C2937EE58DA7E4B3C6C0CF087",
+      "patchedSha256": "7F80F387EB5E7949E698DE24A5ACE46004973119E203EBC9C7FEFA950260DA8E",
       "originalSha256": [
         "CDA6C48343C575CF12E48C09AF4243750B2F6E969EBD6641132DBBE41A579C04"
       ],
@@ -188,7 +188,7 @@
     },
     {
       "path": "Survival\\Scripts\\game\\tools\\PotatoGatling.lua",
-      "patchedSha256": "CF697AAD4C698DFC1027AF07048A136E59E5FBACCF6ABC87A4B188BF186BEEEB",
+      "patchedSha256": "42E11BF85F88B45B4B8433FBB2339C5C781E539A1CD931BC9907BEA474B263BE",
       "originalSha256": [
         "9968041EE2BDEC0D20F5CC848A568683870D4B71B29F16A8B1C3C2E87D67B06B"
       ],
@@ -196,7 +196,7 @@
     },
     {
       "path": "Survival\\Scripts\\game\\tools\\ScrapPotatoRifle.lua",
-      "patchedSha256": "68FC80CA2154EE714DA486973F77BE82BCE3B6A026CE4F9F4A47B5A1560F9BF6",
+      "patchedSha256": "84D53F1D1C178814E374AD1350D6F91F788281AC1D920CB75428732A2F6AF779",
       "originalSha256": [
         "639CC94E6E0DF5D10A532DC54B306D0307E126C595A5379B16EAF61F49CCFB40"
       ],
@@ -204,7 +204,7 @@
     },
     {
       "path": "Survival\\Scripts\\game\\tools\\PotatoLauncher.lua",
-      "patchedSha256": "D2EFCF241A0006429B6DA60F894DAC932849CB2C569ACCBE713EB6E15DB176AD",
+      "patchedSha256": "A5556E9F301932868048C0F19DA3330C1BEB1892A8A503B824120BEFE658E627",
       "originalSha256": [
         "D819DE13E42708FC9A28CAD4C12865839F10A83B6E018F591D3359DDBAC60A36"
       ],
@@ -212,7 +212,7 @@
     },
     {
       "path": "Survival\\Scripts\\game\\tools\\ClayRifle.lua",
-      "patchedSha256": "580BAE887E51A926FC5E647107FF8EB010FD5E4EC95011B38D54C19E0A185E4A",
+      "patchedSha256": "719377C00F5DD91661DB3D53E025ADDDB317D70CFAD449824545A6AF414F7F19",
       "originalSha256": [
         "2303E03C184E187530CEA093F2352C86CA3B5EF3515CE39482EC3B416D9D98BC"
       ],

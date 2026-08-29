@@ -135,6 +135,7 @@ private:
     bool x_was_down_ = false;
     bool y_was_down_ = false;
     bool xy_chord_latched_ = false;
+    bool input_rearm_required_ = true;
     bool locomotion_reference_valid_ = false;
     XrVector3f locomotion_reference_forward_{0.0f, 0.0f, -1.0f};
     uint64_t recenter_hold_start_ms_ = 0;

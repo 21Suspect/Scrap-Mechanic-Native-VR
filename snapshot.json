@@ -1,10 +1,10 @@
 {
-  "snapshot": "chapter2-v0.4.0-beta",
-  "status": "chapter2-beta-patch-current-state",
-  "legacyBranch": "main",
-  "chapter2Branch": "chapter2-1.0",
-  "localFeatureBranch": "chapter2-feature-port",
-  "localFeatureStatus": "promoted-to-chapter2-beta-after-headset-testing",
+  "snapshot": "chapter2-v1.0.0",
+  "status": "chapter2-stable",
+  "legacyBranch": "legacy-pre-1.0",
+  "chapter2Branch": "main",
+  "localFeatureBranch": "chapter2-vr-barrel-fire",
+  "localFeatureStatus": "promoted-after-headset-testing",
   "game": {
     "steamAppId": 387990,
     "steamBuildId": 24529696,
@@ -26,7 +26,7 @@
   },
   "source": {
     "path": "src/native_vr.cpp",
-    "sha256": "10EB05BB5DE68D80AF01FBC6150C5AC0FCEAFD09A090079BD99FD03D3349D317",
+    "sha256": "102BBF447750A7F8DB668A39543A3709D90F9D0B62C3438949809209D3A97E2D",
     "reshadeApi": 18,
     "reshadeCommit": "4a50d1eddace85734871d91792ff214f13f66c01",
     "minhookCommit": "c3fcafdc10146beb5919319d0683e44e3c30d537",
@@ -35,72 +35,53 @@
   },
   "testedArtifact": {
     "path": "payload/Release/smvr_native_vr_v1.addon64",
-    "size": 4021760,
-    "sha256": "D8E6D070BEE66A7626944FC82291558445EEAA8BDD0B2A1DC2A2D86CF187747F"
+    "size": 4025856,
+    "sha256": "74295E66FF9A84BAB56E0D10C00B82FD259D359BCA3189DF23118D968297174B"
   },
   "localCandidateArtifact": {
-    "version": "0.4.0-chapter2-beta-20260829",
+    "version": "1.0.0-chapter2-20260830",
     "path": "payload/Release/smvr_native_vr_v1.addon64",
-    "size": 4021760,
-    "sha256": "D8E6D070BEE66A7626944FC82291558445EEAA8BDD0B2A1DC2A2D86CF187747F",
-    "headsetConfirmed": false,
+    "size": 4025856,
+    "sha256": "74295E66FF9A84BAB56E0D10C00B82FD259D359BCA3189DF23118D968297174B",
+    "headsetConfirmed": true,
     "source": {
-      "nativeVrSha256": "10EB05BB5DE68D80AF01FBC6150C5AC0FCEAFD09A090079BD99FD03D3349D317",
-      "featureInputSha256": "7A4428412E97C8F2201B5D801DE3DBBCA33C640D1FC9617114310EFD7888B1CC",
-      "featureInputHeaderSha256": "84060E6B481DF53B06685B476341247E7B0D7822660AFEBBE56056012C0F5D83",
+      "nativeVrSha256": "102BBF447750A7F8DB668A39543A3709D90F9D0B62C3438949809209D3A97E2D",
+      "featureInputSha256": "1843A600C3F3E1D4A001043780B5543F19DD75F00C63B61668E52E9FD07AD82C",
+      "featureInputHeaderSha256": "57C3C457E8A7F1115DA8689A803775DFBD0435DFBDC3B825DF98B65C44E7324F",
       "engineInputSha256": "7E42A655339628C71657FA5CE9F1E0328865570D1F0D0516762D66E52DCCFC43",
       "engineInputHeaderSha256": "45E786AC11CFB4D0E0F4FF1E8A93C8E39D42E2CD4ACC97F44ACED7050528B500",
       "startupMenuSha256": "24E690991F4DEE5798CD220B7B8DF4E640EE25DE3FDFD732824A4A5F31F5C898",
       "startupMenuHeaderSha256": "8A60E95601D458403AE6738975AC614BE5A4C31BD27BF1C72DC2A536D1321E3D",
       "vrHandsSha256": "3242E7B46BA8D02C9DA30570672B0081E211895FCD4E2AFCE536AED47D6CB426",
-      "vrToolsSha256": "E52B32FAA4C6D8E7B865C9CAE4195F27BA36927E1ECCC8D921F4F9DE5EEF6D7E",
+      "vrToolsSha256": "B530D47180CE9601C1A2A31646522A8D7F4220CBB657E3FE6CD2C500D621C2B9",
       "mechanicHandsAssetSha256": "2FBD78C8DFDE75EE5990A64BCB030B05213CC984B23C5A178506498CDD0354FC",
       "nativeToolAssetSha256": "EC2DC32C3933895B71D9469A859A28E938E55165DAA1AE42313EC1C973B96CEB",
       "chapter2ToolAssetSha256": "8DFD5A51BFFEC3F45E3FE57F714354E7CB24AB3C38BF1461BB16BF3E43DB1183",
       "mechanicHandsGeneratorSha256": "2795AD1C628BA0EDF689D86C7D4B13C14BD5022D5AE8086D138AA9B8EBAEE181",
       "chapter2ToolGeneratorSha256": "74BADC890EF7652F85EF9EA54EBEEED7A10B3D098B6B742C76A7122F7BF3793A",
-      "chapter2GameplayBridgeSha256": "B1C1D55D293E586DE2B64DE4F3001CD36045B918E032B76E8E49F4E0471AAFB7",
+      "chapter2GameplayBridgeSha256": "C39115B5E83D8D4E04DDB9FC4F8D933A3935DEA148BE8F93F8517DDF7A0D968D",
       "clayCalibrationHelperSourceSha256": "1258A507DCD596E64D3DD101255C5538551AEF3E872313D64BB34A0FD3A40A17",
       "weaponScriptSha256": {
-        "PotatoRifle.lua": "47CBA003A163FB15D37A62BC927FB011D67E4AB8572831E4A5B46E9D3A3F6BFD",
-        "PotatoShotgun.lua": "395D05FFD99A7C736D1EE52D165091AC4FB6321C2937EE58DA7E4B3C6C0CF087",
-        "PotatoGatling.lua": "CF697AAD4C698DFC1027AF07048A136E59E5FBACCF6ABC87A4B188BF186BEEEB",
-        "ScrapPotatoRifle.lua": "68FC80CA2154EE714DA486973F77BE82BCE3B6A026CE4F9F4A47B5A1560F9BF6",
-        "PotatoLauncher.lua": "D2EFCF241A0006429B6DA60F894DAC932849CB2C569ACCBE713EB6E15DB176AD",
-        "ClayRifle.lua": "580BAE887E51A926FC5E647107FF8EB010FD5E4EC95011B38D54C19E0A185E4A"
+        "PotatoRifle.lua": "1396BD5877CF37C6C72167604D144F6D6E7899416A92BD28362A74B47A2157E1",
+        "PotatoShotgun.lua": "7F80F387EB5E7949E698DE24A5ACE46004973119E203EBC9C7FEFA950260DA8E",
+        "PotatoGatling.lua": "42E11BF85F88B45B4B8433FBB2339C5C781E539A1CD931BC9907BEA474B263BE",
+        "ScrapPotatoRifle.lua": "84D53F1D1C178814E374AD1350D6F91F788281AC1D920CB75428732A2F6AF779",
+        "PotatoLauncher.lua": "A5556E9F301932868048C0F19DA3330C1BEB1892A8A503B824120BEFE658E627",
+        "ClayRifle.lua": "719377C00F5DD91661DB3D53E025ADDDB317D70CFAD449824545A6AF414F7F19"
       }
     }
   },
-  "localCandidateValidation": {
-    "date": "2026-08-29",
-    "pcVrEnabled": false,
-    "durationSeconds": 0,
-    "samples": 0,
-    "nonresponsiveSamples": 0,
-    "processRestarts": 0,
-    "normalExit": false,
-    "addonFailed": false,
-    "stereoFrames": 0,
-    "xrSuccessFrames": 0,
-    "metaRuntimeLoaded": false,
+  "validation": {
+    "date": "2026-08-30",
     "installerManagedFiles": 28,
-    "headsetConfirmed": false,
+    "headsetConfirmed": true,
     "clayCalibrationHeadsetConfirmed": true,
-    "weaponAimHeadsetConfirmed": false
+    "weaponAimHeadsetConfirmed": true,
+    "seatTransitionRecoveryHeadsetConfirmed": true
   },
-  "knownLimitations": [
-    "Gun projectiles intentionally retain stock Scrap Mechanic 1.0 PC-crosshair origin and direction; white VR barrel lasers are visual only.",
-    "The desktop left-eye mirror may freeze while the HMD is active even though headset rendering continues.",
-    "Fullscreen/windowed switching with an active HMD is less thoroughly confirmed than normal windowed play.",
-    "Modal startup and in-game menus are spatialized; the persistent gameplay HUD is not yet decomposed into independent 3D widgets.",
-    "The adaptive spatial-UI cadence and restrained OpenXR haptics are beta changes awaiting their post-package headset confirmation pass.",
-    "The beta is locked to Steam build 24529696 and the installer is unsigned."
-  ],
-  "localInstaller": {
-    "version": "0.4.0-chapter2-beta-20260829",
-    "path": "dist/ScrapMechanicVR-Chapter2-Patcher.exe",
-    "size": 6857728,
-    "sha256": "B17CD0AE6F28BA3B951690675D8AED94370B2BD42B9B4BE1CE2D850D960C4D45",
+  "installer": {
+    "version": "1.0.0-chapter2-20260830",
+    "path": "dist/ScrapMechanicVR-Installer.exe",
     "selfTest": "PASS",
     "published": true
   }

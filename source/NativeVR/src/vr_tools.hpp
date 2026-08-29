@@ -30,6 +30,10 @@ namespace scrapvr::tools
 	// Returns the calibrated hand-local pointer origin only for the three native
 	// tools whose real engine hit-test must follow the visible VR laser.
 	bool get_interaction_laser_offset(XrVector3f &offset);
+	// Returns the calibrated hand-local muzzle origin for the active gun together
+	// with the equipped Chapter 2 item UUID. Lua uses this value for projectile
+	// spawning; guns do not need a visible debug ray for the calibration to work.
+	bool get_gun_muzzle_offset(XrVector3f &offset, const char *&item_uuid);
 	bool is_hammer_active();
 	HapticProfile active_haptic_profile();
 	bool is_player_seated();

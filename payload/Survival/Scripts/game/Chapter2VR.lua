@@ -16,6 +16,12 @@ local VrActionLocalOffsets = {
 }
 
 local VrWorldStatePath = "$GAME_DATA/NativeVR/world_state.json"
+local VrPlayerStatePath = "$GAME_DATA/NativeVR/player_state.json"
+local VrHandBridgePath = "$GAME_DATA/NativeVR/hand_physics.json"
+local VrGunFireDebugPath = "$GAME_DATA/NativeVR/gun_fire_debug.json"
+local VrDirectBridgeFreshTicks = 10
+local VrDirectPoseFreshTicks = 6
+local VrPrimaryBridgeFreshTicks = 8
 
 local VrToolLaserItems = {
 	["8c7efc37-cd7c-4262-976e-39585f8527bf"] = true,
@@ -23,7 +29,14 @@ local VrToolLaserItems = {
 	["fdb8b8be-96e7-4de0-85c7-d2f42e4f33ce"] = true
 }
 
-local function clearClientAim()
+local function clearGunAim()
+	g_vrGunAimActive = false
+	g_vrGunMuzzlePosition = nil
+	g_vrGunDirection = nil
+	g_vrGunItem = nil
+end
+
+local function clearTrackedAim()
 	g_vrPrimaryActionAvailable = false
 	g_vrPrimaryActionDown = false
 	g_vrActionActive = false
@@ -34,6 +47,14 @@ local function clearClientAim()
 	g_vrToolPointerDirection = nil
 	g_vrHammerSwingDirection = nil
 	g_vrHammerSwingFreshTimer = 1.0
+	clearGunAim()
+end
+
+local function clearClientAim()
+	clearTrackedAim()
+	g_vrBridgeActive = false
+	g_vrBridgeFreshTimer = 1.0
+	g_vrBridgeLastTick = -1000
 end
 
 local function publishWorldState( active )
@@ -46,6 +67,21 @@ local function publishWorldState( active )
 		sm.log.warning( "SCRAPVR_WORLD_STATE active=" .. tostring( active == true ) )
 	else
 		sm.log.error( "SCRAPVR_WORLD_STATE_WRITE_FAILED " .. tostring( errorMessage ) )
+	end
+end
+
+local function publishPlayerState( active, seated, firstPerson, activeItem )
+	Chapter2VR.playerStateSequence = ( Chapter2VR.playerStateSequence or 0 ) + 1
+	local ok, errorMessage = pcall( sm.json.save, {
+		version = 1,
+		sequence = Chapter2VR.playerStateSequence,
+		active = active == true,
+		seated = seated == true,
+		firstPerson = firstPerson == true,
+		activeItem = activeItem or "00000000-0000-0000-0000-000000000000"
+	}, VrPlayerStatePath )
+	if not ok then
+		sm.log.error( "SCRAPVR_PLAYER_STATE_WRITE_FAILED " .. tostring( errorMessage ) )
 	end
 end
 
@@ -99,10 +135,15 @@ function Chapter2VR.clientCreate( self )
 	self.cl.vrHammerSwingFreshTimer = 1.0
 	self.cl.vrNativeToolItem = nil
 	self.cl.vrHandFreshTimer = 1.0
+	self.cl.vrBridgeFreshTimer = 1.0
+	self.cl.vrGunFreshTimer = 1.0
+	self.cl.vrGunAimItem = nil
+	self.cl.vrPlayerStateTimer = 0.0
 	self.cl.vrSeated = nil
 	self.cl.vrFirstPerson = nil
 	if self.player == sm.localPlayer.getPlayer() then
 		publishWorldState( true )
+		publishPlayerState( false, false, false, nil )
 		sm.log.warning( "SCRAPVR_BRIDGE_CREATE" )
 	end
 	clearClientAim()
@@ -110,8 +151,15 @@ end
 
 local function updateToolAim( self, data )
 	local activeItem = tostring( sm.localPlayer.getActiveItem() )
+	self.cl.vrBridgeFreshTimer = 0.0
+	g_vrBridgeFreshTimer = 0.0
+	g_vrBridgeLastTick = sm.game.getCurrentTick()
+	g_vrBridgeActive = data.vrActive == true
 	local pose = resolveHandPose( data )
-	if not pose then return end
+	if not pose then
+		clearTrackedAim()
+		return
+	end
 	local hand = pose.hand
 
 	local actionOffset = VrActionLocalOffsets[activeItem] or { 0.000, -0.035, -0.120 }
@@ -125,6 +173,23 @@ local function updateToolAim( self, data )
 	g_vrToolPointerEnabled = laserOffset ~= nil
 	g_vrToolPointerOrigin = laserOffset and handLocalPosition( pose, laserOffset ) or nil
 	g_vrToolPointerDirection = laserOffset and pose.forward or nil
+
+	local muzzle = data.gunMuzzle
+	if type( muzzle ) == "table" and muzzle.active == true and muzzle.item == activeItem and
+		validNumber( muzzle.x ) and validNumber( muzzle.y ) and validNumber( muzzle.z ) then
+		g_vrGunAimActive = true
+		g_vrGunMuzzlePosition = handLocalPosition( pose, { muzzle.x, muzzle.y, muzzle.z } )
+		g_vrGunDirection = pose.forward
+		g_vrGunItem = activeItem
+		self.cl.vrGunFreshTimer = 0.0
+		if self.cl.vrGunAimItem ~= activeItem then
+			self.cl.vrGunAimItem = activeItem
+			sm.log.warning( "SCRAPVR_GUN_MUZZLE_READY " .. activeItem )
+		end
+	else
+		clearGunAim()
+		self.cl.vrGunAimItem = nil
+	end
 	self.cl.vrHandFreshTimer = 0.0
 end
 
@@ -134,34 +199,46 @@ function Chapter2VR.clientUpdate( self, dt )
 	local locking = character and character:getLockingInteractable() or nil
 	local seated = locking ~= nil and locking:hasSeat()
 	local activeItem = tostring( sm.localPlayer.getActiveItem() )
-	-- Chapter 2 no longer exposes the old player marker reliably when it is
-	-- emitted only after a hand-physics file update. Publish the equipped item
-	-- first, on change, so the native hand pass can select the matching mesh.
-	if self.cl.vrNativeToolItem ~= activeItem then
+	local toolChanged = self.cl.vrNativeToolItem ~= activeItem
+	local seatedChanged = self.cl.vrSeated ~= seated
+	local firstPerson = sm.localPlayer.isInFirstPersonView()
+	local firstPersonChanged = self.cl.vrFirstPerson ~= firstPerson
+	-- Keep readable transition markers for diagnostics; the native renderer now
+	-- consumes the authoritative player-state JSON published below.
+	if toolChanged then
 		self.cl.vrNativeToolItem = activeItem
 		sm.log.warning( "SCRAPVR_NATIVE_TOOL " .. activeItem )
 	end
-	if self.cl.vrSeated ~= seated then
+	if seatedChanged then
 		self.cl.vrSeated = seated
 		sm.log.warning( seated and "SCRAPVR_SEATED 1" or "SCRAPVR_SEATED 0" )
 	end
-	local firstPerson = sm.localPlayer.isInFirstPersonView()
-	if self.cl.vrFirstPerson ~= firstPerson then
+	if firstPersonChanged then
 		self.cl.vrFirstPerson = firstPerson
 		sm.log.warning( firstPerson and "SCRAPVR_FIRST_PERSON 1" or "SCRAPVR_FIRST_PERSON 0" )
 	end
+	self.cl.vrPlayerStateTimer = ( self.cl.vrPlayerStateTimer or 0.0 ) + dt
+	if toolChanged or seatedChanged or firstPersonChanged or self.cl.vrPlayerStateTimer >= 0.25 then
+		self.cl.vrPlayerStateTimer = 0.0
+		publishPlayerState( true, seated, firstPerson, activeItem )
+	end
 
 	self.cl.vrHandFreshTimer = ( self.cl.vrHandFreshTimer or 1.0 ) + dt
+	self.cl.vrBridgeFreshTimer = ( self.cl.vrBridgeFreshTimer or 1.0 ) + dt
+	self.cl.vrGunFreshTimer = ( self.cl.vrGunFreshTimer or 1.0 ) + dt
+	g_vrBridgeFreshTimer = self.cl.vrBridgeFreshTimer
 	self.cl.vrHammerSwingFreshTimer = ( self.cl.vrHammerSwingFreshTimer or 1.0 ) + dt
 	g_vrHammerSwingFreshTimer = self.cl.vrHammerSwingFreshTimer
 	if self.cl.vrHammerSwingFreshTimer > 0.6 then g_vrHammerSwingDirection = nil end
+	if self.cl.vrGunFreshTimer > 0.12 then clearGunAim() end
 	if self.cl.vrHandFreshTimer > 0.8 then clearClientAim() end
 	self.cl.vrHandTimer = ( self.cl.vrHandTimer or 0.0 ) + dt
 	if self.cl.vrHandTimer < 0.02 then return end
 	self.cl.vrHandTimer = 0.0
-	local path = "$GAME_DATA/NativeVR/hand_physics.json"
-	if not sm.json.fileExists( path ) then return end
-	local ok, data = pcall( sm.json.open, path )
+	-- fileExists is backed by the game's resource catalog and can remain false
+	-- for this native add-on's runtime-created file. Open it directly and let
+	-- pcall handle the short periods where the bridge is genuinely absent.
+	local ok, data = pcall( sm.json.open, VrHandBridgePath )
 	if not ok or type( data ) ~= "table" or type( data.sequence ) ~= "number" or
 		data.sequence == self.cl.vrHandSequence then return end
 	-- A previous VR run may have ended without deleting its last bridge file.
@@ -246,8 +323,12 @@ local function updateTouchControls( settings, state, tick, player )
 		local nearestDistance = searchRadius
 		for _, shape in ipairs( sm.shape.shapesInSphere( hand.position, searchRadius ) ) do
 			local uuid = shape:getShapeUuid()
-			if uuid == VrInteractiveSwitch or uuid == VrInteractiveButton or
-				uuid == VrElevatorButton or uuid == VrElevatorCallButton then
+			-- The stock switch and button are engine-native lever/button types.
+			-- Calling interactable:setActive on either from Lua is forbidden and an
+			-- unhandled error disables this player bridge until the world reloads.
+			-- They remain usable through the tracked ray and the game's normal
+			-- interaction input; physical touch is limited to scripted elevators.
+			if uuid == VrElevatorButton or uuid == VrElevatorCallButton then
 				local interactable = shape:getInteractable()
 				local allowed = previousTouch and previousTouch.interactable == interactable and
 					searchRadius or settings.interactionRadius
@@ -284,25 +365,8 @@ local function updateTouchControls( settings, state, tick, player )
 				local nextAllowed = state.interactionCooldowns[interactable] or 0
 				if not alreadyTouched and tick >= nextAllowed then
 					state.interactionCooldowns[interactable] = tick + settings.interactionCooldownTicks
-					if nearestTouch.uuid == VrInteractiveSwitch then
-						interactable:setActive( not interactable:isActive() )
-					elseif nearestTouch.uuid == VrInteractiveButton then
-						interactable:setActive( true )
-					else
-						sm.event.sendToInteractable( interactable, "sv_e_vrInteract", { player = player } )
-					end
+					sm.event.sendToInteractable( interactable, "sv_e_vrInteract", { player = player } )
 				end
-			end
-		end
-	end
-	for _, previousTouch in pairs( state.touching ) do
-		if previousTouch.uuid == VrInteractiveButton then
-			local stillTouched = false
-			for _, currentTouch in pairs( currentTouches ) do
-				if currentTouch.interactable == previousTouch.interactable then stillTouched = true end
-			end
-			if not stillTouched and sm.exists( previousTouch.interactable ) then
-				previousTouch.interactable:setActive( false )
 			end
 		end
 	end
@@ -352,12 +416,21 @@ end
 function Chapter2VR.clientDestroy( self )
 	if self.player == sm.localPlayer.getPlayer() then
 		publishWorldState( false )
+		publishPlayerState( false, false, false, nil )
 		clearClientAim()
 	end
 end
 
 function Chapter2VR.primaryState( toolState, primaryState )
-	if g_vrPrimaryActionAvailable == true then
+	-- This check must be independent of Chapter2VR.clientUpdate's dt timer. The
+	-- player callback can temporarily stop during seat/headset transitions while
+	-- equipped tools continue updating; a cached VR trigger must then expire on
+	-- the game's authoritative tick clock instead of suppressing desktop input.
+	local tick = sm.game.getCurrentTick()
+	local bridgeAge = type( g_vrBridgeLastTick ) == "number" and tick - g_vrBridgeLastTick or nil
+	local vrPrimaryFresh = g_vrPrimaryActionAvailable == true and g_vrBridgeActive == true and
+		bridgeAge ~= nil and bridgeAge >= 0 and bridgeAge <= VrPrimaryBridgeFreshTicks
+	if vrPrimaryFresh then
 		if g_vrPrimaryActionDown == true then
 			primaryState = toolState.vrPrimaryTriggerDown and sm.tool.interactState.hold or
 				sm.tool.interactState.start
@@ -373,4 +446,113 @@ function Chapter2VR.primaryState( toolState, primaryState )
 		primaryState = sm.tool.interactState.stop
 	end
 	return primaryState
+end
+
+-- Returns a fresh tracked barrel pose and whether VR is authoritative. A gun
+-- must never silently fall back to the desktop camera while a live VR session
+-- is present: if tracking or the equipped-tool calibration is not ready, the
+-- caller receives authoritative=true with no pose and skips that shot.
+local function refreshDirectGunPose()
+	local tick = sm.game.getCurrentTick()
+	if Chapter2VR.directGunReadTick == tick then return tick end
+	Chapter2VR.directGunReadTick = tick
+	Chapter2VR.directGunReadReason = "bridge_missing"
+
+	local ok, data = pcall( sm.json.open, VrHandBridgePath )
+	if not ok or type( data ) ~= "table" then
+		Chapter2VR.directGunReadReason = "bridge_unavailable"
+		return tick
+	end
+	if data.vrActive ~= true or type( data.sequence ) ~= "number" then
+		Chapter2VR.directGunReadReason = "bridge_inactive"
+		return tick
+	end
+
+	if Chapter2VR.directGunSequence ~= data.sequence then
+		Chapter2VR.directGunSequence = data.sequence
+		Chapter2VR.directGunBridgeTick = tick
+	end
+
+	local activeItem = tostring( sm.localPlayer.getActiveItem() )
+	local muzzle = data.gunMuzzle
+	local pose = resolveHandPose( data )
+	if not pose then
+		Chapter2VR.directGunReadReason = "right_hand_inactive"
+		return tick
+	end
+	if type( muzzle ) ~= "table" or muzzle.active ~= true then
+		Chapter2VR.directGunReadReason = "gun_calibration_inactive"
+		return tick
+	end
+	if muzzle.item ~= activeItem then
+		Chapter2VR.directGunReadReason = "gun_uuid_mismatch"
+		return tick
+	end
+	if not validNumber( muzzle.x ) or not validNumber( muzzle.y ) or not validNumber( muzzle.z ) then
+		Chapter2VR.directGunReadReason = "gun_offset_invalid"
+		return tick
+	end
+
+	local direction = pose.forward
+	local position = handLocalPosition( pose, { muzzle.x, muzzle.y, muzzle.z } )
+	Chapter2VR.directGunPose = {
+		position = position,
+		direction = direction,
+		item = activeItem,
+		sequence = data.sequence,
+		tick = tick
+	}
+	Chapter2VR.directGunReadReason = "tracked_barrel"
+
+	-- Keep the existing consumers in sync, but do not rely on the player
+	-- callback having run before a tool fires.
+	g_vrBridgeActive = true
+	g_vrBridgeFreshTimer = 0.0
+	g_vrGunAimActive = true
+	g_vrGunMuzzlePosition = position
+	g_vrGunDirection = direction
+	g_vrGunItem = activeItem
+	return tick
+end
+
+local function writeGunFireDiagnostic( firePos, direction, authoritative, reason )
+	local cameraDirection = sm.localPlayer.getDirection()
+	local payload = {
+		tick = sm.game.getCurrentTick(),
+		item = tostring( sm.localPlayer.getActiveItem() ),
+		sequence = Chapter2VR.directGunSequence or -1,
+		source = firePos and "vr_barrel" or ( authoritative and "blocked" or "pc_fallback" ),
+		reason = reason,
+		vrDirection = direction and { x = direction.x, y = direction.y, z = direction.z } or nil,
+		cameraDirection = { x = cameraDirection.x, y = cameraDirection.y, z = cameraDirection.z },
+		muzzlePosition = firePos and { x = firePos.x, y = firePos.y, z = firePos.z } or nil
+	}
+	pcall( sm.json.save, payload, VrGunFireDebugPath )
+end
+
+function Chapter2VR.gunFirePose( tool, firing )
+	local tick = refreshDirectGunPose()
+	local bridgeTick = Chapter2VR.directGunBridgeTick
+	local authoritative = bridgeTick ~= nil and tick - bridgeTick <= VrDirectBridgeFreshTicks
+	local cached = Chapter2VR.directGunPose
+	local activeItem = tostring( sm.localPlayer.getActiveItem() )
+	local poseFresh = cached ~= nil and cached.item == activeItem and
+		tick - cached.tick <= VrDirectPoseFreshTicks
+	local reason = Chapter2VR.directGunReadReason or "unknown"
+
+	if authoritative and poseFresh then
+		local direction = cached.direction
+		local owner = tool and tool:getOwner() or nil
+		local character = owner and owner.character or nil
+		if direction:length() >= 0.5 and
+			( not character or ( cached.position - character.worldPosition ):length() <= 3.0 ) then
+			direction = direction:normalize()
+			if firing then writeGunFireDiagnostic( cached.position, direction, true, "tracked_barrel" ) end
+			return cached.position, direction, true
+		end
+		reason = "pose_sanity_failed"
+	end
+
+	if firing then writeGunFireDiagnostic( nil, nil, authoritative, reason ) end
+	return nil, nil, authoritative
 end

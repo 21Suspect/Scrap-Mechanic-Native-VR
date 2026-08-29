@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if (-not $OutputPath) {
-    $OutputPath = Join-Path $PSScriptRoot 'dist\ScrapMechanicVR-Chapter2-Patcher.exe'
+    $OutputPath = Join-Path $PSScriptRoot 'dist\ScrapMechanicVR-Installer.exe'
 }
 $csc = 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (-not (Test-Path -LiteralPath $csc -PathType Leaf)) {

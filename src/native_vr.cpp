@@ -117,6 +117,8 @@ uint64_t g_hand_bridge_sequence = 0;
 uint64_t g_last_hand_bridge_publish_ms = 0;
 std::atomic<bool> g_hand_bridge_logged{false};
 bool g_previous_right_interaction = false;
+bool g_previous_gun_muzzle_active = false;
+std::string g_previous_gun_muzzle_item;
 XrVector3f g_optical_hammer_previous{};
 uint64_t g_optical_hammer_previous_ms = 0;
 uint64_t g_optical_hammer_last_swing_ms = 0;
@@ -370,10 +372,38 @@ void remove_hand_bridge(bool reset_session = false)
         g_hand_bridge_sequence = 0;
         g_previous_right_interaction = false;
     }
+    g_previous_gun_muzzle_active = false;
+    g_previous_gun_muzzle_item.clear();
     g_last_hand_bridge_publish_ms = 0;
     g_hand_bridge_logged.store(false, std::memory_order_release);
     g_right_hand_world_active = false;
     g_right_hand_world_ms = 0;
+}
+
+void deactivate_hand_bridge()
+{
+    g_previous_right_interaction = false;
+    g_previous_gun_muzzle_active = false;
+    g_previous_gun_muzzle_item.clear();
+    g_last_hand_bridge_publish_ms = 0;
+    g_hand_bridge_logged.store(false, std::memory_order_release);
+    g_right_hand_world_active = false;
+    g_right_hand_world_ms = 0;
+
+    wchar_t path[MAX_PATH]{}, temporary[MAX_PATH]{};
+    if (!hand_bridge_paths(path, temporary, true)) return;
+    const uint64_t hand_sequence = ++g_hand_bridge_sequence;
+    char json[1024]{};
+    const int length = std::snprintf(json, sizeof(json),
+        "{\"sequence\":%llu,\"vrActive\":false,\"opticalGunTrigger\":false,"
+        "\"gunMuzzle\":{\"active\":false,\"item\":\"\",\"x\":0,\"y\":0,\"z\":0},"
+        "\"hammerSwingSequence\":%llu,\"hammerSwingDirection\":{\"x\":0,\"y\":0,\"z\":0},"
+        "\"left\":{\"active\":false,\"interact\":false,\"optical\":false},"
+        "\"right\":{\"active\":false,\"interact\":false,\"optical\":false}}",
+        static_cast<unsigned long long>(hand_sequence),
+        static_cast<unsigned long long>(g_optical_hammer_swing_sequence));
+    if (length > 0 && static_cast<size_t>(length) < sizeof(json))
+        write_atomic_file(path, temporary, json, static_cast<size_t>(length));
 }
 
 void remove_world_state_bridge()
@@ -385,6 +415,8 @@ void remove_world_state_bridge()
     *slash=L'\0';
     wchar_t path[MAX_PATH]{};
     if (swprintf_s(path,L"%s\\world_state.json",hand_path)>=0)
+        DeleteFileW(path);
+    if (swprintf_s(path,L"%s\\player_state.json",hand_path)>=0)
         DeleteFileW(path);
 }
 
@@ -399,15 +431,6 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
         scrapvr::hands::get_pose(0, poses[0], optical[0], interaction[0]),
         scrapvr::hands::get_pose(1, poses[1], optical[1], interaction[1])
     };
-    if (!active[0] && !active[1])
-    {
-        // Tracking can be lost for a frame while the XR session remains alive.
-        // Keep the marker present so Lua knows VR is still authoritative and
-        // blocks a stale shot instead of silently falling back to the PC camera.
-        g_right_hand_world_active = false;
-        g_right_hand_world_ms = 0;
-        return;
-    }
     XrVector3f world[2]{}, forward[2]{}, up[2]{};
     const XrQuaternionf inverse_reference = conjugate(normalize(reference.orientation));
     for (uint32_t hand = 0; hand < 2; ++hand)
@@ -436,6 +459,11 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
         g_right_hand_world_ms = now;
     }
 
+    XrVector3f gun_muzzle_offset{};
+    const char *gun_muzzle_item = nullptr;
+    const bool gun_tool_active = scrapvr::tools::get_gun_muzzle_offset(
+        gun_muzzle_offset, gun_muzzle_item);
+    const bool gun_muzzle_active = active[1] && gun_tool_active && gun_muzzle_item;
     const bool hammer_active = scrapvr::tools::is_hammer_active();
     if (active[1] && optical[1] && hammer_active)
     {
@@ -483,23 +511,31 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
         g_optical_hammer_armed = true;
     }
 
-    // Keep the general hand bridge available for non-projectile VR interactions.
-    // Gun projectile origin and direction intentionally remain game-default.
     const bool right_interaction_changed = interaction[1] != g_previous_right_interaction;
-    const uint64_t publish_interval_ms = interaction[1] ? 20u : 1000u;
-    if (!right_interaction_changed && now - g_last_hand_bridge_publish_ms < publish_interval_ms) return;
+    const std::string gun_item = gun_muzzle_item ? gun_muzzle_item : "";
+    const bool gun_muzzle_changed = gun_muzzle_active != g_previous_gun_muzzle_active ||
+        gun_item != g_previous_gun_muzzle_item;
+    // Keep an equipped gun's pose current even before the trigger moves. This
+    // prevents the first shot after hand motion from using an old barrel pose.
+    const uint64_t publish_interval_ms = gun_tool_active ? 20u : (interaction[1] ? 20u : 1000u);
+    if (!right_interaction_changed && !gun_muzzle_changed &&
+        now - g_last_hand_bridge_publish_ms < publish_interval_ms) return;
 
     wchar_t path[MAX_PATH]{}, temporary[MAX_PATH]{};
     if (!hand_bridge_paths(path, temporary, true)) return;
-    const bool optical_gun_trigger = optical[1] && !hammer_active && interaction[1];
+    const bool optical_gun_trigger = optical[1] && gun_tool_active && interaction[1];
     const uint64_t hand_sequence = ++g_hand_bridge_sequence;
-    char json[1280]{};
+    char json[1536]{};
     const int length = std::snprintf(json, sizeof(json),
-        "{\"sequence\":%llu,\"opticalGunTrigger\":%s,\"hammerSwingSequence\":%llu,\"hammerSwingDirection\":{\"x\":%.5f,\"y\":%.5f,\"z\":%.5f},"
+        "{\"sequence\":%llu,\"vrActive\":true,\"opticalGunTrigger\":%s,"
+        "\"gunMuzzle\":{\"active\":%s,\"item\":\"%s\",\"x\":%.5f,\"y\":%.5f,\"z\":%.5f},"
+        "\"hammerSwingSequence\":%llu,\"hammerSwingDirection\":{\"x\":%.5f,\"y\":%.5f,\"z\":%.5f},"
         "\"left\":{\"active\":%s,\"interact\":%s,\"optical\":%s,\"x\":%.5f,\"y\":%.5f,\"z\":%.5f,\"fx\":%.5f,\"fy\":%.5f,\"fz\":%.5f,\"ux\":%.5f,\"uy\":%.5f,\"uz\":%.5f},"
         "\"right\":{\"active\":%s,\"interact\":%s,\"optical\":%s,\"x\":%.5f,\"y\":%.5f,\"z\":%.5f,\"fx\":%.5f,\"fy\":%.5f,\"fz\":%.5f,\"ux\":%.5f,\"uy\":%.5f,\"uz\":%.5f}}",
         static_cast<unsigned long long>(hand_sequence),
         optical_gun_trigger ? "true" : "false",
+        gun_muzzle_active ? "true" : "false", gun_item.c_str(),
+        gun_muzzle_offset.x, gun_muzzle_offset.y, gun_muzzle_offset.z,
         static_cast<unsigned long long>(g_optical_hammer_swing_sequence),
         g_optical_hammer_swing_direction.x, g_optical_hammer_swing_direction.y,
         g_optical_hammer_swing_direction.z,
@@ -514,10 +550,12 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
     if (!write_atomic_file(path, temporary, json, static_cast<size_t>(length))) return;
 
     g_last_hand_bridge_publish_ms = now;
+    g_previous_gun_muzzle_active = gun_muzzle_active;
+    g_previous_gun_muzzle_item = gun_item;
     if (g_optical_hammer_click_publishes > 0) --g_optical_hammer_click_publishes;
     if (!g_hand_bridge_logged.exchange(true))
     {
-        log_line("VR_HAND_BRIDGE_ACTIVE path=Data/NativeVR/hand_physics.json world_space=1 gun_projectile_override=0");
+        log_line("VR_HAND_BRIDGE_ACTIVE path=Data/NativeVR/hand_physics.json world_space=1 gun_projectile_override=tracked_barrel");
     }
 }
 
@@ -1710,10 +1748,10 @@ struct OpenXrState
                 const auto &changed = *reinterpret_cast<const XrEventDataSessionStateChanged *>(&event);
                 state = changed.state;
                 g_input.on_session_state(state);
+                if (state != XR_SESSION_STATE_FOCUSED) deactivate_hand_bridge();
                 log_line("XR_SESSION_STATE state=%d", static_cast<int>(state));
                 if (state == XR_SESSION_STATE_READY && !running)
                 {
-                    remove_hand_bridge(false);
                     XrSessionBeginInfo begin{XR_TYPE_SESSION_BEGIN_INFO};
                     begin.primaryViewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
                     result = xrBeginSession(session, &begin);
@@ -1735,7 +1773,6 @@ struct OpenXrState
                     running = false; anchor_valid = false;
                     g_startup_menu.reset_world_anchor();
                     g_startup_menu.reset_state();
-                    remove_hand_bridge(false);
                     restore_render_size_override();
                     restore_viewmodel_pass_patch();
                     if (XR_FAILED(result)) fail("xrEndSession", result);
@@ -1745,7 +1782,6 @@ struct OpenXrState
                     running = false;
                     g_startup_menu.reset_world_anchor();
                     g_startup_menu.reset_state();
-                    remove_hand_bridge(false);
                     restore_render_size_override();
                     restore_viewmodel_pass_patch();
                     g_failed.store(true); log_line("FAIL stage=session_exit_or_loss state=%d", static_cast<int>(state));
@@ -1890,7 +1926,8 @@ struct OpenXrState
                 anchor_game.m[12], anchor_game.m[13], anchor_game.m[14], anchor_head.orientation.x,
                 anchor_head.orientation.y, anchor_head.orientation.z, anchor_head.orientation.w);
         }
-        publish_hand_bridge(anchor_head, game_world_to_view);
+        if (state == XR_SESSION_STATE_FOCUSED)
+            publish_hand_bridge(anchor_head, game_world_to_view);
         if (g_feature_startup_menu_enabled)
         {
             g_startup_menu.update_pointer(

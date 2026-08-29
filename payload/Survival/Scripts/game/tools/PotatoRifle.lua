@@ -186,10 +186,13 @@ function PotatoRifle.client_onUpdate( self, dt )
 	local effectPos, rot
 
 	if self.tool:isLocal() then
-		local dir = sm.localPlayer.getDirection()
-		local firePos = self.tool:getFpBonePos( "pejnt_barrel" )
+		local vrFirePos, vrDirection = Chapter2VR.gunFirePose( self.tool )
+		local dir = vrFirePos and vrDirection or sm.localPlayer.getDirection()
+		local firePos = vrFirePos or self.tool:getFpBonePos( "pejnt_barrel" )
 
-		if not self.aiming then
+		if vrFirePos then
+			effectPos = firePos
+		elseif not self.aiming then
 			effectPos = firePos + dir * 0.2
 		else
 			effectPos = firePos + dir * 0.45
@@ -562,18 +565,21 @@ function PotatoRifle.cl_onPrimaryUse( self, state )
 
 		if not sm.game.getEnableAmmoConsumption() or sm.container.canSpend( sm.localPlayer.getInventory(), obj_plantables_potato, 1 ) then
 			local firstPerson = self.tool:isInFirstPersonView()
+			local vrFirePos, vrDirection, vrAuthoritative = Chapter2VR.gunFirePose( self.tool, true )
+			if vrAuthoritative and not vrFirePos then return end
+			local vrGunAim = vrFirePos ~= nil
 
-			local dir = sm.localPlayer.getDirection()
+			local dir = vrGunAim and vrDirection or sm.localPlayer.getDirection()
 
-			local firePos = self:calculateFirePosition()
-			local fakePosition = self:calculateTpMuzzlePos()
+			local firePos = vrGunAim and vrFirePos or self:calculateFirePosition()
+			local fakePosition = vrGunAim and firePos or self:calculateTpMuzzlePos()
 			local fakePositionSelf = fakePosition
-			if firstPerson then
+			if firstPerson and not vrGunAim then
 				fakePositionSelf = self:calculateFpMuzzlePos()
 			end
 
 			-- Aim assist
-			if not firstPerson then
+			if not vrGunAim and not firstPerson then
 				local raycastPos = sm.camera.getPosition() + sm.camera.getDirection() * sm.camera.getDirection():dot( GetOwnerPosition( self.tool ) - sm.camera.getPosition() )
 				local hit, result = sm.localPlayer.getRaycast( 250, raycastPos, sm.camera.getDirection() )
 				if hit then
@@ -589,7 +595,9 @@ function PotatoRifle.cl_onPrimaryUse( self, state )
 				end
 			end
 
-			dir = dir:rotate( math.rad( 0.955 ), sm.camera.getRight() ) -- 50 m sight calibration
+			if not vrGunAim then
+				dir = dir:rotate( math.rad( 0.955 ), sm.camera.getRight() ) -- 50 m sight calibration
+			end
 
 			-- Spread
 			local fireMode = self.aiming and self.aimFireMode or self.normalFireMode

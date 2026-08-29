@@ -2,7 +2,7 @@
 
 ## Native add-on
 
-The Chapter 2 beta uses LLVM-MinGW UCRT x86-64 (`llvm-mingw-20260616`) and Ninja. Its dependencies are ReShade API 18, MinHook 1.3.3 source, OpenXR 1.1.60 headers, and the matching MinGW OpenXR loader import library in `third_party`.
+The Chapter 2 release uses LLVM-MinGW UCRT x86-64 (`llvm-mingw-20260616`) and Ninja. Its dependencies are ReShade API 18, MinHook 1.3.3 source, OpenXR 1.1.60 headers, and the matching MinGW OpenXR loader import library in `third_party`.
 
 ```powershell
 .\Build.ps1 `
@@ -36,11 +36,11 @@ Only use the payload with the exact executable hash documented in `README.md`. D
 .\Build-OneFileInstaller.ps1
 ```
 
-The public artifact is `dist/ScrapMechanicVR-Chapter2-Patcher.exe`. It validates its embedded patcher, manifest, native add-on, and all 28 managed payload files before installation. It discovers Steam and the active 64-bit OpenXR runtime, rejects unsupported game builds, backs up original files, and supports verify, repair/restore, and uninstall.
+The public artifact is `dist/ScrapMechanicVR-Installer.exe`. It validates its embedded patcher, manifest, native add-on, and all 28 managed payload files before installation. It discovers Steam and the active 64-bit OpenXR runtime, rejects unsupported game builds, backs up original files, and supports verify, repair/restore, and uninstall.
 
-Current version: `0.3.1-chapter2-beta-20260829`
+Current version: `1.0.0-chapter2-20260830`
 
-Installer SHA-256: `259A1A22CDD902C42842EB8F45B7CAB9192A00E904BD71BCEC27EEC52B881A3D`
+The installer SHA-256 is recorded in `SHA256SUMS.txt`.
 
 The backend invalidates Scrap Mechanic's generated `Cache/Bundle/core_data.cbo` after relevant install, repair, and uninstall operations so the game recompiles current player callbacks rather than running a stale Lua bundle.
 
@@ -54,4 +54,4 @@ Before publishing:
 4. Build the one-file installer and run its self-test.
 5. Run `Verify-Snapshot.ps1`.
 6. Regenerate `SHA256SUMS.txt` and record the installer hash in `README.md` and this file.
-7. Publish only to `chapter2-1.0`; do not modify the legacy `main` branch.
+7. Publish the current Chapter 2 release to `main`; preserve the pre-1.0 build on `legacy-pre-1.0`.

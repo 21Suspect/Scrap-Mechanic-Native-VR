@@ -188,9 +188,10 @@ function ScrapPotatoRifle.client_onUpdate( self, dt )
 	end
 
 	if self.tool:isLocal() then
-		local dir = sm.localPlayer.getDirection()
-		local firePos = self.tool:getFpBonePos( "pejnt_barrel" )
-		local effectPosFP = firePos + dir * 0.2
+		local vrFirePos, vrDirection = Chapter2VR.gunFirePose( self.tool )
+		local dir = vrFirePos and vrDirection or sm.localPlayer.getDirection()
+		local firePos = vrFirePos or self.tool:getFpBonePos( "pejnt_barrel" )
+		local effectPosFP = vrFirePos and firePos or firePos + dir * 0.2
 		local rotFP = sm.vec3.getRotation( sm.vec3.new( 0, 0, 1 ), dir )
 		self.shootEffectFP:setPosition( effectPosFP )
 		self.shootEffectFP:setVelocity( self.tool:getMovementVelocity() )
@@ -593,18 +594,21 @@ function ScrapPotatoRifle.cl_tryShoot( self )
 
 	if not sm.game.getEnableAmmoConsumption() or sm.container.canSpend( sm.localPlayer.getInventory(), obj_plantables_potato, 1 ) then
 		local firstPerson = self.tool:isInFirstPersonView()
+		local vrFirePos, vrDirection, vrAuthoritative = Chapter2VR.gunFirePose( self.tool, true )
+		if vrAuthoritative and not vrFirePos then return end
+		local vrGunAim = vrFirePos ~= nil
 
-		local dir = sm.localPlayer.getDirection()
+		local dir = vrGunAim and vrDirection or sm.localPlayer.getDirection()
 
-		local firePos = self:calculateFirePosition()
-		local fakePosition = self:calculateTpMuzzlePos()
+		local firePos = vrGunAim and vrFirePos or self:calculateFirePosition()
+		local fakePosition = vrGunAim and firePos or self:calculateTpMuzzlePos()
 		local fakePositionSelf = fakePosition
-		if firstPerson then
+		if firstPerson and not vrGunAim then
 			fakePositionSelf = self:calculateFpMuzzlePos()
 		end
 
 		-- Aim assist
-		if not firstPerson then
+		if not vrGunAim and not firstPerson then
 			local raycastPos = sm.camera.getPosition() + sm.camera.getDirection() * sm.camera.getDirection():dot( GetOwnerPosition( self.tool ) - sm.camera.getPosition() )
 			local hit, result = sm.localPlayer.getRaycast( 250, raycastPos, sm.camera.getDirection() )
 			if hit then
@@ -635,9 +639,13 @@ function ScrapPotatoRifle.cl_tryShoot( self )
 			spreadDeg = SpreadAngleWonk
 			damage = WonkDamage
 			fireVelocity = FireVelocityWonk
-			dir = dir:rotate( math.rad( 9.5 ), sm.camera.getRight() ) -- 25 m sight calibration (vel=25)
+			if not vrGunAim then
+				dir = dir:rotate( math.rad( 9.5 ), sm.camera.getRight() ) -- 25 m sight calibration (vel=25)
+			end
 		else
-			dir = dir:rotate( math.rad( 3.0 ), sm.camera.getRight() ) -- 25 m sight calibration (vel=50)
+			if not vrGunAim then
+				dir = dir:rotate( math.rad( 3.0 ), sm.camera.getRight() ) -- 25 m sight calibration (vel=50)
+			end
 		end
 		dir = sm.noise.gunSpread( dir, spreadDeg )
 

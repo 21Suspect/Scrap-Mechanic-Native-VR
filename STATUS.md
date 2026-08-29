@@ -1,58 +1,33 @@
-# Chapter 2 beta status
+# Chapter 2 release status
 
-Release: `0.4.0-chapter2-beta-20260829`
+Release: `1.0.0-chapter2-20260830`
 
-Branch: `chapter2-1.0`
+Branch: `main`
 
 Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 
-## Headset-confirmed results
+## Headset-confirmed build
 
-- Native stereo, correct depth and perspective, six-degree-of-freedom head tracking, and correct color/contrast on Meta Quest 3 through Quest Link.
-- Runtime-recommended `2064 × 2272` submitted resolution per eye.
-- Exact runtime FOV with no rotational guard band and no cross-shaped missing/duplicated-pixel seam.
-- VR-only first-person viewmodel removal; normal PC mode retains the standard viewmodel.
-- Arm-free mechanic gloves with corrected textures and tuned finger range.
-- Tracked tool and weapon visuals, including the Chapter 2 clay gun and its calibrated moving parts.
-- Both survival and Chapter 2 creative-mode hammer UUIDs use the tracked hammer and physical swing path.
-- World-locked native startup menu with the Chapter 2 VR Mod logo, exact live Scrap Mechanic submenus, native hover/click behavior, controller/hand-tracking laser input, and transparent native fade/blur backgrounds.
-- UI input is sent through Scrap Mechanic's own private input-event queue. The mod does not synthesize Windows mouse motion or mouse-button events.
-- In-world modal menus, including backpack and pause/settings flows, use the same live native spatial panel and were confirmed functional before the adaptive refresh optimization.
+- Native stereo OpenXR rendering at `2064 × 2272` per eye with six-degree-of-freedom head tracking.
+- Exact runtime FOV, correct depth and perspective, VR seam correction, and normal Scrap Mechanic color and contrast.
+- Quest Touch controllers and optional Meta optical hand tracking with tracked mechanic gloves.
+- Tracked tools and Chapter 2 weapons, including physical hammer swings and gunfire from the VR barrel pose.
+- World-locked startup and in-game spatial UI with the live native game menus, transparent composition, hover, click, hold, and drag.
+- UI events are queued directly into Scrap Mechanic's input manager without Windows mouse simulation.
+- Restrained native OpenXR haptics for controller interaction.
+- Normal PC mode retains its standard viewmodel; VR mode removes it.
+- Seat, headset-focus, tool-switching, primary-action, and lift-placement state recover automatically after transitions.
 
 ## Rendering architecture
 
-- Exactly two high-level engine scene renders per OpenXR frame: left and right.
-- No neutral third scene render.
-- OpenXR eye swapchains use the runtime-recommended `2064 × 2272` extent and an sRGB format.
-- The centered engine source is `2565 × 2711`; each eye is cropped to the runtime FOV without a rotational guard band.
-- The user's desktop resolution setting is not rewritten for the VR render size.
-- The first-person viewmodel patch is active only while OpenXR reports `shouldRender=true` and is restored on stop, idle, session loss, disable, and add-on destruction.
-- The menu compositor captures the game's live native UI before mirror composition and removes the native full-screen fade/blur matte for transparent presentation in the VR world.
-- In `0.4.0`, the captured native menu uses a non-postponing adaptive scheduler: 24 FPS during motion/transitions, 12.5 FPS while stationary on-panel, and 6.25 FPS while fully idle. The stereo panel, head pose, laser, input, and haptics continue at the full OpenXR frame rate.
+- Two high-level engine scene renders per OpenXR frame: left eye and right eye.
+- OpenXR swapchains use the runtime-recommended extent and an sRGB format.
+- The centered engine source is `2565 × 2711` and is cropped to the runtime FOV without a rotational guard band.
+- The user's desktop resolution setting remains independent from the VR eye resolution.
+- The live menu compositor uses an adaptive capture scheduler while stereo placement, head tracking, laser input, and haptics continue at headset rate.
 
-## Gameplay status
+## Installer
 
-- Quest Touch and optional Meta optical hand tracking are integrated.
-- Locomotion, turning, jump, crouch, sprint, use, hotbar, backpack, pause, seated zoom, and recenter paths are present.
-- Mechanic gloves, tools, weapons, lasers, physical hammer, touch controls, and the clay calibration helper are included.
-- Restrained OpenXR Touch-controller haptics cover UI hover/click, tools, weapons, use, menus, and recenter actions, with hard amplitude/duration caps and no optical-hand vibration.
-- Gun projectiles and muzzle effects deliberately use stock Scrap Mechanic 1.0 calculations. The unsuccessful experimental tracked-barrel projectile override was removed, so the PC crosshair still determines shot direction. Gun lasers are visual only.
+`dist/ScrapMechanicVR-Installer.exe` embeds and validates all 28 managed payload files, verifies the supported game executable, backs up replaced files, refreshes generated Lua cache when needed, and supports install, start, verify, repair, and uninstall.
 
-## Known limitations
-
-- The desktop left-eye mirror may freeze after the headset becomes active; this does not stop headset rendering.
-- Fullscreen/windowed switching with an active HMD is not as thoroughly confirmed as normal windowed operation.
-- Modal startup and in-game menus are spatialized, but the persistent gameplay HUD is not yet decomposed into independent 3D widgets.
-- The adaptive spatial-UI cadence and OpenXR haptic tuning are build-verified beta changes awaiting their post-package headset confirmation pass.
-- Compatibility is locked to one executable hash and must be updated after a game patch.
-- The installer is unsigned.
-
-## Installer status
-
-The public one-file installer is `dist/ScrapMechanicVR-Chapter2-Patcher.exe`, version `0.4.0-chapter2-beta-20260829`. It embeds and validates all 28 managed payload files, rejects unsupported game executable hashes, backs up replaced files, invalidates the game's generated Lua cache when necessary, detects legacy-mod conflicts, and supports install, verify, repair/restore, and uninstall.
-
-The installer and payload hashes are recorded in `SHA256SUMS.txt`. The former local-only feature-port installer has been retired to avoid ambiguity.
-
-## Evidence boundary
-
-“Confirmed” means the user observed the behavior in Quest 3 on the supported build. Compilation, logs, a desktop mirror, or a passing installer check are supporting evidence but are not substitutes for headset observation. Known defects remain documented rather than being presented as completed features.
+Installer and payload hashes are recorded in `SHA256SUMS.txt`.
