@@ -1,5 +1,5 @@
 {
-  "snapshot": "chapter2-v1.0.0",
+  "snapshot": "chapter2-v1.0.1",
   "status": "chapter2-stable",
   "legacyBranch": "legacy-pre-1.0",
   "chapter2Branch": "main",
@@ -39,7 +39,7 @@
     "sha256": "74295E66FF9A84BAB56E0D10C00B82FD259D359BCA3189DF23118D968297174B"
   },
   "localCandidateArtifact": {
-    "version": "1.0.0-chapter2-20260830",
+    "version": "1.0.1-chapter2-20260830",
     "path": "payload/Release/smvr_native_vr_v1.addon64",
     "size": 4025856,
     "sha256": "74295E66FF9A84BAB56E0D10C00B82FD259D359BCA3189DF23118D968297174B",
@@ -80,7 +80,7 @@
     "seatTransitionRecoveryHeadsetConfirmed": true
   },
   "installer": {
-    "version": "1.0.0-chapter2-20260830",
+    "version": "1.0.1-chapter2-20260830",
     "path": "dist/ScrapMechanicVR-Installer.exe",
     "selfTest": "PASS",
     "published": true
