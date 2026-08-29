@@ -15,40 +15,7 @@ local VrActionLocalOffsets = {
 	["5cc12f03-275e-4c8e-b013-79fc0f913e1b"] = { 0.000, -0.035, -0.120 }
 }
 
-local VrGunMuzzleLocalOffsets = {
-	["c5ea0c2f-185b-48d6-b4df-45c386a575cc"] = { -0.198, -0.035, -0.466 },
-	["f6250bf4-9726-406f-a29a-945c06e460e5"] = { -0.199, -0.035, -0.503 },
-	["9fde0601-c2ba-4c70-8d5c-2a7a9fdd122b"] = { -0.198, -0.035, -0.509 },
-	-- Chapter 2 uses new barrel geometry. These are its actual mesh-tip
-	-- positions after the same 0.145 scale/tool basis used by the native pass.
-	["d51ec758-057b-4263-bd16-7a731e149480"] = { -0.234, -0.050, -0.384 },
-	["a2a2bb33-a841-4b23-88da-b758063d9206"] = { -0.198, -0.035, -0.426 },
-	-- Derived from the frontmost vertices of char_claygun.dae after the same
-	-- native 0.145 scale, tool basis and hand calibration as the visible mesh.
-	["6993e5df-6852-4e84-88ae-df49f765e784"] = { -0.085, -0.035, -0.424 }
-}
-
-local VrGunShotLogCounts = {}
-local VrGunAimLogItems = {}
 local VrWorldStatePath = "$GAME_DATA/NativeVR/world_state.json"
-local VrWeaponBridge = {
-	primed = false,
-	sequence = -1,
-	lastAdvanceTick = -1000,
-	lastReadTick = -1000,
-	data = nil
-}
-
-function Chapter2VR.logGunShot( item, position, direction )
-	local key = tostring( item )
-	local count = VrGunShotLogCounts[key] or 0
-	if count >= 3 or not position or not direction then return end
-	VrGunShotLogCounts[key] = count + 1
-	sm.log.warning( string.format(
-		"SCRAPVR_GUNSHOT item=%s muzzle=%.4f,%.4f,%.4f direction=%.4f,%.4f,%.4f sample=%d",
-		key, position.x, position.y, position.z,
-		direction.x, direction.y, direction.z, count + 1 ) )
-end
 
 local VrToolLaserItems = {
 	["8c7efc37-cd7c-4262-976e-39585f8527bf"] = true,
@@ -62,10 +29,6 @@ local function clearClientAim()
 	g_vrActionActive = false
 	g_vrActionOrigin = nil
 	g_vrActionDirection = nil
-	g_vrGunAimActive = false
-	g_vrGunMuzzlePosition = nil
-	g_vrGunDirection = nil
-	Chapter2VR.gunAim = nil
 	g_vrToolPointerEnabled = false
 	g_vrToolPointerOrigin = nil
 	g_vrToolPointerDirection = nil
@@ -117,67 +80,6 @@ local function handLocalPosition( pose, offset )
 	return pose.position + pose.right * offset[1] + pose.up * offset[2] - pose.forward * offset[3]
 end
 
-local function readLiveWeaponBridge()
-	local tick = sm.game.getCurrentTick()
-	if VrWeaponBridge.lastReadTick ~= tick then
-		VrWeaponBridge.lastReadTick = tick
-		VrWeaponBridge.data = nil
-		local path = "$GAME_DATA/NativeVR/hand_physics.json"
-		if sm.json.fileExists( path ) then
-			local ok, data = pcall( sm.json.open, path )
-			if ok and type( data ) == "table" and type( data.sequence ) == "number" then
-				if not VrWeaponBridge.primed then
-					-- Never trust a bridge file left behind by an earlier VR process. A
-					-- second, advancing sequence is required before weapon aim is live.
-					VrWeaponBridge.primed = true
-					VrWeaponBridge.sequence = data.sequence
-				elseif data.sequence ~= VrWeaponBridge.sequence then
-					VrWeaponBridge.sequence = data.sequence
-					VrWeaponBridge.lastAdvanceTick = tick
-					VrWeaponBridge.data = data
-				elseif tick - VrWeaponBridge.lastAdvanceTick <= 8 then
-					VrWeaponBridge.data = data
-				end
-			end
-		end
-	end
-	if tick - VrWeaponBridge.lastAdvanceTick > 8 then return nil end
-	return VrWeaponBridge.data
-end
-
-function Chapter2VR.getGunAim( item )
-	local key = tostring( item )
-	local aim = Chapter2VR.gunAim
-	local tick = sm.game.getCurrentTick()
-	if aim and aim.item == key and aim.position and aim.direction and
-		aim.direction:length() >= 0.5 and ( not aim.tick or tick - aim.tick <= 8 ) then
-		return aim.position, aim.direction:normalize()
-	end
-
-	-- Scrap Mechanic 1.0 may execute the player and equipped-tool scripts in
-	-- different logic tasks. The old mod's process-global Lua aim cache is then
-	-- not a reliable hand-off. Read the same native bridge from the weapon task,
-	-- while requiring its sequence to keep advancing so normal PC mode can never
-	-- inherit a stale VR pose.
-	local muzzleOffset = VrGunMuzzleLocalOffsets[key]
-	local data = muzzleOffset and readLiveWeaponBridge() or nil
-	local pose = resolveHandPose( data )
-	if not pose then return nil, nil end
-	local position = handLocalPosition( pose, muzzleOffset )
-	local direction = pose.forward:normalize()
-	Chapter2VR.gunAim = {
-		item = key, position = position, direction = direction,
-		sequence = data.sequence, tick = tick, source = "weapon-bridge"
-	}
-	if not VrGunAimLogItems[key] then
-		VrGunAimLogItems[key] = true
-		sm.log.warning( string.format(
-			"SCRAPVR_WEAPON_AIM_ACTIVE item=%s source=weapon-bridge sequence=%d",
-			key, data.sequence ) )
-	end
-	return position, direction
-end
-
 function Chapter2VR.serverCreate( self )
 	self.sv.vrHands = {
 		sequence = -1,
@@ -219,43 +121,11 @@ local function updateToolAim( self, data )
 	g_vrPrimaryActionAvailable = true
 	g_vrPrimaryActionDown = hand.interact == true
 
-	local muzzleOffset = VrGunMuzzleLocalOffsets[activeItem]
-	g_vrGunAimActive = muzzleOffset ~= nil
-	g_vrGunDirection = muzzleOffset and pose.forward or nil
-	g_vrGunMuzzlePosition = muzzleOffset and handLocalPosition( pose, muzzleOffset ) or nil
-	Chapter2VR.gunAim = muzzleOffset and {
-		item = activeItem, position = g_vrGunMuzzlePosition,
-		direction = g_vrGunDirection, sequence = data.sequence,
-		tick = sm.game.getCurrentTick(), source = "player-bridge"
-	} or nil
 	local laserOffset = VrToolLaserItems[activeItem] and VrActionLocalOffsets[activeItem] or nil
 	g_vrToolPointerEnabled = laserOffset ~= nil
 	g_vrToolPointerOrigin = laserOffset and handLocalPosition( pose, laserOffset ) or nil
 	g_vrToolPointerDirection = laserOffset and pose.forward or nil
 	self.cl.vrHandFreshTimer = 0.0
-end
-
--- Chapter 2 schedules the local player and equipped tools in separate Lua
--- logic tasks, so the old mod's process-global g_vrGun* values are not visible
--- to the gun scripts. Route the validated player-task aim through the engine's
--- own local event dispatcher. The requesting Tool object is returned to its
--- owning script; no server round trip or desktop-camera fallback is involved.
-function Chapter2VR.clientGunAimRequest( self, tool )
-	if self.player ~= sm.localPlayer.getPlayer() or not tool or not sm.exists( tool ) or
-		tool:getOwner() ~= self.player then return end
-	local aim = Chapter2VR.gunAim
-	local tick = sm.game.getCurrentTick()
-	if type( aim ) ~= "table" or not aim.position or not aim.direction or
-		type( aim.sequence ) ~= "number" or aim.direction:length() < 0.5 or
-		( aim.tick and tick - aim.tick > 8 ) then return end
-	sm.event.sendToTool( tool, "cl_e_chapter2VrAimUpdate", {
-		item = aim.item,
-		position = aim.position,
-		direction = aim.direction,
-		sequence = aim.sequence,
-		tick = tick,
-		source = "player-tool-event"
-	} )
 end
 
 function Chapter2VR.clientUpdate( self, dt )
@@ -360,44 +230,7 @@ function Chapter2VR.serverReceive( self, params, player )
 	end
 	state.sequence = params.sequence
 	state.hands = accepted
-	-- Keep the same orthonormal right-hand basis used by the local visible gun.
-	-- The validated server copy is the authoritative cross-task transport for
-	-- projectile origin/direction; it is not derived from the PC camera.
-	local gunPose = resolveHandPose( params )
-	if gunPose and accepted.right then
-		state.gunPose = {
-			position = gunPose.position,
-			forward = gunPose.forward,
-			up = gunPose.up,
-			right = gunPose.right,
-			sequence = params.sequence,
-			tick = tick
-		}
-	else
-		state.gunPose = nil
-	end
 	state.lastTick = tick
-end
-
-function Chapter2VR.serverGunAimRequest( self, params )
-	local state = self.sv.vrHands
-	local tick = sm.game.getCurrentTick()
-	if type( params ) ~= "table" or params.player ~= self.player or
-		not params.tool or not sm.exists( params.tool ) or
-		params.tool:getOwner() ~= self.player then return end
-	local key = tostring( params.item )
-	local offset = VrGunMuzzleLocalOffsets[key]
-	local pose = state and state.gunPose or nil
-	if not offset or not pose or tick - pose.tick > 8 then return end
-	local position = handLocalPosition( pose, offset )
-	sm.event.sendToTool( params.tool, "sv_e_chapter2VrAimUpdate", {
-		player = self.player,
-		item = key,
-		position = position,
-		direction = pose.forward,
-		sequence = pose.sequence,
-		tick = tick
-	} )
 end
 
 local function updateTouchControls( settings, state, tick, player )

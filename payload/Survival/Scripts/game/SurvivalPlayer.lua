@@ -189,10 +189,6 @@ function SurvivalPlayer.sv_n_vrHandPhysics( self, params, player )
 	Chapter2VR.serverReceive( self, params, player )
 end
 
-function SurvivalPlayer.sv_e_chapter2VrAimRequest( self, params )
-	Chapter2VR.serverGunAimRequest( self, params )
-end
-
 function SurvivalPlayer.client_onCreate( self )
 	BasePlayer.client_onCreate( self )
 	self.cl = self.cl or {}

@@ -1,6 +1,6 @@
 # Chapter 2 beta status
 
-Release: `0.3.0-chapter2-beta-20260829`
+Release: `0.3.1-chapter2-beta-20260829`
 
 Branch: `chapter2-1.0`
 
@@ -14,6 +14,7 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 - VR-only first-person viewmodel removal; normal PC mode retains the standard viewmodel.
 - Arm-free mechanic gloves with corrected textures and tuned finger range.
 - Tracked tool and weapon visuals, including the Chapter 2 clay gun and its calibrated moving parts.
+- Both survival and Chapter 2 creative-mode hammer UUIDs use the tracked hammer and physical swing path.
 - World-locked native startup menu with the Chapter 2 VR Mod logo, exact live Scrap Mechanic submenus, native hover/click behavior, controller/hand-tracking laser input, and transparent native fade/blur backgrounds.
 - UI input is sent through Scrap Mechanic's own private input-event queue. The mod does not synthesize Windows mouse motion or mouse-button events.
 
@@ -26,6 +27,7 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 - The user's desktop resolution setting is not rewritten for the VR render size.
 - The first-person viewmodel patch is active only while OpenXR reports `shouldRender=true` and is restored on stop, idle, session loss, disable, and add-on destruction.
 - The menu compositor captures the game's live native UI before mirror composition and removes the native full-screen fade/blur matte for transparent presentation in the VR world.
+- In `0.3.1`, the captured native menu is cached between interaction-driven refreshes instead of forcing desktop/headset render-target resizing on every menu frame. This performance change is build- and installer-verified but still awaiting its own headset confirmation pass.
 
 ## Gameplay status
 
@@ -44,7 +46,7 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 
 ## Installer status
 
-The public one-file installer is `dist/ScrapMechanicVR-Chapter2-Patcher.exe`, version `0.3.0-chapter2-beta-20260829`. It embeds and validates all 28 managed payload files, rejects unsupported game executable hashes, backs up replaced files, invalidates the game's generated Lua cache when necessary, detects legacy-mod conflicts, and supports install, verify, repair/restore, and uninstall.
+The public one-file installer is `dist/ScrapMechanicVR-Chapter2-Patcher.exe`, version `0.3.1-chapter2-beta-20260829`. It embeds and validates all 28 managed payload files, rejects unsupported game executable hashes, backs up replaced files, invalidates the game's generated Lua cache when necessary, detects legacy-mod conflicts, and supports install, verify, repair/restore, and uninstall.
 
 The installer and payload hashes are recorded in `SHA256SUMS.txt`. The former local-only feature-port installer has been retired to avoid ambiguity.
 

@@ -2,7 +2,7 @@
 
 This branch is the native OpenXR VR mod for Scrap Mechanic Chapter 2 / 1.0. It is separate from the legacy implementation on `main` and must not be mixed with files from that branch.
 
-> Beta release: tested on Meta Quest 3 through Quest Link with Scrap Mechanic `1.0.5.876`, Steam build `24529696`. Other game builds are rejected by the installer.
+> Beta release `0.3.1`: tested on Meta Quest 3 through Quest Link with Scrap Mechanic `1.0.5.876`, Steam build `24529696`. Other game builds are rejected by the installer.
 
 ## Video showcase
 
@@ -12,7 +12,7 @@ This branch is the native OpenXR VR mod for Scrap Mechanic Chapter 2 / 1.0. It i
 
 1. Close Scrap Mechanic.
 2. Download [ScrapMechanicVR-Chapter2-Patcher.exe](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/raw/chapter2-1.0/dist/ScrapMechanicVR-Chapter2-Patcher.exe).
-3. Verify the installer SHA-256: `E434B408B30ECE40A22690C1E1D0AFD039D49AC5C4E5878408FF8BD9199E1F7C`.
+3. Verify the installer SHA-256: `259A1A22CDD902C42842EB8F45B7CAB9192A00E904BD71BCEC27EEC52B881A3D`.
 4. Run it, confirm Steam build `24529696`, and select **Install VR Mod**.
 5. Keep Quest Link active, set Meta as the active OpenXR runtime, and select **Start Scrap Mechanic**.
 
@@ -38,9 +38,11 @@ The installer is currently unsigned, so Windows may show a SmartScreen warning. 
 - Tracked, arm-free mechanic gloves with tuned finger opening and closing.
 - VR locomotion and common actions, including turning, jump, crouch, sprint, use, hotbar, backpack, pause, seated zoom, and recenter.
 - Tracked hammer, connection tool, paint tool, weld tool, potato weapons, Chapter 2 scrap spudgun, potato launcher, and clay gun.
+- The Chapter 2 creative-mode hammer UUID uses the same tracked mesh and physical swing path as the survival hammer.
 - User-tuned clay-gun grip, moving-part pivots, and rotation axes, plus the included live calibration helper.
 - Thin white aiming lasers on VR guns and tools.
 - World-locked main-menu and submenu display using the game's exact live native UI, including hover states and confirmation dialogs.
+- The native menu is cached between interaction-driven refreshes so the floating UI remains visible without rebuilding desktop- and headset-sized render targets on every menu frame.
 - Right-hand laser interaction for controllers and optical hands. Input is queued directly into Scrap Mechanic's own input manager; Windows mouse simulation is never used.
 - Native menu fade/blur backgrounds are keyed transparent so the 3D menu scene remains visible.
 - Chapter 2 VR Mod logo on both the VR and desktop main menus.
@@ -49,6 +51,7 @@ The installer is currently unsigned, so Windows may show a SmartScreen warning. 
 ## Known limitations
 
 - Gun projectiles intentionally use Scrap Mechanic's stock PC crosshair origin and direction. Earlier experimental VR-barrel projectile rewrites were removed because they were unreliable; the white barrel lasers are visual aiming guides only.
+- The `0.3.1` interaction-driven native-menu cache is included as a beta performance change and has not yet completed a separate headset confirmation pass.
 - The desktop mirror can freeze on its first left-eye frame while the headset is active. Headset rendering continues normally.
 - Fullscreen/windowed switching with an active headset has not completed the same level of user testing as normal windowed play.
 - The floating native UI currently covers the startup/main-menu flow. A complete in-world spatial HUD/backpack rework is not included.

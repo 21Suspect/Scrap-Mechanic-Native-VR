@@ -38,9 +38,9 @@ Only use the payload with the exact executable hash documented in `README.md`. D
 
 The public artifact is `dist/ScrapMechanicVR-Chapter2-Patcher.exe`. It validates its embedded patcher, manifest, native add-on, and all 28 managed payload files before installation. It discovers Steam and the active 64-bit OpenXR runtime, rejects unsupported game builds, backs up original files, and supports verify, repair/restore, and uninstall.
 
-Current version: `0.3.0-chapter2-beta-20260829`
+Current version: `0.3.1-chapter2-beta-20260829`
 
-Installer SHA-256: `E434B408B30ECE40A22690C1E1D0AFD039D49AC5C4E5878408FF8BD9199E1F7C`
+Installer SHA-256: `259A1A22CDD902C42842EB8F45B7CAB9192A00E904BD71BCEC27EEC52B881A3D`
 
 The backend invalidates Scrap Mechanic's generated `Cache/Bundle/core_data.cbo` after relevant install, repair, and uninstall operations so the game recompiles current player callbacks rather than running a stale Lua bundle.
 

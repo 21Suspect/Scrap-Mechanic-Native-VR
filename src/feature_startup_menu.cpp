@@ -361,6 +361,7 @@ bool StartupMenuUi::initialize(ID3D11Device *device, const wchar_t *asset_path)
 
 void StartupMenuUi::update_visibility()
 {
+    const bool was_visible=visible_;
     const bool world_active=poll_world_active();
     if (world_active)
     {
@@ -375,6 +376,22 @@ void StartupMenuUi::update_visibility()
     // menu therefore stays live until a local player script explicitly marks
     // a world active. This covers every submenu and confirmation dialog.
     visible_=true;
+    if (!was_visible) request_native_capture(0);
+}
+
+void StartupMenuUi::request_native_capture(uint64_t delay_ms)
+{
+    native_capture_requested_=true;
+    native_capture_due_ms_=GetTickCount64()+delay_ms;
+}
+
+bool StartupMenuUi::native_capture_due() const
+{
+    if (!visible_) return false;
+    if (!native_menu_view_) return true;
+    const uint64_t now=GetTickCount64();
+    return (native_capture_requested_ && now>=native_capture_due_ms_) ||
+        (native_capture_followup_ms_!=0 && now>=native_capture_followup_ms_);
 }
 
 void StartupMenuUi::set_world_anchor(const XrPosef &player_anchor)
@@ -504,6 +521,15 @@ void StartupMenuUi::update_pointer(const XrPosef &hand, bool active)
         pointer_client_initialized_=true;
         pointer_client_valid_=EngineInputQueue::instance().queue_mouse_move(
             delta_x,delta_y,client_x,client_y);
+        if (pointer_client_valid_ && (!native_capture_pointer_valid_ ||
+            std::abs(client_x-native_capture_pointer_x_)>=6 ||
+            std::abs(client_y-native_capture_pointer_y_)>=6))
+        {
+            native_capture_pointer_x_=client_x;
+            native_capture_pointer_y_=client_y;
+            native_capture_pointer_valid_=true;
+            request_native_capture(90);
+        }
         return;
     }
 
@@ -537,6 +563,8 @@ void StartupMenuUi::update_interaction(bool select_down, float scroll_axis)
             {
                 engine_button_down_=true;
                 ++ui_click_count_;
+                request_native_capture(0);
+                native_capture_followup_ms_=GetTickCount64()+350;
                 if (!input_route_logged_)
                 {
                     input_route_logged_=true;
@@ -553,7 +581,10 @@ void StartupMenuUi::update_interaction(bool select_down, float scroll_axis)
         else if (!select_down && engine_button_down_)
         {
             if (EngineInputQueue::instance().queue_mouse_button(0,false))
+            {
                 engine_button_down_=false;
+                request_native_capture(70);
+            }
         }
         select_down_=select_down;
     }
@@ -566,6 +597,8 @@ void StartupMenuUi::update_interaction(bool select_down, float scroll_axis)
         if (EngineInputQueue::instance().queue_mouse_wheel(wheel))
         {
             scroll_last_ms_=now;
+            request_native_capture(80);
+            native_capture_followup_ms_=now+260;
         }
     }
 }
@@ -625,6 +658,14 @@ bool StartupMenuUi::capture_native_menu(ID3D11DeviceContext *context, IDXGISwapC
     }
     context->CopyResource(native_menu_texture_,source);
     source->Release();
+    const uint64_t capture_time=GetTickCount64();
+    native_capture_requested_=false;
+    native_capture_due_ms_=0;
+    if (native_capture_followup_ms_!=0 && capture_time>=native_capture_followup_ms_)
+        native_capture_followup_ms_=0;
+    native_capture_pointer_x_=pointer_client_x_;
+    native_capture_pointer_y_=pointer_client_y_;
+    native_capture_pointer_valid_=pointer_client_initialized_;
     ++native_capture_count_;
     if (!native_capture_logged_)
     {
@@ -735,6 +776,8 @@ void StartupMenuUi::reset_state()
     visible_=false; pointer_on_panel_=false; pointer_laser_active_=false; hovered_button_=0;
     dynamic_mode_=false; select_down_=false; pointer_client_valid_=false;
     pointer_client_initialized_=false;
+    native_capture_requested_=true; native_capture_pointer_valid_=false;
+    native_capture_due_ms_=native_capture_followup_ms_=0;
 }
 
 void StartupMenuUi::shutdown()
@@ -749,10 +792,12 @@ void StartupMenuUi::shutdown()
     dynamic_panel_pose_={{0,0,0,1},{0,0,0}}; pointer_u_=pointer_v_=0.5f;
     hidden_frames_after_menu_=hovered_button_=0;
     native_capture_count_=ui_click_count_=scroll_last_ms_=0;
+    native_capture_due_ms_=native_capture_followup_ms_=0;
     world_state_poll_ms_=0;
     world_state_path_.clear();
     world_anchor_valid_=world_active_=world_state_known_=pointer_on_panel_=pointer_laser_active_=visible_=logged_=false;
     dynamic_mode_=select_down_=engine_button_down_=pointer_client_valid_=
         pointer_client_initialized_=native_capture_logged_=input_route_logged_=false;
+    native_capture_requested_=true; native_capture_pointer_valid_=false;
 }
 } // namespace smvr::features

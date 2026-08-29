@@ -45,10 +45,12 @@ public:
     bool visible() const { return visible_; }
     bool pointer_active() const { return dynamic_mode_ ? pointer_on_panel_ : hovered_button_ != 0; }
     bool dynamic_mode() const { return dynamic_mode_; }
+    bool native_capture_due() const;
 
 private:
     bool load_asset(const wchar_t *asset_path);
     bool poll_world_active();
+    void request_native_capture(uint64_t delay_ms);
     void draw_menu(ID3D11DeviceContext *context, ID3D11RenderTargetView *target,
                    uint32_t width, uint32_t height, const XrView &view);
     void draw_laser(ID3D11DeviceContext *context, ID3D11RenderTargetView *target,
@@ -86,7 +88,11 @@ private:
     uint64_t ui_click_count_ = 0;
     uint64_t scroll_last_ms_ = 0;
     uint64_t world_state_poll_ms_ = 0;
+    uint64_t native_capture_due_ms_ = 0;
+    uint64_t native_capture_followup_ms_ = 0;
     std::wstring world_state_path_;
+    int native_capture_pointer_x_ = 0;
+    int native_capture_pointer_y_ = 0;
     bool world_anchor_valid_ = false;
     bool world_active_ = false;
     bool world_state_known_ = false;
@@ -101,5 +107,7 @@ private:
     bool pointer_client_initialized_ = false;
     bool native_capture_logged_ = false;
     bool input_route_logged_ = false;
+    bool native_capture_requested_ = true;
+    bool native_capture_pointer_valid_ = false;
 };
 } // namespace smvr::features

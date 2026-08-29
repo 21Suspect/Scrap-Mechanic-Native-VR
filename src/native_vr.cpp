@@ -1379,7 +1379,7 @@ struct OpenXrState
                 // startup-menu mode the frame is deferred to on_present, where
                 // the full desktop UI is copied before the VR mirror replaces it.
                 if (from_present_callback && g_feature_startup_menu_enabled &&
-                    g_startup_menu.visible())
+                    g_startup_menu.visible() && g_startup_menu.native_capture_due())
                     g_startup_menu.capture_native_menu(context,game_swapchain);
                 mirror_left_eye(device, context, game_swapchain, from_present_callback);
             }
@@ -2032,12 +2032,12 @@ struct OpenXrState
             pending_eye_ms[i] = eye_render_ms[i];
         }
 
-        if (g_feature_startup_menu_enabled && g_startup_menu.visible())
+        if (g_feature_startup_menu_enabled && g_startup_menu.visible() &&
+            g_startup_menu.native_capture_due())
         {
-            // The game draws its native menus after this renderer call. Restore
-            // the desktop extent for that UI/present phase, then let the ReShade
-            // Present callback capture the completed 1920x1080 UI. The following
-            // VR frame reapplies the Quest render extent for both eye renders.
+            // Refresh the cached native UI only when it changes. The panel itself
+            // remains a 72 Hz stereo overlay between captures, avoiding a complete
+            // Quest-to-desktop target rebuild on every menu frame.
             restore_render_size_override();
             if (!startup_desktop_ui_logged)
             {

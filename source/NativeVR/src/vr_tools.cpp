@@ -376,6 +376,9 @@ namespace scrapvr::tools
 
 		Tool parse_tool(const std::string &line)
 		{
+			// Scrap Mechanic 1.0 gives the creative-mode sledgehammer its own
+			// tool UUID. It uses the same mesh and physical-swing path.
+			if (line.find("ed185725-ea12-43fc-9cd7-4295d0dbf88b") != std::string::npos) return Tool::hammer;
 			if (line.find("bb641a4f-e391-441c-bc6d-0ae21a069476") != std::string::npos) return Tool::hammer;
 			if (line.find("8c7efc37-cd7c-4262-976e-39585f8527bf") != std::string::npos) return Tool::connect;
 			if (line.find("c60b9627-fc2b-4319-97c5-05921cb976c6") != std::string::npos) return Tool::paint;
@@ -399,8 +402,8 @@ namespace scrapvr::tools
 				{ -0.020f, -0.035f, -0.055f, -0.152f, -0.035f, -0.280f }, // connect
 				{ -0.015f, -0.040f, -0.060f, -0.120f, -0.040f, -0.295f }, // paint
 				{ -0.030f, -0.035f, -0.065f, -0.035f, -0.035f, -0.225f }, // weld
-				// Gun laser origins intentionally match Chapter2VRWeaponAim.lua's
-				// calibrated muzzle offsets. Controller-local -Z is the firing axis.
+				// These offsets only place the visible white pointers at the barrel tips.
+				// They do not affect the game's projectile origin or firing direction.
 				{ -0.020f, -0.035f, -0.060f, -0.198f, -0.035f, -0.466f }, // spudgun
 				{ -0.020f, -0.035f, -0.060f, -0.199f, -0.035f, -0.503f }, // shotgun
 				{ -0.020f, -0.035f, -0.060f, -0.198f, -0.035f, -0.509f }, // gatling
