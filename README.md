@@ -4,9 +4,11 @@
 
 Native OpenXR VR for the current Scrap Mechanic Chapter 2 / 1.0 release, made by [21Suspect](https://github.com/21Suspect).
 
-[![Download installer](https://img.shields.io/badge/Download-VR_Installer-ffad17?style=for-the-badge)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/raw/refs/heads/main/dist/ScrapMechanicVR-Installer.exe)
-[![Platform](https://img.shields.io/badge/Windows-x64-45d6c7?style=for-the-badge)](#requirements)
-[![License](https://img.shields.io/badge/Original_Code-MIT-ffc124?style=for-the-badge)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/21Suspect/Scrap-Mechanic-Native-VR?display_name=tag&sort=semver)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/21Suspect/Scrap-Mechanic-Native-VR/total)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases)
+[![License: MIT](https://img.shields.io/badge/original_code-MIT-ffc124.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%20x64-45d6c7.svg)](#requirements)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy_Me_a_Coffee-Support-FFDD00?logo=buy-me-a-coffee&logoColor=000000)](https://buymeacoffee.com/21suspect)
 
 ## Easy installation
 
