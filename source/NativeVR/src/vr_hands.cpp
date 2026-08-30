@@ -263,8 +263,9 @@ namespace scrapvr::hands
 
 		XrQuaternionf controller_calibration(uint32_t hand)
 		{
-			// Final Touch-controller calibration selected in-headset. Optical palm
-			// tracking deliberately bypasses this controller-specific grip transform.
+			// The OpenXR grip-pose axes are defined consistently for held motion
+			// controllers, including Touch and Index. Optical palm tracking bypasses
+			// this controller-to-glove mesh transform.
 			const float y = hand == 0 ? 75.0f : -75.0f;
 			const float z = hand == 0 ? 90.0f : -90.0f;
 			return quaternion_multiply(
@@ -651,7 +652,7 @@ namespace scrapvr::hands
 		g_initialized = true;
 		if (!scrapvr::tools::initialize(g_device, g_log) && g_log)
 			g_log("VR TOOL RENDERER: initialization failed; tracked hands remain available");
-		if (g_log) g_log("VR HAND RENDERER READY: Scrap Mechanic 1.0 ship-mechanic glove mesh and matching texture loaded for Touch and optical tracking");
+		if (g_log) g_log("VR HAND RENDERER READY: Scrap Mechanic 1.0 ship-mechanic glove mesh and matching texture loaded for OpenXR controllers and optical tracking");
 		return true;
 	}
 

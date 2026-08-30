@@ -40,10 +40,17 @@ if ($branch -eq $snapshot.localFeatureBranch -or $branch -eq $snapshot.chapter2B
         @{ Path = 'source\NativeVR\src\native_tool_asset.hpp'; Expected = $candidate.source.nativeToolAssetSha256 },
         @{ Path = 'source\NativeVR\src\chapter2_tool_asset.hpp'; Expected = $candidate.source.chapter2ToolAssetSha256 },
         @{ Path = 'source\NativeVR\src\held_item_asset.hpp'; Expected = $candidate.source.heldItemAssetSha256 },
+        @{ Path = 'source\NativeVR\src\held_item_catalog.hpp'; Expected = $candidate.source.heldItemCatalogSha256 },
+        @{ Path = 'source\NativeVR\src\custom_content_bridge.cpp'; Expected = $candidate.source.customContentBridgeSha256 },
+        @{ Path = 'source\NativeVR\src\custom_content_bridge.hpp'; Expected = $candidate.source.customContentBridgeHeaderSha256 },
         @{ Path = 'source\NativeVR\tools\generate_mechanic_hands.py'; Expected = $candidate.source.mechanicHandsGeneratorSha256 },
         @{ Path = 'source\NativeVR\tools\generate_chapter2_weapons.py'; Expected = $candidate.source.chapter2ToolGeneratorSha256 },
         @{ Path = 'source\NativeVR\tools\generate_held_item_assets.py'; Expected = $candidate.source.heldItemAssetGeneratorSha256 },
         @{ Path = 'source\NativeVR\tools\generate_held_item_payload.py'; Expected = $candidate.source.heldItemPayloadGeneratorSha256 },
+        @{ Path = 'source\NativeVR\tools\generate_full_held_item_catalog.py'; Expected = $candidate.source.fullHeldItemCatalogGeneratorSha256 },
+        @{ Path = 'source\NativeVR\tools\blender_extract_held_catalog.py'; Expected = $candidate.source.blenderHeldCatalogExtractorSha256 },
+        @{ Path = 'tools\HeldCalibration\Program.cs'; Expected = $candidate.source.heldCalibrationHelperSourceSha256 },
+        @{ Path = 'Build-HeldCalibration.ps1'; Expected = $candidate.source.heldCalibrationBuildScriptSha256 },
         @{ Path = 'payload\Survival\Scripts\game\Chapter2VR.lua'; Expected = $candidate.source.chapter2GameplayBridgeSha256 }
     )
     foreach ($check in $sourceChecks) {

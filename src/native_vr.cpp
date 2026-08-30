@@ -17,6 +17,7 @@
 
 #include "feature_input.hpp"
 #include "feature_startup_menu.hpp"
+#include "custom_content_bridge.hpp"
 #include "vr_hands.hpp"
 #include "vr_tools.hpp"
 
@@ -428,6 +429,14 @@ bool write_atomic_file(const wchar_t *path, const wchar_t *temporary, const char
     return true;
 }
 
+bool write_custom_content_hand_bridge(const char *data, size_t length)
+{
+    wchar_t path[MAX_PATH]{}, temporary[MAX_PATH]{};
+    if (!scrapvr::custom_content_bridge::get_hand_bridge_paths(
+        path, MAX_PATH, temporary, MAX_PATH)) return false;
+    return write_atomic_file(path, temporary, data, length);
+}
+
 void reset_hand_bridge(bool reset_session = false)
 {
     wchar_t path[MAX_PATH]{}, temporary[MAX_PATH]{};
@@ -482,13 +491,19 @@ void deactivate_hand_bridge(bool vr_authoritative = false)
         static_cast<unsigned long long>(hand_sequence),
         vr_authoritative ? "true" : "false",
         static_cast<unsigned long long>(g_optical_hammer_swing_sequence));
-    if (length > 0 && static_cast<size_t>(length) < sizeof(json) &&
-        write_atomic_file(path, temporary, json, static_cast<size_t>(length)))
+    if (length > 0 && static_cast<size_t>(length) < sizeof(json))
     {
-        g_hand_bridge_inactive_authoritative.store(vr_authoritative, std::memory_order_release);
-        g_hand_bridge_inactive_published.store(true, std::memory_order_release);
-        log_line("VR_HAND_BRIDGE_INACTIVE authoritative=%u desktop_fallback=%u",
-            vr_authoritative ? 1u : 0u, vr_authoritative ? 0u : 1u);
+        const size_t json_length = static_cast<size_t>(length);
+        const bool base_written = write_atomic_file(path, temporary, json, json_length);
+        const bool custom_written = write_custom_content_hand_bridge(json, json_length);
+        if (base_written || custom_written)
+        {
+            g_hand_bridge_inactive_authoritative.store(vr_authoritative, std::memory_order_release);
+            g_hand_bridge_inactive_published.store(true, std::memory_order_release);
+            log_line("VR_HAND_BRIDGE_INACTIVE authoritative=%u desktop_fallback=%u custom_content=%u",
+                vr_authoritative ? 1u : 0u, vr_authoritative ? 0u : 1u,
+                custom_written ? 1u : 0u);
+        }
     }
 }
 
@@ -546,9 +561,10 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
     }
 
     XrVector3f gun_muzzle_offset{};
+    XrVector3f gun_muzzle_direction{0.0f, 0.0f, -1.0f};
     const char *gun_muzzle_item = nullptr;
     const bool gun_tool_active = scrapvr::tools::get_gun_muzzle_offset(
-        gun_muzzle_offset, gun_muzzle_item);
+        gun_muzzle_offset, gun_muzzle_direction, gun_muzzle_item);
     const bool gun_muzzle_active = active[1] && gun_tool_active && gun_muzzle_item;
     const bool hammer_active = scrapvr::tools::is_hammer_active();
     if (active[1] && optical[1] && hammer_active)
@@ -614,7 +630,7 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
     char json[1536]{};
     const int length = std::snprintf(json, sizeof(json),
         "{\"sequence\":%llu,\"vrActive\":true,\"vrAuthoritative\":true,\"opticalGunTrigger\":%s,"
-        "\"gunMuzzle\":{\"active\":%s,\"item\":\"%s\",\"x\":%.5f,\"y\":%.5f,\"z\":%.5f},"
+        "\"gunMuzzle\":{\"active\":%s,\"item\":\"%s\",\"x\":%.5f,\"y\":%.5f,\"z\":%.5f,\"dx\":%.5f,\"dy\":%.5f,\"dz\":%.5f},"
         "\"hammerSwingSequence\":%llu,\"hammerSwingDirection\":{\"x\":%.5f,\"y\":%.5f,\"z\":%.5f},"
         "\"left\":{\"active\":%s,\"interact\":%s,\"optical\":%s,\"x\":%.5f,\"y\":%.5f,\"z\":%.5f,\"fx\":%.5f,\"fy\":%.5f,\"fz\":%.5f,\"ux\":%.5f,\"uy\":%.5f,\"uz\":%.5f},"
         "\"right\":{\"active\":%s,\"interact\":%s,\"optical\":%s,\"x\":%.5f,\"y\":%.5f,\"z\":%.5f,\"fx\":%.5f,\"fy\":%.5f,\"fz\":%.5f,\"ux\":%.5f,\"uy\":%.5f,\"uz\":%.5f}}",
@@ -622,6 +638,7 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
         optical_gun_trigger ? "true" : "false",
         gun_muzzle_active ? "true" : "false", gun_item.c_str(),
         gun_muzzle_offset.x, gun_muzzle_offset.y, gun_muzzle_offset.z,
+        gun_muzzle_direction.x, gun_muzzle_direction.y, gun_muzzle_direction.z,
         static_cast<unsigned long long>(g_optical_hammer_swing_sequence),
         g_optical_hammer_swing_direction.x, g_optical_hammer_swing_direction.y,
         g_optical_hammer_swing_direction.z,
@@ -633,7 +650,10 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
         up[1].x, up[1].y, up[1].z);
     if (length <= 0 || static_cast<size_t>(length) >= sizeof(json)) return;
     g_previous_right_interaction = interaction[1];
-    if (!write_atomic_file(path, temporary, json, static_cast<size_t>(length))) return;
+    const size_t json_length = static_cast<size_t>(length);
+    const bool base_written = write_atomic_file(path, temporary, json, json_length);
+    const bool custom_written = write_custom_content_hand_bridge(json, json_length);
+    if (!base_written && !custom_written) return;
 
     g_hand_bridge_inactive_published.store(false, std::memory_order_release);
     g_last_hand_bridge_publish_ms = now;
@@ -646,7 +666,7 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
     if (g_optical_hammer_click_publishes > 0) --g_optical_hammer_click_publishes;
     if (!g_hand_bridge_logged.exchange(true))
     {
-        log_line("VR_HAND_BRIDGE_ACTIVE path=Data/NativeVR/hand_physics.json world_space=1 gun_projectile_override=tracked_barrel");
+        log_line("VR_HAND_BRIDGE_ACTIVE path=content-aware world_space=1 gun_projectile_override=tracked_barrel");
     }
 }
 
@@ -662,7 +682,8 @@ uint8_t __fastcall hk_raycast(void *world, void *unused, const float *origin,
         now - g_right_hand_world_ms <= 250 && origin && delta)
     {
         XrVector3f local_offset{0.0f, -0.035f, -0.120f};
-        scrapvr::tools::get_interaction_laser_offset(local_offset);
+        XrVector3f local_direction{0.0f, 0.0f, -1.0f};
+        scrapvr::tools::get_interaction_laser_offset(local_offset, &local_direction);
         XrVector3f forward = g_right_hand_forward;
         XrVector3f up = g_right_hand_up;
         if (normalize_vector(forward))
@@ -684,7 +705,14 @@ uint8_t __fastcall hk_raycast(void *world, void *unused, const float *origin,
                     g_right_hand_world.z + right.z * local_offset.x + up.z * local_offset.y - forward.z * local_offset.z
                 };
                 const float range = std::sqrt(range_squared);
-                const float redirected_delta[3]{forward.x * range, forward.y * range, forward.z * range};
+				XrVector3f redirected_direction{
+					right.x * local_direction.x + up.x * local_direction.y - forward.x * local_direction.z,
+					right.y * local_direction.x + up.y * local_direction.y - forward.y * local_direction.z,
+					right.z * local_direction.x + up.z * local_direction.y - forward.z * local_direction.z
+				};
+				if (!normalize_vector(redirected_direction)) redirected_direction = forward;
+				const float redirected_delta[3]{redirected_direction.x * range,
+					redirected_direction.y * range, redirected_direction.z * range};
                 if (!g_tool_raycast_logged.exchange(true))
                     log_line("VR_ACTION_RAY_ACTIVE raycast_rva=%llx caller_rva=%llx calibrated_tool_origin=1",
                         static_cast<unsigned long long>(kRaycastRva),

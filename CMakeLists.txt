@@ -21,6 +21,7 @@ set(SMVR_RUNTIME_SOURCES
   src/feature_engine_input.cpp
   src/feature_input.cpp
   src/feature_startup_menu.cpp
+  source/NativeVR/src/custom_content_bridge.cpp
   source/NativeVR/src/vr_hands.cpp
   source/NativeVR/src/vr_tools.cpp
 )

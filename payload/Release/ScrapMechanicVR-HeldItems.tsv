@@ -1,0 +1,1240 @@
+uuid	name	profile	shapeSet
+0009d336-e201-44ae-b47c-87768c17a6e6	obj_mininghub_dropoff_vacuum	Large Parts	survivalobject.shapeset
+00284190-1484-4286-a198-b2ddef768c2e	jnt_suspensionoffroad_02	Medium Parts	interactive_upgradeable.shapeset
+004bb5ee-34ba-484a-924b-31412d898e7e	obj_survivalobject_elevatordoor_left	Large Parts	survivalobject.shapeset
+004da34b-7a9e-4962-b0c3-e48b514fb603	obj_castedpart_t3	Large Parts	castedpart.shapeset
+007d6afc-59ef-4fb4-9bb7-52ab9bcfec22	obj_industrial_pallet	Large Parts	industrial.shapeset
+008d3f17-3bef-439d-8111-13a8c35c8787	obj_moltenorb_t1	Large Parts	moltenorb.shapeset
+011c1ffd-7146-4e8d-8c18-17247d768ae2	obj_spaceship_wall04	Large Parts	spaceship_survivalobject.shapeset
+01d2298b-6cdb-4f4f-bd73-37c76cd60ca3	obj_fittings_ductlong	Small Parts	fittings.shapeset
+0229f59d-1ba3-446a-8f9c-df8b0f816e51	obj_interactive_mountablespudgun_creative	Medium Parts	interactive.shapeset
+027bd4ec-b16d-47d2-8756-e18dc2af3eb6	blk_spaceshipmetal	Blocks	blocks.shapeset
+02e1af8e-090f-432f-9ad4-1bb41add0d4b	obj_rewards_carbackpanel	Quest / Special Items	rewards.shapeset
+02ee2a98-bd8d-4a09-bb69-38edaf66b8e1	obj_harvest_stone	Resources	harvests_shared.shapeset
+036f4af6-e45e-44b9-88a3-79c96194367c	obj_voxelmaterialchunk_t1_large	Resources	voxelmaterialchunk.shapeset
+03ae13a9-65a9-4c2f-8640-8235a8d9ed05	obj_shoprewards_totebotblip_bobblehead	Quest / Special Items	shoprewards.shapeset
+03bdd942-c808-4795-aa0b-554fa98c3c74	obj_interactive_boombox	Large Parts	interactive_shared.shapeset
+04680945-5bb7-4a8a-9246-24c6c2b977d1	obj_warehouse_beambigsplit	Small Parts	warehouse.shapeset
+04733746-4090-4d63-aff1-47dafae506fd	obj_warehouse_bigrampthinsmall	Wedges	warehouse.shapeset
+04782466-eca1-4ed9-8502-036ea269aed9	obj_fittings_pipevalve	Small Parts	fittings.shapeset
+05170ad2-4d8a-48c1-9cd6-9be870e8af42	obj_survivalobject_topdepcardreader	Large Parts	survivalobject.shapeset
+0535b90e-f0a8-491c-8c70-1fc81b939fb4	obj_fittings_wire	Medium Parts	fittings.shapeset
+0539121b-9588-4c64-bdd0-25b0a29b081a	obj_harvests_trees_pine03_p08	Resources	harvests_trees.shapeset
+05452112-f653-48b6-97ba-8c4e2c9eb04a	bq_cozybed_01	Small Parts	builderguide.shapeset
+056e5ff1-f030-40df-946a-b830bf494c92	obj_container_gas	Medium Parts	interactive_containers_shared.shapeset
+05900757-a49f-4907-b498-96bfd2b15176	obj_craftbot_portablecraftbot	Medium Parts	craftbot_creative.shapeset
+05a3e48b-0483-4897-b1e3-370271f815ed	obj_resource_drillcasingmixedrich	Resources	resource.shapeset
+05c81c17-3780-4edb-80a4-1648c25ca460	obj_harvests_trees_pine03_p09	Resources	harvests_trees.shapeset
+05f3a5a4-532a-4642-b648-e0dd60ce9f4d	obj_interactive_turretseat_02_sphere	Large Parts	interactive_shared.shapeset
+0603b36e-0bdb-4828-b90c-ff19abcdfe34	blk_bricks	Blocks	blocks.shapeset
+061b5d4b-0a6a-4212-b0ae-9e9681f1cbfb	blk_wood3	Blocks	blocks.shapeset
+0637b64b-b6aa-49b9-9d20-72d565b42ed8	0637b64b-b6aa-49b9-9d20-72d565b42ed8	Small Parts	effect_proxies.shapeset
+068a89ca-504e-4782-9ede-48f710aeea73	obj_decor_sign05	Medium Parts	decor.shapeset
+06c564e2-ca8d-4843-94e9-322cb835f59e	obj_harvests_trees_birch02_p04	Resources	harvests_trees.shapeset
+06fd0e52-f791-43a6-9fbd-5a8a6260f3f2	obj_fittings_7x8_glass	Large Parts	fittings.shapeset
+07232236-22eb-4912-8774-ab185f368bb9	obj_fittings_pipelong	Medium Parts	fittings.shapeset
+073f92af-f37e-4aff-96b3-d66284d5081c	blk_lights	Blocks	blocks.shapeset
+079b7a15-7718-444b-8560-7717109dabff	obj_harvests_trees_birch03_p06	Resources	harvests_trees.shapeset
+080ef1dd-07a7-4d31-86b8-ac907e1468bf	obj_decor_poster02	Large Parts	decor.shapeset
+0861357a-79bd-44ac-8e8f-45c7f289875d	obj_survivalobject_doorsensor	Large Parts	survivalobject.shapeset
+08918d4d-29e6-427d-ad8c-1eafcc4af1f9	obj_fittings_pipebigsplit	Medium Parts	fittings.shapeset
+094ceb5a-995b-431f-87f4-aac091494ae4	obj_construction_wallfondation	Large Parts	construction.shapeset
+096a0416-4e3d-4e0b-8caf-c47f2739d8e2	obj_voxelmaterialchunk_rich2_small	Resources	voxelmaterialchunk.shapeset
+096d4daf-639e-4947-a1a6-1890eaa94464	obj_container_ammo	Medium Parts	interactive_containers_shared.shapeset
+099bbf9a-6766-4e39-bd12-90d8b81771af	blk_ice	Blocks	blocks.shapeset
+09ca2713-28ee-4119-9622-e85490034758	blk_caution	Blocks	blocks.shapeset
+0a0cc4ee-bdd7-41b1-b5cb-f34a0e6de46e	obj_interactive_sawtable1	Large Parts	craftbot_creative.shapeset
+0a2544c9-902d-42e2-91af-f35dad9c5d0e	obj_harvests_trees_birch03_p01	Resources	harvests_trees.shapeset
+0a597f6d-eb45-4f93-91e5-130e19e0f1f5	obj_industrial_metalgrid	Medium Parts	industrial.shapeset
+0b114031-5065-4365-922d-3980d791e00d	obj_harvest_stonechunk01	Resources	harvests_stones.shapeset
+0b423e11-50dd-4272-92a2-506f42c992d4	obj_harvests_trees_birch03_p04	Resources	harvests_trees.shapeset
+0bc74539-df8a-47c7-aad8-d55d809a01e4	obj_crates_banana	Large Parts	packingcrates.shapeset
+0bdbde72-41a4-4295-b31d-5de814b9ed62	obj_moltenorb_t4	Large Parts	moltenorb.shapeset
+0c077288-d15d-45d6-8439-3dabe7144034	obj_office_waterdispenser	Medium Parts	building.shapeset
+0c07dba0-be79-40fd-9ed8-5a1c34e2d196	obj_manmade_scraproof03	Large Parts	manmade.shapeset
+0c08480b-9ae3-41ec-9ae9-820fcd90f572	obj_survivalobject_caster_output	Medium Parts	survivalobject.shapeset
+0c9cc5bb-af2f-4023-b8d8-cd7d52a60efe	obj_interactive_electricengine_02	Medium Parts	interactive_upgradeable.shapeset
+0cd81a8e-a4b3-4743-b507-600fe35c93ee	obj_structure_concretebarrier	Medium Parts	structure.shapeset
+0db3e749-adf2-4ba5-bb37-1cebcfb59cb2	obj_shoprewards_scrapmechanicbobbleheadfemale	Quest / Special Items	shoprewards.shapeset
+0dba257b-b907-4919-baaf-2fefe19f4e24	obj_small_2way_pipe	Small Parts	fittings.shapeset
+0dff60c2-f7ae-4c13-b9c4-962ec1039be8	obj_building_mopbucket	Large Parts	building.shapeset
+0e68d9ec-9bed-4d09-8bba-973e3af25f22	Quest_ShipConnector02	Large Parts	survivalobject.shapeset
+0e695319-afd0-405b-85c8-289df8614c52	obj_construction_carpetroll	Large Parts	construction.shapeset
+0e6e6903-c284-40ee-9d39-b55312094dac	obj_rewards_window	Quest / Special Items	rewards.shapeset
+0ebf382a-e2e4-4c46-a48e-87808308c1e3	obj_building_sink	Medium Parts	building.shapeset
+0ee1efd7-0495-45da-b086-a831c58cdbda	obj_survivalobject_ladder	Large Parts	survivalobject.shapeset
+0ee4fc0a-9f69-4d67-b5c2-09ea5a22712f	obj_industrial_encryptstandpipe	Small Parts	industrial.shapeset
+0f638bd7-0c0d-4ba3-9ba2-af0b523ddff4	obj_construction_rebarbig	Medium Parts	construction.shapeset
+0f6cb8bb-b905-4636-8acf-614515adcae5	obj_dekotora_starsun	Large Parts	dekotora.shapeset
+0f6d1667-ddf8-4ca9-b290-8bd3ec9b038b	obj_resource_residueore	Resources	resource.shapeset
+0ff9cf8f-b9b9-44cd-9de2-77508fda3318	obj_interactive_growbed_pineapple_mature	Medium Parts	interactive.shapeset
+10079046-6400-42fd-bcd6-f66af6cfd8b8	obj_spaceship_interiorboxmedium	Small Parts	spaceship_survivalobject.shapeset
+10149368-0d49-44c1-9521-dbec436eb770	obj_harvest_log_l02b	Resources	harvests_trees.shapeset
+1016cafc-9f6b-40c9-8713-9019d399783f	blk_metal2	Blocks	blocks.shapeset
+102565a0-c864-463e-b517-72e82242eec2	obj_containers_plantcontaineropen	Small Parts	containers.shapeset
+103fc4e6-7e57-465e-a86d-983343415877	obj_tool_bucket_water	Small Parts	bucket.shapeset
+10590ecd-7d2f-4ff9-a6de-e749870ae8b8	obj_containers_stack	Large Parts	containers.shapeset
+109d044d-6002-4779-be04-34501d78408f	obj_destructable_tape_acrosstheroom02	Small Parts	destructable_tape.shapeset
+109e1514-4f3b-4bd9-8d95-2d81fdb8fb25	obj_building_barracksupportturn	Medium Parts	building.shapeset
+1147e59d-6940-42b4-840b-07f05054f5e0	obj_resource_crudeoil	Resources	resource_creative.shapeset
+11805d14-8dc0-4372-b08d-e1c70392cba8	obj_harvests_nonepart_sapphire	Resources	harvests_nonepart.shapeset
+11ee95f2-b486-4f2d-a59b-106b79908a22	obj_interactive_growbed_pineapple_sprout	Medium Parts	interactive.shapeset
+120ee9c7-198b-4cb2-919d-51601ba2867e	obj_decor_windowcurtain	Large Parts	decor.shapeset
+1215bcc1-b11f-4787-9bea-ff80641a6d19	obj_harvests_nonepart_tier5	Resources	harvests_nonepart.shapeset
+1226cfd3-4fc8-4f9e-b21a-0c9576e2ef2f	obj_tool_handbook	Components	tool_parts.shapeset
+125e3640-4b74-4b96-8015-32ca3d0c1a0c	obj_voxelmaterialchunk_t4_medium	Resources	voxelmaterialchunk.shapeset
+126be16e-10c1-4ccd-82c5-368edc7f766a	obj_harvests_stones_p04	Resources	harvests_stones.shapeset
+127b9b84-74b8-4e41-a53a-b7f163287479	obj_dekotora_railing01	Medium Parts	dekotora.shapeset
+127f5ce0-09d1-4e3a-b1ac-a89f6340ddc8	obj_castedpart_t1	Large Parts	castedpart.shapeset
+12862001-666c-4bdd-8326-a1f43610d28b	obj_interactive_controller_creative	Small Parts	interactive.shapeset
+1299a5d1-b5d3-4a1d-895a-6baf877da780	obj_structure_cableroll02	Medium Parts	structure.shapeset
+12cc6e9a-6d66-4a9a-bb59-b13a50373fd8	obj_characterobject_woc	Quest / Special Items	characterobject.shapeset
+1311538d-9003-47dc-a16d-323794c049d1	char_npc_scoutfarmer_binoculars	Small Parts	char_npc_scoutfarmer_stuff.shapeset
+1325d152-3dd1-41a1-9027-5823c5cb55c4	obj_fittings_ac	Medium Parts	fittings.shapeset
+135967d2-7faa-495f-98f4-5130350396a4	obj_harvest_log_m01	Resources	harvests_trees.shapeset
+1366666f-a1c8-4676-9b14-614a67796aa8	obj_rewards_carbumpersidepart01	Quest / Special Items	rewards.shapeset
+13b7b0ba-5cbb-4501-9862-5879f20306fb	obj_interactive_growbed_orange_sprout	Medium Parts	interactive.shapeset
+13c59db3-c368-4b06-80be-c0b258df93e3	obj_artifact_fossil08	Quest / Special Items	artifact_creative.shapeset
+13ce3374-841a-4ad2-a6c3-ad0dabc1963d	obj_light_rangelightlarge	Medium Parts	interactive_shared.shapeset
+13cf98bf-d033-4be5-a0a0-560cb946a4ba	obj_harvests_trees_birch02_p01	Resources	harvests_trees.shapeset
+13ffabca-91ec-48ce-9dd6-4f6660714701	obj_plants_growbox	Large Parts	plants.shapeset
+14e8f5d0-7d6a-41ab-96a1-fc34588de868	obj_decor_sign06	Medium Parts	decor.shapeset
+1503a160-bf1f-4b86-8406-b11250c71a28	obj_destructable_tape_taperoll04	Small Parts	destructable_tape.shapeset
+1506a3ab-b545-424a-92a0-7395be9e76f6	obj_dekotora_arrowlight_large	Large Parts	dekotora.shapeset
+15a73381-549c-4c60-88e7-45b23b3165a3	obj_survivalobject_trashbot_elevatorfloor	Large Parts	survivalobject.shapeset
+15a8f24b-016a-4db6-adcc-967ee1b6c7b1	obj_industrial_supportxframe	Large Parts	industrial.shapeset
+15bc4cdd-1892-4c8e-810a-0f18063361eb	obj_artifact_fossil09	Quest / Special Items	artifact_creative.shapeset
+15ee8b4c-d58b-462f-a0a0-5c9bcdff495f	obj_harvests_trees_pine03_p10	Resources	harvests_trees.shapeset
+161786c1-1290-4817-8f8b-7f80de755a06	obj_interactive_robotbasshead	Small Parts	interactive.shapeset
+16676910-7011-4514-891f-d1536b5cf56e	obj_interactive_growbed_redbeet_sprout	Medium Parts	interactive.shapeset
+167ec3ff-5506-496a-be16-db2937a9061e	obj_harvests_nonepart_sapphire_p04	Resources	harvests_nonepart.shapeset
+16ba2d22-7b96-4c5e-9eb7-f6422ed80ad4	obj_light_posterspotlight	Medium Parts	lights.shapeset
+16ed53cc-a45b-4f64-92d4-2db93bf33e1c	obj_fittings_7x8_bend_glass	Large Parts	fittings.shapeset
+17153a0e-8461-442f-b172-3a899c1ae99f	obj_fittings_pipebigbend	Medium Parts	fittings.shapeset
+17371481-da9e-4bc1-bbbd-438109aad552	obj_shoprewards_totebotpercussion_bobblehead	Quest / Special Items	shoprewards.shapeset
+176f4537-b245-4ba2-a318-da12e15bf789	obj_warehouse_beamframeturn	Small Parts	warehouse.shapeset
+17844463-6664-4493-96c3-76f7f662d0bb	obj_interactive_sawtable4	Large Parts	craftbot_creative.shapeset
+1786e265-cebe-4ef1-9d13-02c104c6207b	obj_interactive_turretseat_01_sphere	Large Parts	interactive_shared.shapeset
+178fadc6-fff7-4bde-a052-c047e8a8fbcd	obj_questitem_pictureframe	Quest / Special Items	quest_items.shapeset
+17c301ae-1d51-445c-9c72-6f40ec386dba	obj_rewards_anvil	Quest / Special Items	rewards.shapeset
+18055540-6cb7-4c03-857d-1414d410f309	jnt_suspensionoffroad_bearing_05	Medium Parts	interactive_upgradeable.shapeset
+18321228-7164-4dfd-928f-fa86bad31ba1	obj_shoprewards_computer	Quest / Special Items	shoprewards.shapeset
+186b3d0d-4643-4e7a-b769-8ad3c5bc23f3	obj_harvest_lemonium	Resources	harvests.shapeset
+1872d83a-d1a1-4cb7-ad46-9e4468d2548c	obj_interactive_controller_02	Small Parts	interactive_upgradeable.shapeset
+1897ee42-0291-43e4-9645-8c5a5d310398	blk_wood2	Blocks	blocks.shapeset
+189aabd7-a3a4-4ba1-886e-e2e21dd1772b	obj_destructable_tape_tape06	Small Parts	destructable_tape.shapeset
+18a38c8e-18ec-46c5-be00-cee7724401e2	obj_containers_vegboxbanana	Medium Parts	containers.shapeset
+18f9185d-a047-43aa-a3c6-a8f828e04d7a	obj_tool_launcher	Components	tool_parts.shapeset
+1911c3bf-d3e4-48d2-9478-ea4d6f4291fb	bq_watchtower_02	Small Parts	builderguide.shapeset
+19189881-0c42-408f-a2ac-aa0dadd2d50e	vaultfloor	Large Parts	survivalobject.shapeset
+196586b5-897f-40f3-926c-b5dfa4f772eb	obj_spaceship_blinds	Large Parts	spaceship.shapeset
+1986c34b-c318-4992-ab1d-34a1531a4095	obj_harvests_trees_pine02_p04	Resources	harvests_trees.shapeset
+198c8b79-1f02-49fc-aacf-f8cacca7a3a7	obj_rewards_safe	Quest / Special Items	rewards.shapeset
+1991e0c6-4dd8-4e44-9da8-7fdf4d938fdc	obj_office_deskextension	Large Parts	building.shapeset
+1a82f776-5989-4471-b09d-0c3f65012fb3	obj_spaceship_exitsign	Medium Parts	spaceship.shapeset
+1aac8942-38ac-4a83-bc16-6d33436c0934	obj_spaceship_interiorwedgelong	Wedges	spaceship_survivalobject.shapeset
+1ae2cbd0-bc7d-45ed-bf19-57ef5dc14391	blk_undergroundstation	Blocks	blocks_survivalobject.shapeset
+1b24e0a4-3f04-4dfe-83ea-612da2eff922	obj_harvests_trees_pine01_p07	Resources	harvests_trees.shapeset
+1b3eb4f7-080a-4d98-adab-f29f0444b147	obj_dekotora_detailpiece03	Large Parts	dekotora.shapeset
+1b47f36c-7c6e-451c-87b2-34fdf33d6989	obj_fittings_generatorpipesplit	Small Parts	fittings.shapeset
+1b927252-ee6d-420e-8bb4-ae42fcb43ba8	obj_construction_brick	Small Parts	construction.shapeset
+1babcbfe-4585-46a9-afdf-b71dd0ab5396	1babcbfe-4585-46a9-afdf-b71dd0ab5396	Blocks	blocks_blueprint.shapeset
+1bace005-426c-4b44-8530-ef8698210a6f	obj_destructable_tape_rooftape04	Small Parts	destructable_tape.shapeset
+1bdc2111-691c-465f-84d1-0e5faeca9897	obj_destructable_tape_tape02	Small Parts	destructable_tape.shapeset
+1bfccc0a-828f-475c-882c-87d5a96054c9	obj_interactive_gasengine_01	Small Parts	interactive_upgradeable.shapeset
+1c04327f-1de4-4b06-92a8-2c9b40e491aa	obj_interactive_robotbliphead01	Small Parts	interactive.shapeset
+1c6756ca-3a60-4dcb-a5d1-353edf818308	obj_seed_broccoli	Plantables	plantables_creative.shapeset
+1c75a433-97a2-4da3-a9c1-d47e5421fd2a	obj_voxelmaterialchunk_rich1_large	Resources	voxelmaterialchunk.shapeset
+1c83675f-7c77-4cbb-875b-79d4bd46100d	obj_craftbot_craftbot3	Large Parts	craftbot_creative.shapeset
+1cb6b667-18c2-478f-b519-0b992e61349f	obj_artifact_fossil05	Quest / Special Items	artifact_creative.shapeset
+1d4793af-cb66-4628-804a-9d7404712643	obj_interactive_sensor_01	Small Parts	interactive_upgradeable.shapeset
+1d667253-849c-4f9f-9109-1a2d91795247	obj_harvests_trees_birch01_p04	Resources	harvests_trees.shapeset
+1d689938-56fa-445f-a71c-eed9af0292c4	obj_interactive_growbed_broccoli_sprout	Medium Parts	interactive.shapeset
+1d8b89dc-f498-4914-8424-307dfcc667ff	obj_survivalobject_mininghub_dispenserbot	Large Parts	survivalobject.shapeset
+1daa9b63-c1fe-4566-9a96-3232e9449471	1daa9b63-c1fe-4566-9a96-3232e9449471	Small Parts	debug.shapeset
+1daf2b8a-fd2f-4266-9942-c04feede4f7b	obj_industrial_satellite01	Large Parts	industrial.shapeset
+1db5d0d5-44c2-424e-b74c-234da226341f	obj_jewel_04	Quest / Special Items	jewel_creative.shapeset
+1dc643c9-6f8e-478a-8ebb-4adf3cb9960f	obj_building_barracksupportholder	Medium Parts	building.shapeset
+1dcd74ca-39ba-4b00-a36a-3381b25055f4	obj_crates_tomato	Large Parts	packingcrates.shapeset
+1deb34b0-3d0c-4642-bec2-c7f64f8d28b7	obj_outfitpackage_heart	Quest / Special Items	outfitpackage.shapeset
+1df6f1af-fd39-443a-9fd7-dd389e0ba5c8	obj_spaceship_interiorcables	Medium Parts	spaceship_survivalobject.shapeset
+1e2485d7-f600-406e-b348-9f0b7c1f5077	obj_light_packingtablelamp	Medium Parts	lights.shapeset
+1e8d93a4-506b-470d-9ada-9c0a321e2db5	obj_interactive_button	Small Parts	interactive.shapeset
+1ebed5a8-a6df-45c9-a873-75286b61d2fe	obj_nugget_t1	Resources	resource.shapeset
+1ed1d5a8-466a-4b5e-867b-0d93cd9d2dcb	obj_industrial_beamelevation	Small Parts	industrial.shapeset
+1ef1f0e8-389c-4eb9-b4a8-784499353f14	obj_industrial_platformfencepole	Small Parts	industrial.shapeset
+1f334b62-8955-4406-8848-91e03228c330	obj_decor_cone	Medium Parts	decor.shapeset
+1f343b76-3622-4e4b-9de4-238d43d60734	obj_office_officechairbottom	Medium Parts	building.shapeset
+1f5d8b77-183c-4f8b-83d7-a3940d090926	obj_spaceship_infoboard	Large Parts	spaceship_survivalobject.shapeset
+1f7ac0bb-ad45-4246-9817-59bdf7f7ab39	blk_scrapmetal	Blocks	blocks.shapeset
+1fc74a28-addb-451a-878d-c3c605d63811	blk_scrapwood	Blocks	blocks.shapeset
+1fd89935-122e-4751-be0c-94f2e337b674	obj_interactive_sawtable2	Large Parts	craftbot_creative.shapeset
+202b1841-fd43-4993-9720-e181df634077	obj_structure_metalcube	Large Parts	structure.shapeset
+203fdf06-b311-49fd-933d-a1c6b671a017	obj_small_3wayb_pipe	Small Parts	fittings.shapeset
+20821431-de44-4d54-8877-60833316104e	obj_fittings_ventbig05	Medium Parts	fittings.shapeset
+208e8a82-9c0a-4fe4-87bc-0aec363172ea	obj_harvests_nonepart_sapphire_p05	Resources	harvests_nonepart.shapeset
+20b3577f-a2f1-44f3-a22c-83f792732771	obj_destructable_taperolls_big	Medium Parts	decor.shapeset
+20bd2885-d184-44ae-b72b-f90b786f8664	obj_manmade_holidayposter	Large Parts	manmade.shapeset
+20d4a103-c842-40d7-9df8-0ba0f9000752	obj_rewards_ivypipe04	Quest / Special Items	rewards.shapeset
+20dcd41c-0a11-4668-9b00-97f278ce21af	obj_interactive_sensor_05	Small Parts	interactive_upgradeable.shapeset
+20e0b1f2-dd7b-4b69-9308-b6c26c0b0e6e	obj_destructable_tape_corridor01	Small Parts	destructable_tape.shapeset
+20f59114-5964-451f-bb47-820da3ebbc3b	obj_interactive_saddle_creative	Medium Parts	interactive.shapeset
+2133fdb7-5e3c-4fb9-99ad-5b4f8bf5c6e5	obj_harvests_trees_birch03_p03	Resources	harvests_trees.shapeset
+220b201e-aa40-4995-96c8-e6007af160de	blk_metalbricks	Blocks	blocks.shapeset
+221badef-0313-419c-9a7c-7469d26b0d5b	obj_decor_wcsignmale	Medium Parts	decor.shapeset
+2228cef0-f22a-4901-93c5-48e4df52caf6	obj_industrial_railing	Large Parts	industrial.shapeset
+2289e96f-f9c6-440c-b7c9-ce9474da8264	obj_manmade_salesign	Medium Parts	manmade.shapeset
+22947bb1-7c64-477c-8656-d7857df39b78	obj_harvests_trees_birch01_p01	Resources	harvests_trees.shapeset
+22bdc94b-e85b-4a2a-be2b-f1d782cfab53	obj_decor_herbspot	Medium Parts	decor.shapeset
+22beade5-38ca-47b4-a2ee-32403f58a862	obj_seed_banana	Plantables	plantables_creative.shapeset
+22c526fc-b212-4e4e-af00-1cc69d9129e1	obj_spaceship_frame03	Small Parts	spaceship_survivalobject.shapeset
+22f3e797-82f5-4819-a085-c3cc28ec9025	obj_interactive_electricengine_05	Medium Parts	interactive_upgradeable.shapeset
+2311afca-ca99-4b7b-a209-8382ed7ea356	obj_harvests_trees_pine01_p10	Resources	harvests_trees.shapeset
+2350ac11-e6e3-46da-ac1e-62baf4d581b6	obj_nugget_t5	Resources	resource.shapeset
+2354cd24-3dd3-4db5-84ab-df64c32d2c72	obj_interactive_controller_04	Small Parts	interactive_upgradeable.shapeset
+23572f75-03c0-4c33-b643-70250d0e4ae0	obj_industrial_rooftankslicetop	Large Parts	industrial.shapeset
+239c9c71-e5c7-4ccb-ad40-7bdbb32f3cc9	obj_office_mugholder	Medium Parts	building.shapeset
+23ac6823-51a4-4581-b8ca-061c76f093f6	obj_decor_haybale	Large Parts	decor.shapeset
+23bdcd57-88d1-4626-a57a-a9cca055e3d1	obj_dekotora_detailpiece02	Medium Parts	dekotora.shapeset
+24001201-40dd-4950-b99f-17d878a9e07b	obj_interactive_propanetank_large	Medium Parts	interactive.shapeset
+240d38b9-af66-42f4-8c2b-7bbf26fa5f66	obj_interactive_growbed_carrot_mature	Medium Parts	interactive.shapeset
+2440d224-8791-4587-b464-e8ccad13d3d8	obj_harvests_crystal_large02_p04	Resources	harvests_crystal.shapeset
+2448a709-a8ec-4d69-a927-b9ab195cd83f	obj_spaceship_wall06	Large Parts	spaceship_survivalobject.shapeset
+256fde90-4225-4c22-b107-fcaabe2bec9c	obj_survivalobject_elevatorfan	Large Parts	survivalobject.shapeset
+25a5ffe7-11b1-4d3e-8d7a-48129cbaf05e	blk_beam	Blocks	blocks.shapeset
+260b4597-f1ac-409c-8e6b-90c998c5fe94	jnt_interactive_piston_creative	Small Parts	interactive.shapeset
+26119eb4-0e0e-4730-85ad-8a8c44f3d18c	obj_construction_ramp02	Wedges	construction.shapeset
+265bf568-a801-4ce6-8ac3-d20526443bc5	obj_destructable_tape_big_walltape04	Small Parts	destructable_tape.shapeset
+26768efb-a090-44ce-9397-6a295b73eaf8	obj_moltenorb_t3	Large Parts	moltenorb.shapeset
+267e0c93-62e3-45ad-9470-a14035cb9ca4	obj_resource_ember	Resources	resource_creative.shapeset
+26a9d40f-49fd-403d-94a2-2d27b04a3156	obj_interactive_sawtable3	Large Parts	craftbot_creative.shapeset
+26e7cb39-f380-4203-80c8-b1bf1b4f598d	obj_voxelmaterialchunk_t1_small	Resources	voxelmaterialchunk.shapeset
+27583290-ebc2-452e-9f02-4894da09a9fc	bigbox01	Large Parts	survivalobject.shapeset
+275e4258-ff57-45ae-8e2f-b82204c56d16	obj_spaceship_ceilingvent02	Large Parts	spaceship_survivalobject.shapeset
+276fd55b-ae54-4a7a-ace6-fddd2d3370a5	obj_powertools_drill	Medium Parts	powertools.shapeset
+27a221b1-9809-4df1-901a-caafe119c9b6	obj_outfitpackage_rare	Quest / Special Items	outfitpackage.shapeset
+27c00cfb-4e7f-45fc-a037-f9a941464ce6	obj_manmade_freshsign	Large Parts	manmade.shapeset
+2836d007-a7b7-4b2a-8e0e-e58ca8bb64dc	obj_voxelmaterialchunk_rich1_small	Resources	voxelmaterialchunk.shapeset
+286faea5-83db-4f53-8813-1ce81309a059	obj_destructable_tape_cocoon02	Large Parts	destructable_tape.shapeset
+2870f2dd-ea17-44dd-8c00-8f71e8d2764c	obj_structure_concretepillar	Large Parts	structure.shapeset
+287f63c4-58dd-449d-9895-2bf9fdfef9a3	obj_interactive_growbed_cotton_sprout	Medium Parts	interactive.shapeset
+2893e707-36b3-4ff1-bb3c-ef1b5524ae13	obj_warehouse_craneplatform	Large Parts	warehouse.shapeset
+295451dd-f5b2-421d-9113-b3f704d799d4	obj_industrial_platformfenceconnector	Small Parts	industrial.shapeset
+29c5c1eb-a3bd-45ae-b823-aeb28d70593a	obj_spaceship_frame05	Medium Parts	spaceship_survivalobject.shapeset
+29ededf7-6436-41bf-84f4-8fb5361d29ea	obj_industrial_support_quater_frame	Medium Parts	industrial.shapeset
+2a8028db-9931-4d48-a2f9-bb2c1188d517	obj_artifact_fossil11b	Quest / Special Items	artifact_creative.shapeset
+2aa8cb2c-2311-440c-8162-829ee394fbc2	obj_manmade_scrapwall01	Large Parts	manmade.shapeset
+2af00456-b22e-4743-b338-a91934aba7c5	obj_craftbot_cookbot	Large Parts	cookbot.shapeset
+2b9c6e87-1b75-4a57-8979-74d9f95668ba	obj_interactive_seat_02	Medium Parts	interactive_upgradeable.shapeset
+2ba72fca-443a-49e4-8eb2-073c4226866e	obj_fittings_cordstraightlong	Medium Parts	fittings.shapeset
+2bacc33e-60fb-40c3-b751-ef76f79392c7	obj_decor_sign_elevator	Large Parts	decor.shapeset
+2bbaf389-4ef7-4dca-b7ee-397cc30f3862	obj_warehouse_container5	Small Parts	warehouse.shapeset
+2bc619a3-c884-4e60-9e78-6c04487a48c5	obj_spaceship_wall12_damaged	Large Parts	spaceship_survivalobject.shapeset
+2bfa5011-a51d-4a5f-9aae-2476cd7f6033	obj_spaceshipsurvivalobject_blinds	Large Parts	spaceship_survivalobject.shapeset
+2c4a2633-153a-4800-ba3d-2ac0d993b9c8	obj_consumable_milk	Consumables	consumable_creative.shapeset
+2c6cc263-4515-45a3-9d7a-33dd4e09634f	obj_nugget_t3	Resources	resource.shapeset
+2c90e412-9476-40d9-a440-228c888186bd	obj_spaceship_interiorlight	Small Parts	spaceship.shapeset
+2c9d416b-3ffd-4aad-98b2-f246d833ef79	bq_catapult_01	Small Parts	builderguide.shapeset
+2ccaa006-008e-4069-8de1-15668050f92e	obj_decor_sign01	Medium Parts	decor.shapeset
+2d3016f7-febe-416e-93bc-41d80ca3910d	obj_interactive_saddle_01	Medium Parts	interactive_upgradeable.shapeset
+2d503740-f2da-41a1-ae5c-3c49d44e3bb2	obj_destructable_tape_rooftape03	Small Parts	destructable_tape.shapeset
+2d7f1278-ac93-4039-9eb2-d31715ea10ff	obj_tool_spudgun	Components	tool_parts.shapeset
+2e689944-180d-4a1a-8e2d-35b162938792	obj_survivalobject_warehousearealight_warehouse	Large Parts	survivalobject_lights.shapeset
+2e792123-4a10-4cc6-b9ef-c5a518655cb4	obj_tool_bucket_chemical	Small Parts	bucket.shapeset
+2e977f44-35f1-4184-b780-3f8563e92330	obj_interactive_growbed_banana_sprout	Medium Parts	interactive.shapeset
+2f004fdf-bfb0-46f3-a7ac-7711100bee0c	jnt_interactive_piston_05	Small Parts	interactive_upgradeable.shapeset
+2f955589-701b-4c47-9127-37feeb80d35a	obj_harvests_trees_pine01_p08	Resources	harvests_trees.shapeset
+2fa43c38-9a66-4c03-a159-756a0c8b0078	obj_rewards_modularsofa02	Quest / Special Items	rewards.shapeset
+2ff2b13f-5a50-443c-bbda-1f40f6aa917f	obj_survivalobject_workbench	Large Parts	survivalobject.shapeset
+3082a130-f1e4-4a7f-9856-7129f969564c	obj_shoprewards_gasstove	Quest / Special Items	shoprewards.shapeset
+3091926a-9340-46d9-83d6-4fd7c68ad950	obj_interactive_gasengine_05	Small Parts	interactive_upgradeable.shapeset
+30a2288b-e88e-4a92-a916-1edbfc2b2dac	blk_scrapstone	Blocks	blocks.shapeset
+30c83521-b815-4810-9657-56a4f3e4ec51	bq_compass_01	Small Parts	builderguide.shapeset
+30d3d0fe-a96a-4804-a0bd-8f01cf674adb	obj_shoprewards_scrapmechanicbobblehead	Quest / Special Items	shoprewards.shapeset
+3104311d-a1c6-4f26-8eb9-7eea54fe164f	obj_harvests_trees_spruce02_p02	Resources	harvests_trees.shapeset
+31768765-5a08-499a-a7e6-7e7613363f75	obj_industrial_beambend	Small Parts	industrial.shapeset
+31ada55e-7c79-4aee-86b6-809c0e5468df	obj_decor_cashregister	Small Parts	decor.shapeset
+31c38d38-73f5-47ef-93c8-e10d4f579e1c	obj_spaceship_interiornet	Large Parts	spaceship.shapeset
+31f14f52-f4d8-4b9f-9d6e-7412497c9284	jnt_interactive_piston_02	Small Parts	interactive_upgradeable.shapeset
+320467e3-622e-4548-99b4-cf6f9580a8c7	obj_survivalobject_excavationelevatorbutton	Large Parts	survivalobject.shapeset
+32111055-2a23-413b-a490-da619b85a9bf	obj_resource_drillcasingt3	Resources	resource.shapeset
+3292878f-4d1e-49e3-a80f-16b710dad42e	obj_fittings_pipebigwallconnector	Medium Parts	fittings.shapeset
+33102836-a94d-4ab3-9864-3d54d32c230d	obj_fittings_wirebend	Medium Parts	fittings.shapeset
+3348fef6-987f-4857-b9f4-d358d01bf472	obj_survivalobject_garageconsole	Large Parts	survivalobject.shapeset
+33739a87-babb-4731-a22b-d614a23e5e3f	obj_topdepartment_chair_foot	Medium Parts	interactive_shared.shapeset
+33d01ddd-f32b-4a9a-87d6-efb6710b389c	obj_interactive_gasengine_02	Small Parts	interactive_upgradeable.shapeset
+33d5f0c1-f80c-478a-b69d-9edafe376474	obj_industrial_supportvframe	Large Parts	industrial.shapeset
+34081f36-2cca-47aa-b252-7d49a685e759	obj_shoprewards_goldplatinumbearing	Quest / Special Items	shoprewards.shapeset
+3408bc45-4556-4c7e-9a89-40d520559963	obj_dekotora_stripelight05	Small Parts	dekotora.shapeset
+3440440b-d362-4473-aa03-b7c41e1fe7ad	obj_resource_cotton	Resources	resource_creative.shapeset
+346a4ea9-d360-4133-b62f-4c188000c60b	obj_industrial_powerswitch	Medium Parts	industrial.shapeset
+34d22fc5-0a45-4d71-9aaf-64df1355c272	obj_characterobject_totebotpackage	Quest / Special Items	characterobject.shapeset
+3526de39-dcf4-484b-84ec-3336538be192	obj_office_cubiclefastener	Medium Parts	building.shapeset
+36335664-6e61-4d44-9876-54f9660a8565	obj_consumable_glue	Resources	resource_creative.shapeset
+381e18f8-9491-41ef-9cf4-82488cbcff04	obj_harvests_nonepart_sapphire_p02	Resources	harvests_nonepart.shapeset
+382924d1-66f5-49e2-949c-aa5aa319ad72	obj_dekotora_lightpanel01	Medium Parts	dekotora.shapeset
+387095d6-5aba-45e3-abd0-098710c268f8	obj_small_4way_pipe	Small Parts	fittings.shapeset
+3878d965-de4a-4e7b-a15a-73cc032158b6	obj_decor_arrowsign	Medium Parts	decor.shapeset
+388adeab-67e5-4901-afe8-c56217754510	obj_resource_glowpoop	Resources	resource_creative.shapeset
+38934d9d-69a8-4a1f-8137-892ede148cb4	obj_industrial_powergeneratorside	Large Parts	industrial.shapeset
+38e41fb5-dd50-4294-829d-a517f0282fed	obj_seed_tomato	Plantables	plantables_creative.shapeset
+38ec258d-c644-4f08-8635-3f7434c884dd	obj_container_seed	Medium Parts	interactive_containers.shapeset
+38ee0516-abc5-4e46-9195-c763610d7ec4	obj_interactive_driversaddle_creative	Medium Parts	interactive.shapeset
+3945ccd8-5adb-417a-9ea2-5f5e080f30f4	bq_musicbox_01	Small Parts	builderguide.shapeset
+39f68574-c85b-41d0-a579-ac7d7a71281d	obj_survivalobject_depthscreen	Large Parts	survivalobject.shapeset
+3a135dd2-510c-434b-b019-ce077042a5c8	obj_packingstation_crateload	Large Parts	survivalobject.shapeset
+3a3280e4-03b6-4a4d-9e02-e348478213c9	obj_consumable_glowstick	Consumables	consumable_shared.shapeset
+3ac141b5-3fbe-4588-9679-c458ac07642a	obj_warehouse_beambigturn	Small Parts	warehouse.shapeset
+3ad7a2de-5e8d-4765-b3c9-f7cfa9b05cbc	bq_crowbar_01	Small Parts	builderguide.shapeset
+3b0c9ff3-6c5a-404a-b830-4872471bf33f	obj_harvests_trees_spruce02_p05	Resources	harvests_trees.shapeset
+3b30e244-edca-44c3-a2b8-08ae779c69e6	obj_harvests_trees_leafy03_p01	Resources	harvests_trees.shapeset
+3b47a99f-85c4-4490-8dc5-3560b7c4c863	obj_industrial_encryptstandpillar	Medium Parts	industrial.shapeset
+3b552b6f-2f32-4c1f-b9c4-ff9ff7dd0ac3	obj_warehouse_bigrampsmall	Wedges	warehouse.shapeset
+3b683206-f4b6-4652-bb32-dd488e73f367	obj_harvests_trees_birch02_p06	Resources	harvests_trees.shapeset
+3b972f2f-30c7-4a5e-a100-5e257e62295d	obj_interactive_seat_01	Medium Parts	interactive_upgradeable.shapeset
+3bd4430f-75bc-452c-9e80-1bd639898689	obj_containers_stonecrate	Large Parts	containers.shapeset
+3be58cc4-04b4-455d-a9c3-8a8fd262b6d6	obj_resource_coralium	Resources	resource.shapeset
+3c0cf002-905f-45bc-84ef-b4fbb4549a63	obj_rewards_modularsofa01	Quest / Special Items	rewards.shapeset
+3c2689bd-57ef-45ed-9ed6-d4eea775202a	obj_interactive_sawtable5	Large Parts	craftbot_creative.shapeset
+3cbf5f08-14da-4db5-8360-de5078e7c4c1	obj_industrial_encryptstandframe	Medium Parts	industrial.shapeset
+3cdbbefe-43b4-4ad7-af47-af0b2e7563c9	jnt_suspensionsport_bearing_01	Small Parts	interactive_upgradeable.shapeset
+3cee1dde-7858-4086-9dc9-a488041cb358	obj_rewards_windshield_middlepart	Quest / Special Items	rewards.shapeset
+3d0b7a6e-5b40-474c-bbaf-efaa54890e6a	blk_crossnet	Blocks	blocks.shapeset
+3d127db0-da28-4483-86fd-3eeed20fb85d	obj_interactive_blockcontainersmall	Small Parts	interactive.shapeset
+3d4f2fac-f670-48f9-b2f9-305a88ed00a7	obj_voxelmaterialchunk_rich2_large	Resources	voxelmaterialchunk.shapeset
+3d5d61ff-60ea-4546-8df0-496e69f3ea07	obj_harvests_crystal_large01_p00	Resources	harvests_crystal.shapeset
+3d83f236-0a89-4599-b641-3c470f339574	obj_harvests_nonepart_sapphire_p07	Resources	harvests_nonepart.shapeset
+3d9dd135-5e3d-412a-bb1b-2ad58f0ea8be	obj_harvests_trees_leafy02_p04	Resources	harvests_trees.shapeset
+3db622ee-112b-4b72-97fc-5bf49c3edf15	obj_destructable_tape_tape05	Small Parts	destructable_tape.shapeset
+3de61f00-5782-40ca-923d-7efabe334572	obj_office_deskleg	Small Parts	building.shapeset
+3de7e8ca-f7f4-4faf-b348-4848741528c1	obj_destructable_tape_cornertape01	Medium Parts	destructable_tape.shapeset
+3e10ef67-383a-4b60-aa5b-b1173134e437	obj_powertools_sawblade	Medium Parts	powertools.shapeset
+3e2ed3ed-d1a5-4f51-8d43-e65230168f9a	obj_dekotora_scrollingstrip	Medium Parts	dekotora.shapeset
+3e3242e4-1791-4f70-8d1d-0ae9ba3ee94c	blk_warehousefloor	Blocks	blocks.shapeset
+3e6d2a8a-c836-4ae5-b6bf-9ec01c6393b0	obj_harvest_log_l02a	Resources	harvests_trees.shapeset
+3eca719f-4e1e-4555-89ce-04cfb0901bc1	obj_mininghub_dropoff_button	Large Parts	survivalobject.shapeset
+3efe715f-8745-475f-a609-5e7cbe09a8ef	obj_interactive_bathtub	Large Parts	interactive.shapeset
+3f7c3f3c-9b28-4a26-abbd-8f2948e9b027	obj_harvests_trees_pine03_p05	Resources	harvests_trees.shapeset
+3fa0afca-7715-459e-86fa-2a81cf3027b8	obj_decor_sink	Medium Parts	decor.shapeset
+3faf624b-0a95-452f-b6cd-9930ad1731c5	obj_tool_frier	Components	tool_parts.shapeset
+40223a65-8a5d-479f-b278-6329082b02b9	obj_harvests_nonepart_tier5_p01	Resources	harvests_nonepart.shapeset
+4053c30c-6717-47c7-b0a9-177f7b8b30bc	obj_spaceship_wall02	Large Parts	spaceship_survivalobject.shapeset
+40730f13-5fdb-4785-b32e-5ca6519c162e	obj_interactive_growbed_soil	Medium Parts	interactive_creative.shapeset
+40c5b3fd-1ac4-47f4-ae61-503e14baf20f	obj_fittings_powerstation	Large Parts	fittings.shapeset
+40e8bd0d-04a0-4e95-b593-4038b54b156f	obj_resources_slimyclam	Resources	resource_creative.shapeset
+40ff42d8-6e6f-4da4-a91c-8289e72b9ea1	obj_harvests_trees_leafy03_p02	Resources	harvests_trees.shapeset
+4126d267-c8df-4c3c-98c7-9cb17f87f770	obj_harvests_trees_leafy01_p00	Resources	harvests_trees.shapeset
+412dee88-996e-49c2-8b51-5644f659f9b2	obj_fittings_pipebigtank	Large Parts	fittings.shapeset
+414854a9-77bc-48aa-a9d5-0c7cd213e4df	obj_warehouse_fancube	Small Parts	warehouse.shapeset
+4152ce33-9b43-4c51-80a3-e0b4fe38841d	obj_interactive_raftshark	Large Parts	interactive.shapeset
+41784077-0636-470f-a6df-b868f152af29	obj_fittings_7x8_bend	Large Parts	fittings.shapeset
+41960868-6245-47b5-97c4-f446e199812f	obj_interactive_driversaddle_04	Medium Parts	interactive_upgradeable.shapeset
+419f0371-fb1e-41d4-9a0c-019c86549677	obj_survivalobject_garagesideboard	Medium Parts	survivalobject.shapeset
+419fb889-e440-420c-b553-4cdf95e71a61	obj_warehouse_beambigbend	Small Parts	warehouse.shapeset
+41db3e10-7b8f-4ff3-81f3-4f240f1f3cce	obj_resource_refinedcoralium	Resources	resource.shapeset
+42786777-c148-4e13-9bab-e460564e79c3	obj_interactive_seat_creative	Medium Parts	interactive.shapeset
+42b4c02e-2de5-431e-981a-f42cb7829e68	obj_interactive_turretseat_05_sphere	Large Parts	interactive_shared.shapeset
+42bac230-35c5-4d22-a141-1cf693137548	obj_harvests_trees_leafy02_p03	Resources	harvests_trees.shapeset
+42c8e4fc-0c38-4aa8-80ea-1835dd982d7c	42c8e4fc-0c38-4aa8-80ea-1835dd982d7c	Medium Parts	effect_proxies.shapeset
+42f70341-207d-4e9d-b8ed-37962603a926	obj_interactive_saddle_05	Medium Parts	interactive_upgradeable.shapeset
+4349bf0e-1244-4136-b597-2fa86354eb78	obj_warehouse_doorframelight_warehouse	Medium Parts	survivalobject_lights.shapeset
+4369132a-40d8-47e7-ac45-e390c0ea6597	obj_construction_soundisolation	Large Parts	construction.shapeset
+43c0ca80-0980-433a-88a3-929727a62a6d	obj_warehouse_container1	Large Parts	warehouse.shapeset
+4406022d-30fb-42cd-9970-c4f5290b85a6	obj_structure_freightcrate	Large Parts	structure.shapeset
+44395054-ce48-40ba-aa21-03eae2298834	quest_recording	Quest / Special Items	quest_items.shapeset
+448d7d18-2a36-4749-8d73-3da913ae6aeb	obj_warehouse_overheadcranearm	Large Parts	warehouse.shapeset
+44afe29b-73a8-4892-94c9-f885b238a971	obj_interactive_turretseat_05_base	Large Parts	interactive_shared.shapeset
+454ad69d-bac2-4b06-9386-6267bcbfece2	obj_interactive_mountablespudgun	Medium Parts	interactive.shapeset
+45b6f45a-9b47-40af-88d1-f1ad0d98e565	obj_destructable_tape_doorwaytape01_destroyed	Large Parts	destructable_tape.shapeset
+45e5c193-8896-4687-a4b0-cf4b2da047d1	obj_industrial_supportbeambase	Large Parts	industrial.shapeset
+45ee9f5a-cfc0-4f3a-bbe8-09f2ce1dbc4c	obj_spaceship_corner01_damaged	Large Parts	spaceship_survivalobject.shapeset
+46396518-8c29-4da9-81bb-a020f4baf5b2	jnt_interactive_piston_03	Small Parts	interactive_upgradeable.shapeset
+46465697-ed36-4720-ba8a-08c568b4e36c	obj_interactive_seat_04	Medium Parts	interactive_upgradeable.shapeset
+468650b4-5ff7-4be1-9e75-05ed86fd83e0	obj_fittings_ventbig02	Large Parts	fittings.shapeset
+46a78456-aa4f-409d-98d2-d1fdeac94e41	obj_harvests_trees_pine02_p00	Resources	harvests_trees.shapeset
+46ac20df-dfbc-434f-aaf3-f34ddc2afb42	obj_spaceship_wall03	Large Parts	spaceship_survivalobject.shapeset
+46c20f58-14f5-41f8-acf7-9e487c397d06	bq_totebotkey_01	Small Parts	builderguide.shapeset
+46d85e5b-353c-4f06-8fd8-b9ddd3443245	obj_interactive_textsign_extralarge	Large Parts	interactive_shared.shapeset
+46d9239a-e0b7-4baf-96d4-6a1c9f75b865	bq_creation_first_car	Large Parts	builderguide.shapeset
+46f4a939-b20c-4fae-bf37-8410796a05f2	obj_destructable_tape_cornertape02	Medium Parts	destructable_tape.shapeset
+47062936-5d28-43ec-81b5-8fdb619e97e4	obj_spaceship_ceilinglight	Large Parts	spaceship.shapeset
+470b9a92-ed94-4ef2-b1ea-b45f47ef0982	obj_interactive_gasengine_03	Small Parts	interactive_upgradeable.shapeset
+4724913e-4f9b-4334-8408-4b0850a1c7de	obj_decor_sign_warehouse	Large Parts	decor.shapeset
+479e8131-cc76-48e1-9979-8053a7295d1f	obj_interactive_freezer	Medium Parts	interactive_creative.shapeset
+47b95667-6296-4bc4-a93e-8e2bf51c8b80	obj_harvests_trees_birch02_p03	Resources	harvests_trees.shapeset
+47d33078-a9b0-4e30-9610-ad0556be5fa2	obj_office_desk	Large Parts	building.shapeset
+47e140e8-eec1-4066-ad75-57557ea07e9b	obj_resource_drillcasingt1	Resources	resource.shapeset
+47ece75a-bfca-4e8a-b618-4f609fcea0da	obj_plantables_carrot	Plantables	plantables_creative.shapeset
+48563128-f84a-4342-8d9f-190c633a6ea9	obj_survivalobject_electricengine	Medium Parts	survivalobject.shapeset
+488dfd3c-eb6b-4663-90b1-add00b1c2700	obj_shoprewards_spaceshipstatue	Quest / Special Items	shoprewards.shapeset
+48a0b91a-1edb-4695-ba61-c702570563ce	obj_destructable_tape_rooftape01	Small Parts	destructable_tape.shapeset
+48f39ccd-1013-4d54-b8ad-e0aebeb88867	obj_consumables_cableroll	Consumables	consumable.shapeset
+4908ecfb-ec05-42c5-a02a-7675ccc3eb19	obj_interactive_textsign_small	Medium Parts	interactive_shared.shapeset
+49938942-fbb6-444d-bba6-1fb339ee5cf3	obj_fittings_pipebiglid	Medium Parts	fittings.shapeset
+4a1b886b-913e-4aad-b5b6-6e41b0db23a6	jnt_bearing	Small Parts	interactive.shapeset
+4a3d40d4-ce86-4a68-b042-8d107ea39d78	obj_interactive_plasmadrill_lvl3	Medium Parts	powertools.shapeset
+4aa2a6f0-65a4-42e3-bf96-7dec62570e0b	blk_metalnet	Blocks	blocks.shapeset
+4ad97d49-c8a5-47f3-ace3-d56ba3affe50	blk_spaceshipfloor	Blocks	blocks.shapeset
+4ae689b2-b785-4cb9-94e6-6bbe10adf926	blk_fancycarpet	Blocks	blocks.shapeset
+4b3ddd03-d950-40f1-b6d0-92d59f08c8ec	obj_artifact_fossil11c	Quest / Special Items	artifact_creative.shapeset
+4b6d2bee-d0f1-4e56-96f0-d2596388cad2	obj_seed_blueberry	Plantables	plantables_creative.shapeset
+4beb69d3-ede9-434e-9535-62e7677f6982	obj_shoprewards_lowriderplaque	Quest / Special Items	shoprewards.shapeset
+4c17571c-89b5-40f3-b13f-e9399591d0b4	obj_building_stalldoor	Large Parts	building.shapeset
+4c1cc8de-7af1-4f8e-a5c4-c583460af9e5	obj_interactive_thruster_03	Medium Parts	interactive_upgradeable.shapeset
+4c3f6a7c-45c6-4ed8-bf13-c247c3db6b81	jnt_suspensionoffroad_04	Medium Parts	interactive_upgradeable.shapeset
+4c474cff-3f6a-4306-93d1-c4c74578afd2	obj_container_smallchest_pipe	Medium Parts	interactive_shared.shapeset
+4c5c3ffd-9aaf-4ded-a7c5-452d239cac32	obj_characterobject_tapebotpackage	Quest / Special Items	characterobject.shapeset
+4c6e27a2-4c35-4df3-9794-5e206fef9012	obj_interactive_robotdrumhead	Small Parts	interactive.shapeset
+4c7b8096-b8ca-4341-bfe9-d31d2d5443b8	obj_industrial_beamlong	Medium Parts	industrial.shapeset
+4c81e687-7508-4ddb-868f-fac20e44f488	bq_sawbladearm_01	Small Parts	builderguide.shapeset
+4c93de5a-72ab-40d0-a081-c41e3aa87e86	obj_office_officechair	Medium Parts	building.shapeset
+4cb6aaf3-a807-4ad6-aaa0-0d0e321b8253	jnt_suspensionsport_bearing_05	Small Parts	interactive_upgradeable.shapeset
+4cd7a389-a1ac-47f4-8cc0-2776174985da	obj_harvest_stonechunk03	Resources	harvests_stones.shapeset
+4ce00048-f735-4fab-b978-5f405e60f48f	obj_plantables_redbeet	Plantables	plantables_creative.shapeset
+4d3d1a02-83ff-4795-9fa7-85eaee8f36f2	obj_resource_drillcasingmixedt4	Resources	resource.shapeset
+4d54298c-93a0-4b6d-8719-7380430a27bb	obj_decor_poster03	Large Parts	decor.shapeset
+4d807f6b-7cdb-41e8-81e2-d87a599422a7	4d807f6b-7cdb-41e8-81e2-d87a599422a7	Small Parts	effect_proxies.shapeset
+4d974692-e011-4556-952c-d50da68dd961	obj_vehicle_gripwheel_x7	Medium Parts	vehicle.shapeset
+4db857f1-07dc-4ea2-9391-fd24903945d1	obj_warehouse_packingtable	Large Parts	warehouse.shapeset
+4dbb89fa-af8c-420e-b394-35c56ba2e6f2	mounted propanetank01	Large Parts	survivalobject.shapeset
+4de326f4-e01d-4948-9db6-a0b1b18b8e21	obj_harvests_crystal_large01_p03	Resources	harvests_crystal.shapeset
+4dfa7bca-8b82-4fc4-8bb0-0f787b3c59ba	bq_steelbridge_01	Small Parts	builderguide.shapeset
+4e084e1c-08e9-43de-bc6f-6fd73a9620aa	obj_spaceship_frame01	Small Parts	spaceship_survivalobject.shapeset
+4e3f17bb-0169-4eb5-a4b4-84725a607b2c	obj_harvest_stonechunk02	Resources	harvests_stones.shapeset
+4e67067c-7865-4bc8-ba0d-84c5a465efab	obj_survivalobject_posterspotlight2_warehouse	Small Parts	survivalobject_lights.shapeset
+4e9c67f9-602f-4df5-bcf6-939dcb18d010	obj_shoprewards_farmbotbobblehead	Quest / Special Items	shoprewards.shapeset
+4ec64cda-1a5b-4465-88b4-5ea452c4a556	obj_plantables_pineapple	Plantables	plantables_creative.shapeset
+4edfeea0-4dd9-4260-82b0-a812b4179296	obj_resource_drillcasingmixedt1	Resources	resource.shapeset
+4f1c0036-389b-432e-81de-8261cb9f9d57	obj_fittings_pipebend	Small Parts	fittings.shapeset
+4f33ee9c-397a-4f47-b91c-32ae96cbe507	obj_resource_drillcasingrich	Resources	resource.shapeset
+4f5092dd-e2e5-4d42-8ec9-c0337cf23e21	obj_spaceship_interiornetlarge	Large Parts	spaceship.shapeset
+4f693e6e-7819-46ff-aef3-5cfd2fc5bbde	obj_harvests_trees_pine03_p07	Resources	harvests_trees.shapeset
+4f9d4c7b-c9fe-4f95-a36a-8f22654d14f5	obj_shoprewards_synth	Quest / Special Items	shoprewards.shapeset
+4fbf640a-200d-45c6-862a-cc2900f84f2c	obj_packingstation_mid	Large Parts	survivalobject.shapeset
+4fcb4cb8-7623-11ea-bc55-0242ac130003	obj_craftbot_craftbot5	Large Parts	craftbot_creative.shapeset
+50007ac9-e97d-4b32-9fd6-de919c8a34a4	obj_industrial_windshield	Medium Parts	industrial.shapeset
+50668b05-41de-4b48-abf2-6a576ab550fe	obj_destructable_tape_cornertape03	Medium Parts	destructable_tape.shapeset
+50f624e6-7e33-4118-8252-2219e73e9af1	obj_characterobject_redtapebotpackage	Quest / Special Items	characterobject.shapeset
+513530b0-61bd-4b82-83e7-191d090d25d8	obj_warehouse_container7	Large Parts	warehouse.shapeset
+515dd68d-9371-49c0-b9ef-79036b8486b2	jnt_suspensionoffroad_bearing_04	Medium Parts	interactive_upgradeable.shapeset
+5240e55e-663e-43fa-aac2-40974d29ab36	obj_harvests_nonepart_tier5_p04	Resources	harvests_nonepart.shapeset
+52855106-a95c-4427-9970-3f227109b66d	jnt_suspensionsport_05	Small Parts	interactive_upgradeable.shapeset
+53349c8d-14e8-4055-bd79-a1ab56fe876e	obj_industrial_windowglass02	Medium Parts	industrial.shapeset
+53d81bab-ee3f-4b86-9a95-831d8e88771e	obj_survivalobject_doorprogresslight	Large Parts	survivalobject.shapeset
+53e8478f-517f-4ea0-be9c-f4a357400cc1	obj_fittings_pipebiglong	Large Parts	fittings.shapeset
+54d84731-d9ec-435d-bc9d-d48e0763b1bf	obj_consumable_pizzaburger	Consumables	consumable_creative.shapeset
+54d8ef21-357d-48a3-a66d-40446f6bb686	obj_consumable_carrotburger	Consumables	consumable_creative.shapeset
+54ea2236-001c-4560-8e6d-3942a885bb3b	obj_warehouse_overheadcranearmplatform	Large Parts	warehouse.shapeset
+5530e6a0-4748-4926-b134-50ca9ecb9dcf	obj_consumable_component	Components	component.shapeset
+55597dd3-44b6-4fd5-81da-bb56d2ec59d9	obj_destructable_tape_tape04	Small Parts	destructable_tape.shapeset
+555bb06d-322f-445e-a46a-18204d146304	bq_xylophone_01	Small Parts	builderguide.shapeset
+55b19e7f-e45b-48b2-8f7c-d9e84fed0736	obj_harvests_trees_birch01_p00	Resources	harvests_trees.shapeset
+5627aa08-8bc4-4cf3-a6b6-101ae59e6fc6	obj_builderguide_main6x6	Large Parts	builderguide.shapeset
+56545d5c-556d-4cd5-9125-6e34acf37c3d	obj_industrial_supportbeam	Large Parts	industrial.shapeset
+56cea967-a685-494d-85ef-3aa121a0c193	obj_interactive_electricengine_03	Medium Parts	interactive_upgradeable.shapeset
+5721f7ad-a9b2-4fc5-a264-c2c98fa464bc	blk_crystal	Blocks	blocks.shapeset
+57b7e02c-b787-45a5-a250-3d750cfe04aa	obj_harvests_nonepart_sapphire_p08	Resources	harvests_nonepart.shapeset
+57d39e43-5c0b-476c-b8a2-474c77c22607	obj_harvests_trees_leafy03_p06	Resources	harvests_trees.shapeset
+57fad8e9-2aff-40c3-9d5c-8f81573b58b9	obj_industrial_windowglass01	Medium Parts	industrial.shapeset
+5888a6dd-59ab-4cd6-86b2-6e68f64674b5	obj_fittings_pipebigholder	Small Parts	fittings.shapeset
+5939f460-ab6c-48f2-9d07-a66845ce8cf2	obj_pneumatic_pipe_bend	Medium Parts	vacumpipe.shapeset
+598d865c-324c-4129-9c57-21a6abd2cb2e	obj_interactive_controller_01	Small Parts	interactive_upgradeable.shapeset
+59ea6ce8-239b-4eed-8847-a51b907d9b42	obj_pneumatic_pipe_01	Medium Parts	vacumpipe.shapeset
+59f6951a-a450-42bf-ad03-54567cb70245	obj_scrap_smallwheel	Medium Parts	interactive_scrap_creative.shapeset
+5a0ffe5b-f7cf-482b-915f-1d6b0876c26c	obj_harvests_trees_leafy02_p06	Resources	harvests_trees.shapeset
+5a106512-9284-40de-be68-2c186e903097	obj_small_4wayb_pipe	Small Parts	fittings.shapeset
+5a508601-485f-4db6-8134-69a4d3d02bc1	obj_harvests_trees_spruce02_p00	Resources	harvests_trees.shapeset
+5ad298e4-f5ad-479c-9ec6-6c4f9d3fb8ae	obj_decor_sunshakemachine	Large Parts	decor.shapeset
+5b1a0d4b-420d-4ba4-ab56-fa09c7d27291	bq_bigfan_01	Small Parts	builderguide.shapeset
+5b628f22-ec0d-448f-a6be-3453950120a4	obj_spaceship_interiorcalendar	Small Parts	spaceship.shapeset
+5b684cc5-0af4-4dfc-a6fd-e3c441d3557a	obj_dekotora_railing01extension	Medium Parts	dekotora.shapeset
+5b8d77d3-b129-4d5c-b4c6-1d4f86b22058	obj_structure_metalbeam	Large Parts	structure.shapeset
+5ba206c2-d10b-4815-b95b-04be4959ec31	obj_spaceship_wall11	Medium Parts	spaceship_survivalobject.shapeset
+5bb1143f-a8c9-4366-a4eb-71115a5255bd	obj_spaceshipsurvivalobject_interiorshelf	Medium Parts	spaceship_survivalobject.shapeset
+5c5800f6-c6e0-4af5-b655-0c920b8ffa19	obj_harvests_nonepart_tier5_p02	Resources	harvests_nonepart.shapeset
+5ca61a85-7040-47bc-8f87-5d2ce295cb6e	obj_harvests_trees_pine01_p06	Resources	harvests_trees.shapeset
+5cb15c93-4fa9-48da-9974-2e95ca6c9e1c	obj_craftbot_refinery	Large Parts	craftbot_creative.shapeset
+5cb39ea5-554d-4c40-9d9a-6b2dd59de953	obj_harvest_metal	Resources	harvests_shared.shapeset
+5cb58060-1221-4935-b13e-04097b61cfbe	obj_interactive_growbed_broccoli_mature	Medium Parts	interactive.shapeset
+5cd67a6e-52cc-4eb0-9f44-275d366516c5	obj_industrial_powergenerator1	Large Parts	industrial.shapeset
+5cf2c67c-62f6-4219-a857-943901611c6f	obj_harvests_trees_leafy02_p02	Resources	harvests_trees.shapeset
+5d013e2f-7b7a-4652-a9c7-784123dde5fb	obj_harvests_crystal_medium_p03	Resources	harvests_crystal.shapeset
+5d2cdb56-2be8-4a62-8f05-ce5c9c1510ac	obj_spaceship_wall08_damaged	Large Parts	spaceship_survivalobject.shapeset
+5d2f2d3f-cd6b-4d84-8320-7844b672b192	obj_structure_metalcanisterframe	Large Parts	structure.shapeset
+5dc9ab5e-fefb-4264-b503-1711671e7a38	bq_cardboardpoop_01	Small Parts	builderguide.shapeset
+5e3dff9b-2450-44ae-ad46-d2f6b5148cbf	obj_light_arealight	Large Parts	lights.shapeset
+5e51e905-2092-4069-9eb5-afa67b8b2fc8	obj_decor_windowblinds	Large Parts	decor.shapeset
+5e57e0f7-e87c-4269-b274-146fe40e1b44	obj_interactive_electricengine_04	Medium Parts	interactive_upgradeable.shapeset
+5e5d231e-405e-4f45-9bd0-b3557dbb42eb	obj_interactive_electricengine_01	Medium Parts	interactive_upgradeable.shapeset
+5e610f08-1195-4b68-85b3-adf799efa411	obj_interactive_growbed_carrot_sprout	Medium Parts	interactive.shapeset
+5e96037a-a338-490a-a76f-6b4d820f8e46	obj_interactive_thruster_creative	Medium Parts	interactive.shapeset
+5eb8975b-0acf-43a7-ab4e-62ce661c0df7	obj_interactive_comfybed	Large Parts	interactive_creative.shapeset
+5ee9b950-839f-479a-bc06-902b830504cf	obj_harvests_trees_birch01_p02	Resources	harvests_trees.shapeset
+5f41af56-df4c-4837-9b3c-10781335757f	blk_glass	Blocks	blocks.shapeset
+5f5926f5-1449-49b0-8997-2d5a0df37b21	obj_spaceship_interiorshelf	Medium Parts	spaceship.shapeset
+5f5b2a0d-b629-4bea-93ca-e1f45ccac62b	gyrocore	Quest / Special Items	quest_items.shapeset
+5f63541f-f6be-4acc-8948-ba9d30a58d78	jnt_suspensionsport_bearing_03	Small Parts	interactive_upgradeable.shapeset
+5fa7d58a-19b1-4ef1-a938-1406f8716941	blk_spaceshipmetal_resticted	Blocks	blocks_survivalobject.shapeset
+5ff56026-7af2-4644-b30c-f0b43230093f	obj_survivalobject_elevatorceiling	Large Parts	survivalobject.shapeset
+60075229-2e4e-4aeb-9e64-da41b6ac9611	obj_warehouse_bigrampthin	Wedges	warehouse.shapeset
+60268822-dff6-46bb-95e6-8db72fa5a2b4	bq_beesuit_01	Small Parts	builderguide.shapeset
+6083a851-5931-47f7-834d-1a953bf7a1d0	obj_voxelmaterialchunk_rich1_medium	Resources	voxelmaterialchunk.shapeset
+608d6e20-bc3e-4440-907f-f0bd5fb45eac	obj_harvests_trees_pine01_p01	Resources	harvests_trees.shapeset
+60cc1dc1-8cff-446f-82c4-37a6e6d61c8e	obj_survivalobject_shipcompartment	Medium Parts	survivalobject.shapeset
+6130d484-775e-481a-889a-43d2e8d29058	obj_warehouse_beambig	Small Parts	warehouse.shapeset
+614c3193-13da-40f4-9b03-37f26e760fd6	obj_hideout_questgiver	Large Parts	survivalobject.shapeset
+614e5a34-f7f5-43e0-afe1-3b561063d093	obj_survivalobject_mustache	Quest / Special Items	quest_items.shapeset
+6159898f-beb8-4f49-825b-92b0774daa61	obj_spaceship_wall12	Large Parts	spaceship_survivalobject.shapeset
+61b0abe1-817d-416a-b49d-443b2ec13b6e	obj_rewards_lavalamp	Quest / Special Items	rewards.shapeset
+61bdf048-c09f-4cf5-8b47-35ba28c0580c	obj_survivalobject_elevatorcallbutton	Small Parts	survivalobject.shapeset
+61f24d00-3d2d-44bf-818e-50a11c920aca	obj_harvests_trees_pine02_p03	Resources	harvests_trees.shapeset
+6232b62a-f3e0-4609-a159-ab08abf8125f	obj_construction_bucket	Medium Parts	construction.shapeset
+628b2d61-5ceb-43e9-8334-a4135566df7a	blk_plastic	Blocks	blocks.shapeset
+628fd350-577d-413f-82a8-7f08a83de3d8	obj_crates_redbeet	Large Parts	packingcrates.shapeset
+635eee58-9a36-437f-9e30-78dab0cbcc59	obj_industrial_platformstairsramp	Wedges	industrial.shapeset
+63695efd-0862-49f2-ace6-4d1758147fae	obj_outfitpackage_common	Quest / Special Items	outfitpackage.shapeset
+63910258-85da-45eb-8108-bb5c489695a0	obj_rewards_ivypipe02	Quest / Special Items	rewards.shapeset
+6395a2f1-4169-4a7e-be15-a9864cb6ce7e	obj_consumable_clay	Consumables	consumable_shared.shapeset
+63cf0973-b81e-4fe1-ae44-654937e1b0e4	obj_fittings_7x8	Large Parts	fittings.shapeset
+64051718-a3f1-422b-bda3-277efa0c4545	obj_seed_redbeet	Plantables	plantables_creative.shapeset
+640574ae-f55c-460b-9070-030877f7afa5	obj_harvests_nonepart_tier5_p08	Resources	harvests_nonepart.shapeset
+64401599-2a38-4d83-93f9-a76b137c9574	obj_rewards_plant02	Quest / Special Items	rewards.shapeset
+64555383-f1c9-4027-a1c4-02951d085b76	obj_harvests_trees_birch01_p05	Resources	harvests_trees.shapeset
+645a592e-b015-4ca6-b5a7-cc33612870eb	jnt_gyroseat	Small Parts	interactive_shared.shapeset
+647296c4-41ef-4173-8a54-d2a1ae1e89c3	obj_fittings_cordstraight	Small Parts	fittings.shapeset
+64a83163-23f6-4f10-bb6b-97c43c43f601	obj_dekotora_roundedlight	Medium Parts	dekotora.shapeset
+64e8cdbf-14fa-4c8d-b089-27e3e12542f7	obj_jewel_03	Quest / Special Items	jewel_creative.shapeset
+64fdc73f-259a-49df-94ac-24db25a4dc42	obj_vehicle_wheelhousecorner	Small Parts	vehicle.shapeset
+6546c293-a5aa-4442-80d5-a2819f077746	obj_interactive_electricengine_creative	Medium Parts	interactive.shapeset
+656eaa31-bd14-4495-8ccd-6c1e5136117b	obj_dekotora_scrollingstripround	Medium Parts	dekotora.shapeset
+659488be-3d33-4244-b762-e7d77dcdcbbe	obj_decor_mirror	Medium Parts	decor.shapeset
+65d543fd-54c4-4520-bee3-f59e1db9cce3	bq_popcorn_01	Small Parts	builderguide.shapeset
+660c50e1-081d-449c-a405-785d4c26328d	obj_interactive_plasmadrill_lvl2	Medium Parts	powertools.shapeset
+6620ceb4-3c35-4a61-9d98-f923d2277395	obj_light_rangelight	Small Parts	interactive_shared.shapeset
+6661da68-74af-4425-ad63-d5b4631ee266	obj_fittings_pipebigshort	Medium Parts	fittings.shapeset
+66affe90-4552-455e-a0b0-b203f9988790	obj_warehouse_container3	Medium Parts	warehouse.shapeset
+66c1ccc6-1a68-40f3-9e10-ee362c3c13bc	obj_spaceship_ceilingvent01	Large Parts	spaceship.shapeset
+66c3a5cd-ce37-4b37-916d-ac39a67ad2f5	obj_fittings_7x8_mount	Large Parts	fittings.shapeset
+67900105-8c85-45b4-a35c-038b69f5eacf	obj_dekotora_lightpanel02	Medium Parts	dekotora.shapeset
+67da25c9-3825-41f6-9724-4546a11cb2a5	jnt_suspensionsport_01	Small Parts	interactive_upgradeable.shapeset
+67ec22d4-cec0-47ee-9ff6-6f5996645270	bq_cornheart_01	Small Parts	builderguide.shapeset
+681b75ce-2489-4a7b-8cb2-2903e7243e83	681b75ce-2489-4a7b-8cb2-2903e7243e83	Small Parts	debug.shapeset
+682538ac-7a45-4f56-b500-ec5d3d5f3eb7	obj_rewards_plant01	Quest / Special Items	rewards.shapeset
+684002ad-3218-4dd0-a6dd-53e6dfdec562	obj_industrial_powergeneratortank	Large Parts	industrial.shapeset
+6873a5b8-c874-4424-8422-920d467140e9	obj_dekotora_xlwheel	Medium Parts	vehicle.shapeset
+68a58472-368d-4b09-ad36-9093f11d76ae	obj_consumable_fireammo	Consumables	consumable_shared.shapeset
+68c2baa5-1274-4bfd-8b12-6e522123f4de	obj_industrial_cylinderlarge	Large Parts	industrial.shapeset
+68d8eeb6-14e4-469b-9ee6-f80ebe1c4be6	obj_spaceship_ceilingbeam03	Medium Parts	spaceship_survivalobject.shapeset
+68db6d52-00fb-441a-ab34-a79341acde32	obj_construction_soundisolationsmall	Large Parts	construction.shapeset
+691e6cf7-00b9-461c-8272-58c43e7ec630	bq_creation_harvest_car	Large Parts	builderguide.shapeset
+6953b17e-0a38-4107-8c56-5ee97e68bee3	obj_interactive_driversaddle_03	Medium Parts	interactive_upgradeable.shapeset
+69559e81-50fa-40ae-afa2-a22c1a49eb54	obj_interactive_watergun	Medium Parts	mounted_guns.shapeset
+695d66c8-b937-472d-8bc2-f3d72dd92879	obj_light_beamframelight	Small Parts	lights.shapeset
+697e3b80-d3f7-4f4a-aba2-23611a45f967	obj_fittings_fusebox	Medium Parts	fittings.shapeset
+69e362c3-32aa-4cd1-adc0-dcfc47b92c0d	obj_vehicle_smallwheel	Medium Parts	vehicle.shapeset
+69fffafa-8084-4de0-9368-e7954d8e1686	obj_structure_metalstairs	Large Parts	structure.shapeset
+6a43fff2-8c6d-4460-9f44-e5483b5267dd	obj_plantables_blueberry	Plantables	plantables_creative.shapeset
+6a620faa-ca0d-4e39-bc67-97fb93d808c2	obj_packingstation_screen_veggie	Large Parts	survivalobject.shapeset
+6a720005-ba27-4cfc-8fb3-b1af8b9c8bd3	obj_industrial_rail	Small Parts	industrial.shapeset
+6ad9b8c7-4006-43cd-aa95-3d63c0e5c9fb	obj_warehouse_fan	Large Parts	warehouse.shapeset
+6b19e80c-dbc3-4a84-be37-54646f39f23d	obj_rewards_carbumper	Quest / Special Items	rewards.shapeset
+6b3f39a4-4aa7-4787-a23d-31419fd54a70	bq_sledgehammer_01	Small Parts	builderguide.shapeset
+6b78fb4b-2af9-4a01-a7c5-7e333d245adb	obj_industrial_supportpillar	Medium Parts	industrial.shapeset
+6bb84152-c4d7-4644-bc37-a3becd79298d	obj_interactive_controller_03	Small Parts	interactive_upgradeable.shapeset
+6bc1a2b3-0e25-4c05-9965-95ed610931d0	obj_structure_woodstairs	Large Parts	structure.shapeset
+6bcba46e-12d8-4771-b703-10733224f569	obj_harvests_crystal_large02_p00	Resources	harvests_crystal.shapeset
+6be64f78-927b-4f61-b645-20adfbd9bfce	obj_fittings_wireshort	Small Parts	fittings.shapeset
+6c4072a2-3260-4042-8a16-b4f257869d3a	obj_moltenorb_t5	Large Parts	moltenorb.shapeset
+6c450f8e-7fe5-43ad-9391-c429e83310d2	obj_survivalobject_garagechest	Medium Parts	survivalobject.shapeset
+6c8401b7-302d-4ae1-b647-35ce3e4d96c7	obj_voxelmaterialchunk_t3_small	Resources	voxelmaterialchunk.shapeset
+6cb18801-8284-4f27-9f2e-b9955861b605	obj_warehouse_banner2	Large Parts	warehouse.shapeset
+6d92d8e7-25e9-4698-b83d-a64dc97978c8	obj_plantables_tomato	Plantables	plantables_creative.shapeset
+6dcdf410-9c68-4de0-a135-6eb5b80b9690	Quest_ShipConnector01	Small Parts	survivalobject.shapeset
+6e3bcef9-ce1e-427e-8c43-a14f466d63dc	obj_dekotora_bulbframing03	Small Parts	dekotora.shapeset
+6e7eb9bb-4b8e-400a-b9c4-2e9320e03ead	obj_harvests_trees_leafy03_p04	Resources	harvests_trees.shapeset
+6e8c1c32-413f-437e-b782-0c0cf889b6a7	bq_creation_advanced_car	Large Parts	builderguide.shapeset
+6f0c29d3-f8c1-4314-b13d-db637ed89061	obj_fittings_ductintersect	Small Parts	fittings.shapeset
+6f38a734-571f-4c3d-97b9-c0aa480973af	obj_vehicle_concavewedge	Wedges	vehicle.shapeset
+6f699ce5-4955-4725-9829-2b6e1dd6eee9	obj_industrial_generatorfoothinge	Medium Parts	industrial.shapeset
+6f89ff7b-f49d-4f6e-904a-5758c29b0d8e	obj_harvests_trees_pine02_p06	Resources	harvests_trees.shapeset
+6f8d188f-b14a-4b57-aa30-c4f81df1b271	obj_survivalobject_warehouseconsole	Large Parts	survivalobject.shapeset
+6feb0f77-9a95-4bae-93d4-a2dc98745953	obj_harvests_crystal_medium_p01	Resources	harvests_crystal.shapeset
+703ca746-d802-4e76-b443-4881e83afb73	obj_interactive_seat_05	Medium Parts	interactive_upgradeable.shapeset
+70673852-7f5e-4731-8c75-c1b9fdf0008b	70673852-7f5e-4731-8c75-c1b9fdf0008b	Small Parts	effect_proxies.shapeset
+70a497d6-6bc2-4ee6-a381-0976d68ac980	obj_fittings_pipebigholderbar	Small Parts	fittings.shapeset
+70a7042e-6865-4341-a481-214786653046	obj_dekotora_hubcap02	Medium Parts	dekotora.shapeset
+70bf77d0-c9dd-4232-9e05-fbf7f49bd62c	obj_decor_sign02	Medium Parts	decor.shapeset
+712a5ebd-0793-49ba-b1ef-681a8fdceba6	obj_hideout_button	Large Parts	survivalobject.shapeset
+71341a00-a5db-4b99-a938-b42349eea654	obj_harvests_crystal_large02_p07	Resources	harvests_crystal.shapeset
+7143326d-e0b6-498b-a25b-45cda8958a0f	obj_interactive_mountableglowgun	Medium Parts	mounted_guns.shapeset
+71665314-db59-4c43-bfe2-2746baa8ffe9	obj_containers_cardboardstack_large	Large Parts	containers.shapeset
+71a12706-49d3-4a41-9ff1-cfd34f86fae2	obj_survivalobject_beamframelight_warehouse	Small Parts	survivalobject_lights.shapeset
+71d3347f-baff-4f44-9ca9-dbdb3376cafc	obj_characterobject_toteboticeblock	Quest / Special Items	characterobject.shapeset
+71fece72-28cb-4732-a0cb-00140170f2b0	obj_harvests_nonepart_tier5_p03	Resources	harvests_nonepart.shapeset
+72045c19-fa44-4ce9-9f99-e9541e5a4d46	obj_rewards_plant03	Quest / Special Items	rewards.shapeset
+72074131-529b-49c1-9ff3-73706f61eb06	obj_warehouse_packingtableroll	Medium Parts	warehouse.shapeset
+721f9e2a-e99f-4257-9d84-ed234bd0e37f	obj_voxelmaterialchunk_t1_medium	Resources	voxelmaterialchunk.shapeset
+7237080a-676b-4be1-bb7f-2fb1a9f6f274	obj_industrial_windowframe	Large Parts	industrial.shapeset
+72f12b82-c169-4d2e-9f9b-44ef38d51aaa	obj_harvests_nonepart_sapphire_p01	Resources	harvests_nonepart.shapeset
+731c6a84-7ae7-439d-a620-128076f9985c	obj_tool_paint	Components	tool_parts.shapeset
+7324219e-2b19-4098-baa3-9876984ead08	jnt_interactive_piston_04	Small Parts	interactive_upgradeable.shapeset
+737a5987-a586-4a06-9e9d-3661ab8d69d2	obj_harvests_trees_pine03_p00	Resources	harvests_trees.shapeset
+73f838db-783e-4a41-bc0f-9008967780f3	jnt_suspensionoffroad_05	Medium Parts	interactive_upgradeable.shapeset
+7468db55-b29d-4ce0-82b9-2414f493a376	obj_harvest_metal2	Resources	harvests_shared.shapeset
+7479ff7f-37fc-4304-93e9-aad7891c29f2	obj_pneumatic_pipe_05	Medium Parts	vacumpipe.shapeset
+749f69e0-56c9-488c-adf6-66c58531818f	blk_glasstile	Blocks	blocks.shapeset
+74a3f240-65b2-4f52-9555-9b52173fca0a	obj_decor_haybaleround	Large Parts	decor.shapeset
+7516f5b8-9a15-4606-92bb-ea9a96a16594	obj_interactive_saddle_04	Medium Parts	interactive_upgradeable.shapeset
+7527cf2e-1705-4214-9d07-3dc374957e25	obj_container_tinychest	Medium Parts	interactive_shared.shapeset
+7540ef9a-5c84-4dd2-b111-176d8de66e47	obj_decor_rottenfruit	Medium Parts	decor.shapeset
+756a3a47-0e7a-4a87-9d75-d29e790e12d9	obj_artifact_fossil11	Quest / Special Items	artifact_creative.shapeset
+75a84cf4-fd68-4c60-a410-0814aad1a565	obj_harvest_quartz	Resources	harvests.shapeset
+75c11f33-7592-427f-96ac-d89994438042	obj_packingstation_front	Large Parts	survivalobject.shapeset
+76331bbf-abbd-4b8d-bb54-f721a5b6193b	obj_container_fertilizer	Medium Parts	interactive_containers.shapeset
+763fd838-7ed5-420e-8984-c2ae86da1e5c	obj_industrial_windowglass03	Large Parts	industrial.shapeset
+764e94d1-61c0-4fef-9719-5548889e4817	obj_fittings_ventbig01	Medium Parts	fittings.shapeset
+767a3121-2c31-473c-a5ab-27e188fdd55a	obj_craftbot_dressbot	Large Parts	interactive.shapeset
+7728c105-1fd9-4aaa-95ec-1da45b425d89	obj_decor_sign_office	Large Parts	decor.shapeset
+7735cab3-56d7-4d52-b615-090d021e8fdc	obj_characterobject_glowgorp	Quest / Special Items	characterobject.shapeset
+778eff91-2dab-4093-8afc-872c9f76b364	obj_harvests_crystal_large02_p03	Resources	harvests_crystal.shapeset
+77c2687c-2e13-4df8-996a-96fb26d75ee0	obj_interactive_driverseat_01	Large Parts	interactive_upgradeable.shapeset
+7826f497-426b-42cb-a857-0d784f3ab2f3	obj_plants_bigpot	Medium Parts	plants.shapeset
+78677314-1885-4c9e-87ee-04cdc929b0dc	obj_rewards_fireworks	Quest / Special Items	rewards.shapeset
+7934dcd5-f978-4b58-bc92-cff1ca4bb9bf	obj_underground_key	Small Parts	survivalobject.shapeset
+797e07a3-6d56-4b74-949b-9492c7946e0d	obj_interactive_saddle_03	Medium Parts	interactive_upgradeable.shapeset
+79804453-e6d1-4a85-9944-db50d13b27cf	obj_harvests_nonepart_sapphire_p06	Resources	harvests_nonepart.shapeset
+798c2c81-1f8e-481b-8c32-b71b5dc5511a	obj_tool_bucket_empty	Small Parts	bucket.shapeset
+7997f4a5-6f5f-492e-95cb-65a5e2a0f2f2	obj_industrial_powergenerator4	Large Parts	industrial.shapeset
+79cc711e-7094-4029-8419-bbbf8f08c6f2	obj_survivalobject_ruinchest	Large Parts	survivalobject.shapeset
+79e41f5c-7b69-42ba-9172-7e3df49231bd	obj_harvests_trees_pine01_p05	Resources	harvests_trees.shapeset
+79f63a7c-276e-4488-88d4-af7b0390a35f	obj_vehicle_gripwheel_x9	Large Parts	vehicle.shapeset
+7a0e9041-9dd5-4cb1-b804-69ee16c45efe	obj_industrial_windshieldlarge	Large Parts	industrial.shapeset
+7a31b721-c944-4b40-ba71-c1b2e3f00b9c	obj_harvests_trees_pine02_p08	Resources	harvests_trees.shapeset
+7aab1deb-40a1-4af1-a245-71c6c8439d2f	obj_resource_drillcasingt4	Resources	resource.shapeset
+7ab0cac7-b055-4283-b0bc-f85dd4d0416b	obj_outfitpackage_epic	Quest / Special Items	outfitpackage.shapeset
+7b2955eb-0491-46b4-b43d-b7ea4edd3852	obj_structure_cableroll03	Large Parts	structure.shapeset
+7b2c96af-a4a1-420e-9370-ea5b58f23a7e	obj_light_fluorescentlamp	Large Parts	lights.shapeset
+7b57beb6-26c2-42e1-b252-33a5441924fe	obj_dekotora_arrowlight	Medium Parts	dekotora.shapeset
+7b78d74f-c4c7-4c48-80f5-8f7f4bbd5de9	obj_harvests_trees_birch01_p03	Resources	harvests_trees.shapeset
+7ba75948-640c-4563-9501-800cbddbeb6d	obj_destructable_tape_tape03	Small Parts	destructable_tape.shapeset
+7bc20d55-6b49-450c-830c-16282ce7fb2d	obj_road_signfoundation	Medium Parts	decor.shapeset
+7be411a0-8693-4910-800f-990122cbfca4	obj_interactive_growbed_banana_mature	Medium Parts	interactive.shapeset
+7c6e88a7-21a4-4e97-856f-b937264e0d7d	obj_decor_clock	Small Parts	decor.shapeset
+7cf717d7-d167-4f2d-a6e7-6b2c70aa3986	obj_interactive_switch	Small Parts	interactive.shapeset
+7d601a5a-796d-4cae-be88-b47479d38d11	obj_interactive_driversaddle_01	Medium Parts	interactive_upgradeable.shapeset
+7d7691d7-5059-4a43-9384-0b11905b0e3a	obj_interactive_growbed_redbeet_mature	Medium Parts	interactive.shapeset
+7dad8565-b3c3-4ffb-aec2-6df8eb82f06e	obj_dekotora_caplight	Large Parts	dekotora.shapeset
+7dd3db37-9187-4e72-8756-be1fb6f8f5e3	obj_voxelmaterialchunk_t3_medium	Resources	voxelmaterialchunk.shapeset
+7e0b553c-1eae-4fa6-983e-b79ca2c621a9	obj_survivalobject_warehousespotligt	Small Parts	survivalobject.shapeset
+7e2b1dcb-4853-43ed-a7c5-0eb1a24b49d0	obj_containers_barrel_blueberry	Medium Parts	containers.shapeset
+7e8c0879-9f37-417c-a89e-d630cc52130d	warehouse elevatorsign	Medium Parts	warehouse.shapeset
+7ece2c9b-bc74-45b7-b5f1-4c6f41a03a7a	obj_containers_vegboxbeetroot	Large Parts	containers.shapeset
+7ece7c24-a1e9-48ea-86da-7795e2d9a426	obj_builderguide_dummy	Small Parts	builderguide.shapeset
+7ef4d993-07d1-487a-ba12-ce9d82093f38	blk_placeholderblock_sticky	Blocks	blocks.shapeset
+7f0d8b7c-861f-4597-94b4-a87978b3f750	obj_warehouse_bigramp	Wedges	warehouse.shapeset
+7f3eae8d-3dd1-47f6-94de-0450c86e4af0	obj_interactive_turretseat_04_sphere	Large Parts	interactive_shared.shapeset
+7fa4ecf6-d8fe-49eb-a950-db1fb4590c4d	obj_spaceship_wall09	Medium Parts	spaceship_survivalobject.shapeset
+7fe8ed87-0c08-460d-9d08-7a64ad131f43	obj_survivalobject_platformspawner	Large Parts	survivalobject.shapeset
+7feba511-4910-429d-a0e3-f1727259ae5c	obj_industrial_rooftankslice	Large Parts	industrial.shapeset
+8024db09-9147-4fe3-a747-00bc30ab724b	obj_small_2wayb_pipe	Small Parts	fittings.shapeset
+80550b05-f9eb-433c-9773-2af3beb1479d	obj_containers_vegboxgreen	Medium Parts	containers.shapeset
+8062d6c3-7850-4b8f-89ec-1c171a81698a	obj_robotparts_minerbot_thruster	Large Parts	robotparts.shapeset
+80680f7d-5f8a-4bf7-962b-ebd07481cd0a	obj_interactive_gravelcollector	Large Parts	craftbot.shapeset
+807f2819-b2f2-4db6-bd71-04add4b69634	obj_dekotora_pinballflipper	Large Parts	dekotora.shapeset
+8089b86c-7390-4cb6-b30e-7b281e8c329e	obj_harvests_trees_pine02_p10	Resources	harvests_trees.shapeset
+80bc2b9f-98a9-44e4-9cb8-d4ec7e95b40f	obj_decor_babyduck	Small Parts	decor.shapeset
+81211639-f02c-43ff-b3b5-70d6ba8f2e9b	jnt_suspensionsport_bearing_02	Small Parts	interactive_upgradeable.shapeset
+818f4e15-ff51-4fed-b874-723a25d62e1c	obj_interactive_horn	Small Parts	interactive.shapeset
+8260108a-2943-4446-8331-b22db4547257	obj_nugget_t4	Resources	resource.shapeset
+82625879-3a0a-4ab8-9895-575d38ec4420	obj_construction_wall02	Large Parts	construction.shapeset
+82694546-92b2-47c3-894d-7fc215e2de4a	obj_warehouse_beamframe	Small Parts	warehouse.shapeset
+8310f5b9-3394-4723-ac23-f59a21d6e3f3	obj_fittings_7x8_T	Large Parts	fittings.shapeset
+8336bf8b-cde0-46a0-b995-5000cba4f27f	obj_industrial_platformfenceshort	Medium Parts	industrial.shapeset
+8365cf6a-af1a-41aa-a8c9-34313dce1f55	obj_destructable_taperolls_small	Small Parts	decor.shapeset
+836e98a2-8c8c-4a6b-9239-54acdd4f4736	obj_tool_weld	Components	tool_parts.shapeset
+838c8d9a-8fc0-4b15-898b-b82bbf8bf2e0	obj_fittings_generatorpipelong	Medium Parts	fittings.shapeset
+84050f02-448f-4cc0-93b8-82876368ada6	obj_rewards_coffepot	Quest / Special Items	rewards.shapeset
+847af9bd-21ae-4d16-971f-5c8378e83f51	obj_resource_refinedsapphire	Resources	resource.shapeset
+847daf20-02bf-4170-8699-9ab106acd29a	obj_scrap_seat	Medium Parts	interactive_scrap_creative.shapeset
+84d8e6eb-948b-4dd4-ab23-55a64d33eff1	obj_spaceship_wall05	Large Parts	spaceship_survivalobject.shapeset
+84fdb4ca-46cd-424b-b608-0998741941dc	obj_resource_crystal	Resources	resource.shapeset
+85339a1d-e67f-4c63-94fd-4a1cf8c25810	obj_light_posterspotlight2	Small Parts	lights.shapeset
+85379fe5-da83-4aa2-b9c2-d67476ad6079	obj_industrial_platformfencelong	Large Parts	industrial.shapeset
+85623170-074a-4663-8944-97d131aff495	obj_fittings_generatorpipebend	Small Parts	fittings.shapeset
+85771e42-fbb3-49f5-ab99-85167623deeb	obj_shoprewards_totebotbass_bobblehead	Quest / Special Items	shoprewards.shapeset
+85a54457-4172-4be5-a750-96df4d40286c	obj_harvests_trees_pine03_p04	Resources	harvests_trees.shapeset
+85a5f261-dd80-42db-9386-cb8606382d9c	obj_dekotora_stripelight01	Small Parts	dekotora.shapeset
+85fc5f11-722b-4723-91f2-293a81ad0800	obj_tool_connect	Components	tool_parts.shapeset
+86128cfa-5c90-4d7c-a9eb-fff9490f9ef9	86128cfa-5c90-4d7c-a9eb-fff9490f9ef9	Small Parts	effect_proxies.shapeset
+862f6857-3050-4a84-8191-6a7cbb50bd1a	obj_fittings_pipebig	Medium Parts	fittings.shapeset
+863e8585-4548-4cd8-a221-c123aeaab060	obj_interactive_bed_tutorial	Large Parts	spaceship_survivalobject.shapeset
+8694192c-d91b-444c-a184-910911bbb354	obj_interactive_stafftoilet	Medium Parts	interactive_shared.shapeset
+869d4736-289a-4952-96cd-8a40117a2d28	obj_consumable_water	Consumables	consumable_shared.shapeset
+86a10654-9bf9-46e6-8f42-3c76af451d5e	obj_interactive_growbed_chili_mature	Medium Parts	interactive.shapeset
+872ae33f-cf02-4959-91d0-ead1dacfd34b	obj_fittings_generatorpipe	Small Parts	fittings.shapeset
+87878e83-8170-4796-9401-6baba45ccef2	obj_industrial_beam	Small Parts	industrial.shapeset
+87a3bc6b-5eb3-43a3-871a-0cb42a415d64	obj_construction_wallplank	Large Parts	construction.shapeset
+87de6612-06c2-43c7-a4aa-652c0eb1dd18	blk_undergroundstation4x	Blocks	blocks_survivalobject.shapeset
+87f60f59-fae9-419c-9189-29c75432b84e	obj_survivalobject_partunlockstation	Large Parts	survivalobject.shapeset
+8821ec7c-477d-4d3b-9b0c-aee479d3e6c3	obj_harvests_trees_leafy03_p03	Resources	harvests_trees.shapeset
+8836fff8-11fc-4596-bb8b-4bf50e79a8bf	obj_dekotora_pyramid	Medium Parts	dekotora.shapeset
+884080be-c723-4e6e-828b-6019af8beed6	obj_decor_sign_utility	Large Parts	decor.shapeset
+8852c66b-4e8b-434a-b4e7-f494a69d17de	obj_interactive_turretseat_02_base	Large Parts	interactive_shared.shapeset
+885ab381-007d-4a60-99e3-c58dec54c880	obj_fittings_cordjunction	Small Parts	fittings.shapeset
+88800e74-19b2-4014-90f9-982c2667d932	obj_castedpart_t2	Large Parts	castedpart.shapeset
+8883e0ee-8a6e-423a-a4e0-583d9bf105bd	obj_seed_chili	Plantables	plantables_creative.shapeset
+88dc2a60-7e1a-4c24-8584-2491acd79753	obj_harvest_log_s01	Resources	harvests_trees.shapeset
+88dc4f4a-18c2-4d79-8dee-f0e7ac9d5845	obj_harvests_trees_leafy01_p04	Resources	harvests_trees.shapeset
+89b9a340-1b77-4cc8-bc33-b38ca35e9fd0	obj_survivalobject_underground_callbutton	Large Parts	survivalobject.shapeset
+89ca09da-4e7c-404f-99eb-beb275cfc217	obj_harvests_trees_birch02_p00	Resources	harvests_trees.shapeset
+89e040f6-6e30-41b0-9d7b-97e6bb2cc0b0	obj_dekotora_hubcap01	Medium Parts	dekotora.shapeset
+89f446fa-ba6a-4728-93b5-6a1abda114fc	obj_destructable_tape_doorwaytape01	Large Parts	destructable_tape.shapeset
+89f6c762-c0ed-44ad-b3f1-a60dbdd889c5	obj_plants_succulent	Small Parts	plants.shapeset
+8a4a55b0-0228-4839-933b-0716cedb3f96	obj_containers_cardboardstack_small	Medium Parts	containers.shapeset
+8a87566d-f540-49b6-909d-4dcfbfa007c0	obj_interactive_stickywheel	Medium Parts	interactive_shared.shapeset
+8aa4459f-6c45-41ae-94f4-4ddff0279c18	obj_shootingrange_farmertarget	Large Parts	shootingrange.shapeset
+8aedf6c2-94e1-4506-89d4-a0227c552f1e	blk_metal1	Blocks	blocks.shapeset
+8b45b80d-2415-4ef4-aec4-90d0e3ee4cf5	obj_interactive_growbed_cotton_mature	Medium Parts	interactive.shapeset
+8b4bd31f-cb1e-42ae-ac33-b2f951609bd2	obj_rewards_windshield	Quest / Special Items	rewards.shapeset
+8b684022-254b-41af-a58c-ec4b14791000	obj_containers_vegboxblue	Medium Parts	containers.shapeset
+8bc24c12-e4a9-414b-8467-33736e455cb0	obj_structure_concretefoundation01	Medium Parts	structure.shapeset
+8bcc5a38-b566-45fe-b47e-45118ee70d2d	obj_containers_vegboxorange	Large Parts	containers.shapeset
+8c0a32e1-50a4-4e23-be1d-a09d12fc65c1	obj_harvests_trees_pine03_p01	Resources	harvests_trees.shapeset
+8c0ad43a-4bc8-41ef-ab3a-de70eb9ef510	obj_harvests_stones_p05	Resources	harvests_stones.shapeset
+8c4b9721-3de4-4ae3-a7d1-6f66a16d1368	obj_industrial_window	Large Parts	industrial.shapeset
+8c741785-5eae-4c48-9f99-d62bf522a83f	jnt_interactive_piston_01	Small Parts	interactive_upgradeable.shapeset
+8ca49bff-eeef-4b43-abd0-b527a567f1b7	blk_tiles	Blocks	blocks.shapeset
+8ca9a4f2-c8c8-439d-9945-e2e95dafbc21	obj_industrial_powergenerator5	Large Parts	industrial.shapeset
+8ce25d2e-5802-4806-84cd-094b97e21863	obj_survivalobject_warehousespotligt_warehouse	Small Parts	survivalobject_lights.shapeset
+8cf2c0fb-0b04-4a31-b8af-e89a025307b4	obj_structure_freightshell	Large Parts	structure.shapeset
+8d3b98de-c981-4f05-abfe-d22ee4781d33	obj_interactive_propanetank_small	Small Parts	interactive.shapeset
+8d601982-4608-4d5e-bb9e-e4041486f7c7	obj_survivalobject_farmerball	Large Parts	survivalobject.shapeset
+8d7be7bf-37c9-44d6-8adf-fc87b141cadf	obj_industrial_rackcube	Small Parts	industrial.shapeset
+8e2dfa65-c08e-4f51-a007-5fed80d846a3	obj_harvests_trees_pine03_p06	Resources	harvests_trees.shapeset
+8e2ff26d-8856-46d5-94ff-060f9cfd4ade	obj_interactive_growbed_orange_mature	Medium Parts	interactive.shapeset
+8e61a423-5aa6-4dd3-ac57-ecac313f82f5	obj_consumable_tea	Consumables	consumable_creative.shapeset
+8e7f019d-d5ac-4f1c-8f26-95664548a41b	obj_rewards_windshield_rightpart	Quest / Special Items	rewards.shapeset
+8eb4f8d7-16fe-49c6-be8e-8c0f4350de9c	obj_dekotora_exhaust	Medium Parts	dekotora.shapeset
+8f5f8a39-734d-4bc3-8a9e-74026bcb3704	obj_warehouse_overheadcranearmplate	Large Parts	warehouse.shapeset
+8f7fd0e7-c46e-4944-a414-7ce2437bb30f	obj_interactive_timer	Small Parts	interactive.shapeset
+8f9e059a-4c3a-4664-967a-28f127529aaf	obj_harvests_trees_spruce03_p05	Resources	harvests_trees.shapeset
+8fd2cf31-70b3-499a-bfb0-7e3d2c580258	obj_interactive_encryptor_connection	Medium Parts	interactive.shapeset
+903871bd-e71f-4681-ad56-8bf180fe4da9	obj_resource_nimbolium	Resources	resource.shapeset
+903b0823-4ce1-48e6-9702-aeaa7598c347	obj_fittings_cordbend	Small Parts	fittings.shapeset
+90686663-1a3e-479a-b1c4-f81699274f50	obj_spaceship_corner03	Large Parts	spaceship_survivalobject.shapeset
+90762ac2-5082-461d-9028-480d38a7da10	obj_survivalobject_vendor	Large Parts	survivalobject.shapeset
+90badd3e-3a45-4e3f-b197-b4859bc26ef6	obj_voxelmaterialchunk_t4_small	Resources	voxelmaterialchunk.shapeset
+90dbaebf-8ea1-4a5a-8f6f-86ddde77c6c8	obj_interactive_filecabinet	Medium Parts	interactive_shared.shapeset
+90f31b94-a831-4786-a5e7-6d423c224718	obj_harvests_trees_leafy01_p03	Resources	harvests_trees.shapeset
+90fc3603-3544-4254-97ef-ea6723510961	obj_interactive_sensor_03	Small Parts	interactive_upgradeable.shapeset
+910a7f2c-52b0-46eb-8873-ad13255539af	obj_consumable_battery	Consumables	consumable_shared.shapeset
+916cbfc2-776f-49d4-838a-eb946136be3e	obj_industrial_encryptstandbase	Large Parts	industrial.shapeset
+920b40c8-6dfc-42e7-84e1-d7e7e73128f6	blk_restroom	Blocks	blocks.shapeset
+927d80d8-84ee-44f0-9d8b-cb7a688e0b6c	obj_small_long_pipe	Medium Parts	fittings.shapeset
+92a6186b-9c42-48d0-9ebc-a978044e6a22	obj_harvests_trees_leafy03_p05	Resources	harvests_trees.shapeset
+92bae57d-ae30-4a75-a7ad-8bf91f20d660	obj_harvests_stones_p06	Resources	harvests_stones.shapeset
+93ace99a-f58c-4dd3-8334-0ee890e42feb	obj_harvests_trees_pine01_p02	Resources	harvests_trees.shapeset
+93c27ab2-4930-4654-ba1c-bcfe35e966f6	obj_seed_cotton	Plantables	plantables_creative.shapeset
+93e32c6b-b9de-4fed-ad9d-49f0850ee634	obj_construction_wallpillar	Large Parts	construction.shapeset
+9483438c-bb40-4cd6-8f34-1a1a250d622a	9483438c-bb40-4cd6-8f34-1a1a250d622a	Small Parts	effect_proxies.shapeset
+94acfb72-c650-4cb5-a8aa-08af3e691d2e	obj_warehouse_container2	Medium Parts	warehouse.shapeset
+94cf22f0-f0fb-4d1b-b5ce-f4b54e8e84d1	obj_destructable_tape_corridor02	Small Parts	destructable_tape.shapeset
+9518dd16-f207-4dd5-9c52-91a655446a80	obj_harvests_trees_pine02_p02	Resources	harvests_trees.shapeset
+95365a45-83aa-4858-b792-c182be676524	obj_dekotora_detailpiece01	Medium Parts	dekotora.shapeset
+9601f2ca-9552-48b0-afc1-b0f200461114	obj_container_XXL_chest	Large Parts	interactive_shared.shapeset
+960c9498-f76a-4ffc-a608-218dc6909de8	obj_destructable_tape_acrosstheroom03	Small Parts	destructable_tape.shapeset
+96392e20-12e9-4a19-8dc5-7a8e33238ae2	obj_warehouse_cranehook	Medium Parts	warehouse.shapeset
+967b042a-2f92-4fa1-9d7a-801b7faf4a6e	obj_dekotora_ledhorn	Medium Parts	dekotora.shapeset
+968de65c-75f3-471b-954e-6165a4b6d3d6	obj_harvest_wood	Resources	harvests_shared.shapeset
+9769c4b2-67f0-446b-a00d-ee432218b038	obj_construction_signcone_taped	Medium Parts	survivalobject.shapeset
+9777f897-4cce-4c22-99ce-793aaca9f7c0	obj_fittings_7x1	Large Parts	fittings.shapeset
+97f449b6-c948-448b-b8b3-4448e3f6b956	obj_pneumatic_pump	Medium Parts	vacumpipe.shapeset
+988b5592-9e53-4782-a058-d26be442bd49	obj_spaceship_corner02	Large Parts	spaceship_survivalobject.shapeset
+98a4c187-4049-4628-842b-5cc6e5dac9f5	obj_interactive_growbed_chili_sprout	Medium Parts	interactive.shapeset
+98a85002-3b45-4fe8-b2fb-390a9953e877	obj_interactive_beehive	Medium Parts	interactive_creative.shapeset
+98ef8fca-d4a3-4b9a-8699-0630b003b9fa	obj_spaceship_interiorboxlarge	Medium Parts	spaceship_survivalobject.shapeset
+992ae45d-63b5-42c5-bc58-3b6c207834d9	obj_topdepartment_chair	Medium Parts	interactive_shared.shapeset
+99477093-e819-4199-b62a-fda6143aae89	obj_crates_broccoli	Large Parts	packingcrates.shapeset
+998c250a-e814-4c67-be0e-f8abe084ab72	obj_interactive_growbed_potato_mature	Medium Parts	interactive.shapeset
+99926542-be5f-4642-8525-e7e9557083a0	99926542-be5f-4642-8525-e7e9557083a0	Small Parts	effect_proxies.shapeset
+99a76f79-f9ca-4c71-9098-7300ebacf1bd	obj_interactive_growbed_pigmentflower_sprout	Medium Parts	interactive.shapeset
+99b7fd1d-7126-4928-bfc2-f82befcbd905	obj_decor_sign03	Medium Parts	decor.shapeset
+99b817f7-0f1f-4329-ae6b-e1f0199aa2da	obj_artifact_fossil13	Quest / Special Items	artifact_creative.shapeset
+9a3058f3-6771-464f-a3e0-25d247f1422f	obj_survivalobject_cardreader_arm	Large Parts	survivalobject.shapeset
+9a3e478c-2224-44fa-887c-239965bd05ad	obj_consumable_soilbag	Consumables	consumable_creative.shapeset
+9a9e40b9-b887-4387-870d-6d8e75656aea	obj_harvests_nonepart_tier5_p06	Resources	harvests_nonepart.shapeset
+9b4a43c3-4950-49e2-858e-34768550a227	obj_destructable_tape_rooftape02	Small Parts	destructable_tape.shapeset
+9b4ea447-9cd9-4cd1-84d5-8c414890e523	obj_building_barracksupport	Medium Parts	building.shapeset
+9b8f2abd-265c-4750-b8b9-fe6cb564633c	obj_pneumatic_pipe_03	Medium Parts	vacumpipe.shapeset
+9b9c0a82-a9bf-41d4-a599-58182f162058	obj_interactive_plasmadrill_lvl1	Medium Parts	powertools.shapeset
+9bdb677f-8033-451f-8bc7-7ae71351c35c	obj_spaceship_wall10	Medium Parts	spaceship_survivalobject.shapeset
+9be6047c-3d44-44db-b4b9-9bcf8a9aab20	blk_insulation	Blocks	blocks.shapeset
+9c051125-517d-4852-9bb9-2e77f8bea55f	obj_rewards_10pin	Quest / Special Items	rewards.shapeset
+9c1f1f76-7391-4661-ae32-e96250030229	obj_characterobject_farmbotpackage	Quest / Special Items	characterobject.shapeset
+9c54cf82-d000-4368-99f7-00ba477146fb	obj_tool_scrap_spudgun	Components	tool_parts.shapeset
+9c65d5da-453d-46a1-86f6-9c2ada653e98	obj_dekotora_bulbframing04	Small Parts	dekotora.shapeset
+9c6d8dba-1783-4c42-8a02-6af1c5d63ec6	obj_small_6way_pipe	Small Parts	fittings.shapeset
+9c82a525-8a8b-4483-9595-505aaa042486	obj_seed_carrot	Plantables	plantables_creative.shapeset
+9ca81758-7c90-4368-ab57-1d9d62b32a37	obj_harvests_trees_leafy02_p05	Resources	harvests_trees.shapeset
+9cd8288c-5a19-479f-af47-9eb55230ade2	obj_crates_carrot	Large Parts	packingcrates.shapeset
+9d3cc7ee-a4b2-4041-b1d3-a55751002c7d	obj_construction_light_warehouse	Medium Parts	survivalobject_lights.shapeset
+9d6992f4-8a1a-40c2-8be3-adfce6e4cfed	obj_shoprewards_totebotsynthvoice_bobblehead	Quest / Special Items	shoprewards.shapeset
+9d7e182f-c5d6-45e9-af21-1c24977b30c9	obj_fittings_ductshort	Small Parts	fittings.shapeset
+9dcd7de9-477c-4334-80e8-42e2edb221cf	obj_jewel_01	Quest / Special Items	jewel_creative.shapeset
+9dd1ccea-1e44-430d-b706-3ff45416583e	obj_interactive_driversaddle_05	Medium Parts	interactive_upgradeable.shapeset
+9e9280f7-c9bc-4b86-b788-43f9b48903dd	obj_fittings_ventbig03	Medium Parts	fittings.shapeset
+9ecae683-acdf-4d32-84ab-8b576f80356d	obj_survivalobject_infotrader_broken	Large Parts	survivalobject.shapeset
+9edb6f7c-fb44-4348-a1c4-8afb41b92d8a	obj_seed_pineapple	Plantables	plantables_creative.shapeset
+9eead4cf-4743-486e-99be-a553c4c10740	obj_decor_bed	Large Parts	decor.shapeset
+9f0f56e8-2c31-4d83-996c-d00a9b296c3f	obj_interactive_logicgate	Small Parts	interactive.shapeset
+9f37d9e9-be8d-49c8-a7ac-e59c67786083	obj_fittings_pipesplit	Small Parts	fittings.shapeset
+9f909330-869e-468b-822a-204876118c0a	obj_construction_carpetrollstand	Medium Parts	construction.shapeset
+9f9cd82f-8a5a-406b-b26d-d1adc289c8b4	obj_castedpart_t4	Large Parts	castedpart.shapeset
+9fc793b2-250b-40ab-bcb3-97cf97c7b481	obj_interactive_thruster_02	Medium Parts	interactive_upgradeable.shapeset
+a052e116-f273-4d73-872c-924a97b86720	obj_interactive_robotsynthhead	Small Parts	interactive.shapeset
+a0654dd8-f36a-4c41-bafd-18d9e5f0df2e	obj_containers_barrel_tomato	Medium Parts	containers.shapeset
+a092359d-5cea-484d-a274-470d9a567632	obj_interactive_controller_05	Small Parts	interactive_upgradeable.shapeset
+a0fbc5ac-4e77-4119-b6e9-f3b6f8fbcb66	obj_resource_refinedcrystal	Resources	resource.shapeset
+a20e79dd-d74e-4e10-845a-b101b3a95ab2	obj_harvests_trees_pine03_p02	Resources	harvests_trees.shapeset
+a22136b4-9cdc-4786-b5d4-e60248a79346	bq_baguette_01	Small Parts	builderguide.shapeset
+a2cf56fe-9961-481b-9a12-093f64867d9c	obj_warehouse_packingtablesupport	Medium Parts	warehouse.shapeset
+a3046bed-5cea-4bbb-a164-4b46448f87b3	obj_loot_schematic	Consumables	consumable.shapeset
+a3fce2c1-6a0f-4025-ba0d-4b8a618edd7d	obj_voxelmaterial_t3	Resources	voxelmaterial.shapeset
+a3fd668d-7590-4ce2-bbda-7154caae6b25	obj_dekotora_bulbframing01	Small Parts	dekotora.shapeset
+a479066d-4b03-46b5-8437-e99fec3f43ee	blk_stripednet	Blocks	blocks.shapeset
+a481138b-fae9-47c9-9bc2-91b6d2e2bf52	jnt_suspensionoffroad_creative	Medium Parts	interactive.shapeset
+a4ab4df5-403d-4baa-a3c3-ecc19dd87340	obj_harvest_log_l01	Resources	harvests_trees.shapeset
+a4c1590f-c491-4e7f-974a-f1cd09503c18	obj_interactive_cornade_explosive	Consumables	consumable_shared.shapeset
+a5093336-af02-42c4-8afd-196f22a0917f	gyroslot	Quest / Special Items	quest_items.shapeset
+a5198434-2639-4cb0-8e01-865bc4d9b791	obj_decor_sign04	Medium Parts	decor.shapeset
+a553bf2f-3a66-404a-b4c6-ce9e7b73f9d4	obj_survivalobject_elevatorbutton	Medium Parts	survivalobject.shapeset
+a5985971-1f95-4373-a5d9-4ce0a3e74851	obj_interactive_beacon	Large Parts	beacon.shapeset
+a6523fd2-869c-4d11-ba42-dc967a8aad25	obj_harvests_trees_leafy03_p08	Resources	harvests_trees.shapeset
+a6524403-668d-4e41-93a7-6326e9205560	obj_destructable_tape_corridor03	Small Parts	destructable_tape.shapeset
+a68470c8-67f4-4248-8c76-15fa7fb09ec6	obj_harvests_trees_spruce02_p04	Resources	harvests_trees.shapeset
+a6c6ce30-dd47-4587-b475-085d55c6a3b4	blk_concrete1	Blocks	blocks.shapeset
+a6ec1dcc-07e9-418a-819e-904e28a32f63	obj_decor_mug	Small Parts	decor.shapeset
+a736ffdf-22c1-40f2-8e40-988cab7c0559	obj_interactive_thruster_05	Medium Parts	interactive_upgradeable.shapeset
+a73f7005-b89a-427d-8e94-c3d6f729be52	obj_harvests_trees_birch03_p02	Resources	harvests_trees.shapeset
+a77a3c86-ba12-4f1f-986c-4bb532c5105d	obj_pneumatic_pipe_02	Medium Parts	vacumpipe.shapeset
+a79a2bc9-1015-4c25-ab4b-0d4cb715db47	obj_spaceship_frame04	Small Parts	spaceship_survivalobject.shapeset
+a7d719f5-e839-4a95-923c-981b4dc21125	obj_spaceship_wall08	Large Parts	spaceship_survivalobject.shapeset
+a7fb4293-f623-4a0f-9465-8bc640f0038b	obj_vehicle_license_plate	Medium Parts	vehicle.shapeset
+a8164438-65fa-4840-8bc2-766fad543841	obj_fittings_wireconcavebend	Small Parts	fittings.shapeset
+a8caa052-0b7c-4391-b6ce-2d20bf2dc55c	obj_voxelmaterialchunk_rich2_medium	Resources	voxelmaterialchunk.shapeset
+a914fcb5-2509-428e-b8ad-80bf28af9f65	obj_warehouse_beambiglong	Large Parts	warehouse.shapeset
+a9193ac7-be8a-423c-920e-7a1305465e27	char_npc_scoutfarmer_binoculars	Small Parts	char_npc_scoutfarmer_stuff.shapeset
+a930a42f-63ed-4fb0-933e-56ce8a889cc5	obj_craftbot_resourcecontainer	Large Parts	craftbot_creative.shapeset
+a96232ef-2778-4c23-8a11-7cbc5b1de8b0	obj_interactive_textsign_large	Medium Parts	interactive_shared.shapeset
+a9658eaf-0dd8-46a6-8cac-be6978f19b79	jnt_suspensionoffroad_03	Medium Parts	interactive_upgradeable.shapeset
+aa3e38ef-21aa-4430-ab56-93c367f4f458	obj_spaceship_frame02	Medium Parts	spaceship_survivalobject.shapeset
+aa4c9c5e-7fc6-4c27-967f-c550e551c872	obj_plantables_banana	Plantables	plantables_creative.shapeset
+aa5325da-03f9-46cc-9655-983ee7ac2ab2	obj_industrial_supportxbeam	Medium Parts	industrial.shapeset
+aa8d89eb-919b-42f4-8b58-af6f0d5856bc	jnt_suspensionsport_creative	Small Parts	interactive.shapeset
+aae686a2-0eb3-43b3-b998-def282de79e9	jnt_suspensionsport_02	Small Parts	interactive_upgradeable.shapeset
+ab835444-a6b3-41b4-bf37-207031c5ff8d	obj_rewards_doorhandle	Quest / Special Items	rewards.shapeset
+aba65407-60a8-4640-881f-a67cb58b5956	obj_dekotora_stripelight02	Small Parts	dekotora.shapeset
+abaef792-741e-4c6b-8e79-02461a37b035	obj_warehouse_doorframelight	Medium Parts	warehouse.shapeset
+abf92fdd-a3e6-4faa-b0b2-f5c57aca6262	obj_rewards_carbumpersidepart02	Quest / Special Items	rewards.shapeset
+ac0b5b0a-14e1-4b31-8944-0a351fbfcc67	obj_consumable_fertilizer	Consumables	consumable_creative.shapeset
+ac59ef69-95a7-4907-a8ba-e5c83ef83112	obj_construction_rebarmedium	Medium Parts	construction.shapeset
+acc00050-d40e-42e9-9c2e-22ec2109dc3e	obj_decor_sign_packaging	Large Parts	decor.shapeset
+ad35f7e6-af8f-40fa-aef4-77d827ac8a8a	obj_container_chest	Medium Parts	interactive_shared.shapeset
+ad3654b9-f64c-411b-8c70-32c2ba83e2cf	jnt_suspensionoffroad_bearing_03	Medium Parts	interactive_upgradeable.shapeset
+ad9e5936-ecf0-4d2e-a96b-6c1413d3aba2	jnt_suspensionoffroad_bearing_02	Medium Parts	interactive_upgradeable.shapeset
+ad9f6357-b0b4-4dab-b84e-fb20df54d1ac	obj_industrial_powerholders	Medium Parts	industrial.shapeset
+add3acc6-a6fd-44e8-a384-a7a16ce13c81	obj_interactive_sensor_creative	Small Parts	interactive.shapeset
+aea10ac2-2fbb-4372-ab31-7be4bdfeec35	blk_undergroundstation2x	Blocks	blocks_survivalobject.shapeset
+aec1ff30-9347-4166-9cb7-f414e1563d9d	obj_spaceship_shipdoor	Large Parts	spaceship.shapeset
+af389b10-a31b-46f7-bbe9-0bfad8181e97	obj_industrial_powergenerator2	Large Parts	industrial.shapeset
+af4fa08f-7424-45b5-8861-995f1bf0a44c	obj_survivalobject_keylock_growlab	Large Parts	survivalobject.shapeset
+af5afd6c-6fd5-43ab-818a-803c5674c006	af5afd6c-6fd5-43ab-818a-803c5674c006	Small Parts	effect_proxies.shapeset
+aff3fcf0-9b67-42b5-bced-5acdf223c9aa	obj_harvests_trees_pine02_p05	Resources	harvests_trees.shapeset
+b0329961-7ac0-4a83-aabc-6701e516de7b	obj_construction_mould	Large Parts	construction.shapeset
+b050533f-200b-4253-9532-c2cfa273f982	obj_fittings_ductelevate	Small Parts	fittings.shapeset
+b07d0eb7-10cf-489a-9624-2813173bb5e7	obj_harvests_crystal_large02_p02	Resources	harvests_crystal.shapeset
+b0d6f391-452f-49c8-a821-551d32a376ea	obj_voxelmaterialchunk_t4_large	Resources	voxelmaterialchunk.shapeset
+b12d7023-e9ee-4f8a-960e-2993f2dba03d	obj_dekotora_cube	Medium Parts	dekotora.shapeset
+b145d9ae-4966-4af6-9497-8fca33f9aee3	blk_drywall	Blocks	blocks.shapeset
+b14ff2ee-d7c7-4c75-bc88-342bd67afc7a	obj_survivalobject_quotameter	Large Parts	survivalobject.shapeset
+b1647259-50bd-4838-814a-bfddd770ba70	obj_harvests_trees_leafy02_p07	Resources	harvests_trees.shapeset
+b1c6bac0-4055-4193-8490-7704d0ea7113	obj_building_barracksupportbase	Medium Parts	building.shapeset
+b1dd7967-da2a-4ff5-a90f-bbd7e9bae4d7	obj_decor_mannequinhand	Small Parts	decor.shapeset
+b23f64dd-8182-4d73-90bf-6ccb9dd24d4d	obj_resource_sapphire	Resources	resource.shapeset
+b2c6c47e-7443-4566-a194-d3f24435733d	obj_harvests_trees_pine02_p07	Resources	harvests_trees.shapeset
+b2c933a8-2dfb-479f-a3d9-b87797d5e0c6	obj_fittings_pipebigholderbarbend	Small Parts	fittings.shapeset
+b2d9e40b-e8e8-4d1e-86f9-86d0bdc5ddc4	obj_harvests_stones_p02	Resources	harvests_stones.shapeset
+b31b7203-44d0-4aab-93d0-843e5493ff15	obj_dekotora_stripelight04	Small Parts	dekotora.shapeset
+b3425d6d-ea3d-45de-9078-10af2e178389	obj_warehouse_container3B	Medium Parts	warehouse.shapeset
+b3761216-dfc4-4679-960b-00f5ae5f8258	obj_spaceship_interiorhandle	Small Parts	spaceship.shapeset
+b3bb8083-d9b5-408d-b45c-49a444efba57	obj_spaceship_wall01	Large Parts	spaceship_survivalobject.shapeset
+b40f65a0-ac9f-4fdf-863a-7623e22bf009	obj_survivalobject_topdepartment_log	Large Parts	survivalobject.shapeset
+b41de15e-a136-425a-a730-889b58cf4466	obj_consumable_multicomponent	Components	component.shapeset
+b4498227-6650-4e52-b5a6-6db7a7b34d14	obj_decor_sign08	Medium Parts	decor.shapeset
+b46c3271-6288-4b74-a6b1-9ea946cf072b	obj_interactive_prospector	Large Parts	craftbot.shapeset
+b4831236-a9b3-4422-92da-803f9252a279	obj_office_waterdispensertank_taped	Medium Parts	survivalobject.shapeset
+b4fa180c-2111-4339-b6fd-aed900b57093	blk_squarenet	Blocks	blocks.shapeset
+b50a014c-0785-4b1b-b63e-51cfdb7e49ad	obj_industrial_stairfence	Medium Parts	industrial.shapeset
+b593a935-802a-4715-b27f-739a091a8977	obj_interactive_mineralcrusher	Large Parts	craftbot.shapeset
+b5cdd503-fe1c-482b-86ab-6a5d2cc4fc8f	obj_plantables_broccoli	Plantables	plantables_creative.shapeset
+b5ce8bc0-e8b3-418f-9267-81b85a8eba0d	obj_powerstation_battery	Quest / Special Items	quest_items.shapeset
+b5cf212b-331e-46e3-9a72-5e8bc2b9a5b7	b5cf212b-331e-46e3-9a72-5e8bc2b9a5b7	Small Parts	effect_proxies.shapeset
+b5ee5539-75a2-4fef-873b-ef7c9398b3f5	blk_armoredglass	Blocks	blocks.shapeset
+b627c533-f0e7-4fa7-83e6-5c3d517568e0	obj_office_cubicle	Large Parts	building.shapeset
+b633c3ee-2cda-4096-989a-60e90cd220aa	obj_tool_spudling	Components	tool_parts.shapeset
+b63c6440-dfc2-4da7-acdb-3c385080b2e4	obj_craftbot_craftbot1	Large Parts	craftbot_creative.shapeset
+b70e6fe1-26e2-4dee-bb70-ab33426379ad	obj_interactive_growbed_blueberry_mature	Medium Parts	interactive.shapeset
+b7571f6f-9d53-44ba-99d2-3b4f05e6fd0f	obj_craftbot_craftbot2	Large Parts	craftbot_creative.shapeset
+b7756219-75f2-4eb8-93d1-262e8ddded27	obj_harvests_trees_birch03_p00	Resources	harvests_trees.shapeset
+b7cf1762-4010-4915-813d-dfbefb100ef5	obj_warehouse_cranehook_base	Medium Parts	warehouse.shapeset
+b7e4c3a1-5d8f-42e9-a6b0-1c3d5e7f9a2b	obj_survivalobject_tileelevator	Large Parts	survivalobject.shapeset
+b7e60b8e-2075-4ae4-b906-53af3845e198	obj_warehouse_container4	Medium Parts	warehouse.shapeset
+b8982b4d-1deb-47c8-932e-622a0c8889f3	obj_moltenorb_t2	Large Parts	moltenorb.shapeset
+b8f17d3c-e07d-438d-8295-39fda96fb86b	obj_dekotora_star	Small Parts	dekotora.shapeset
+b8f9c227-ab51-4d38-b425-dfc208cc4dd6	obj_interactive_turretseat_01_base	Large Parts	interactive_shared.shapeset
+b94a113d-ddd4-45db-844c-1d97ca0e1d61	obj_manmade_scrapwallsmall	Large Parts	manmade.shapeset
+b95bcc20-9581-4228-b444-b1c7ebc73507	obj_harvests_trees_spruce02_p01	Resources	harvests_trees.shapeset
+b973b537-1a2c-4569-b323-1abcecca385f	obj_interactive_bed	Large Parts	interactive_shared.shapeset
+b9775316-7272-4a66-a8a9-179108d76f18	obj_industrial_beamend	Small Parts	industrial.shapeset
+ba3fbedc-1802-4406-852d-3f3a7ddc4be2	obj_plantables_chili	Plantables	plantables_creative.shapeset
+ba4cdff7-227b-4b97-aca8-1c700b93fec7	obj_questdecor_kitchencounter	Medium Parts	decor.shapeset
+ba7775ef-d03b-46bd-aa09-09015297a415	obj_warehouse_container3C	Large Parts	warehouse.shapeset
+ba79e3c0-914f-46ff-874b-243df5589e3c	obj_warehouse_encryptorsign_connection	Large Parts	warehouse.shapeset
+bab9d1d1-6131-4329-a6f2-7b2ddf1f25e1	obj_pneumatic_pipe_t	Medium Parts	vacumpipe.shapeset
+bb14330f-4698-4c2b-a5ba-732443a67d72	obj_harvests_trees_spruce01_p05	Resources	harvests_trees.shapeset
+bb2ed406-f0d3-4fd6-b3f9-7caadfa8e4e4	obj_interactive_driversaddle_02	Medium Parts	interactive_upgradeable.shapeset
+bb443a05-b5b9-4fad-90fc-5e04aa90fd8f	obj_plants_blueflower	Small Parts	plants.shapeset
+bbc5cc77-443d-4aa7-a175-ebdeb09c2df3	obj_fittings_pipe	Small Parts	fittings.shapeset
+bc2973ca-5e68-434c-b8f2-1c9bf924d6f7	obj_interactive_turretseat_03_base	Large Parts	interactive_shared.shapeset
+bc575e0c-d1aa-438e-9f3d-0a80f4ea915f	obj_plants_barbarycactus	Medium Parts	plants.shapeset
+bc69cb3b-7e0c-4c36-805d-f8d89fcfced3	obj_crates_pineapple	Large Parts	packingcrates.shapeset
+bcb44f5d-ef57-40a9-890b-9d1d404904d5	bigbox03	Large Parts	survivalobject.shapeset
+bd2af8d6-ecc4-4071-82cb-56620345c06e	obj_harvests_trees_leafy02_p01	Resources	harvests_trees.shapeset
+bd4b7d66-9d4b-433e-bff9-410cb5baafc3	obj_resource_refinedlemonium	Resources	resource.shapeset
+bd597ac9-6640-43ba-9bd8-ed584a794f13	obj_scrap_driverseat	Large Parts	interactive_scrap_creative.shapeset
+bd77f76a-6c47-4107-ba4a-c340e89ad516	obj_shoprewards_fountainstatue	Quest / Special Items	shoprewards.shapeset
+bdb55551-39a4-437c-aeff-f54368b19b5e	obj_warehouse_beamframelong	Medium Parts	warehouse.shapeset
+be29592a-ef58-4b1d-b18c-895023abd27f	obj_container_chemical	Medium Parts	interactive_containers_shared.shapeset
+be744e84-f67e-4c06-a809-c247adc1babb	obj_warehouse_masterswitch	Medium Parts	warehouse.shapeset
+bee966b0-b5e5-41da-b992-5d363ab85ae4	obj_seed_orange	Plantables	plantables_creative.shapeset
+bf7b6484-8b8b-4846-8110-c5d9f0b9ada7	obj_pneumatic_pipe_04	Medium Parts	vacumpipe.shapeset
+bfcaac1a-5a7f-4fba-9980-1159617a7212	obj_interactive_gasengine_04	Small Parts	interactive_upgradeable.shapeset
+bfcfac34-db0f-42d6-bd0c-74a7a5c95e82	obj_plantables_potato	Consumables	consumable_shared.shapeset
+c0159b96-edf3-46cd-9fbe-96ee1126304b	obj_survivalobject_powercoresocket	Large Parts	survivalobject.shapeset
+c06f9ee5-0da5-46b0-b0b0-d26dcb332e2e	obj_harvests_nonepart_sapphire_p03	Resources	harvests_nonepart.shapeset
+c080f343-347e-441a-a271-98f5f74ca567	obj_survivalobject_keylock	Large Parts	survivalobject.shapeset
+c0dfdea5-a39d-433a-b94a-299345a5df46	blk_metal3	Blocks	blocks.shapeset
+c108d189-87ff-41d1-8d61-667769924a34	obj_resource_quartz	Resources	resource.shapeset
+c10a77d5-3357-4cb4-8113-a2cbe69c7ff2	obj_crates_orange	Large Parts	packingcrates.shapeset
+c10fd31c-6f89-4739-ae7b-23581c1c0c36	obj_dekotora_floorsquare01	Medium Parts	dekotora.shapeset
+c1593ec8-ed29-4f95-8bce-507f028810d2	obj_harvests_trees_pine01_p09	Resources	harvests_trees.shapeset
+c1e99269-4090-489f-bcaf-f7cb04b03a73	obj_harvests_trees_leafy03_p07	Resources	harvests_trees.shapeset
+c2078bfe-fa3d-4c2b-8d97-6b5308ff624b	obj_construction_signcone	Medium Parts	construction.shapeset
+c227ba7c-171c-4a7c-b5e4-faa84d44f03a	obj_interactive_turretseat_03_sphere	Large Parts	interactive_shared.shapeset
+c256423e-0ec5-4206-a7a6-996d039ba476	obj_rewards_windshield_toppart	Quest / Special Items	rewards.shapeset
+c2ce40b1-fc95-48bd-bd05-9c3e394a157a	obj_warehouse_fanblade	Medium Parts	warehouse.shapeset
+c2e6c7f6-6519-4e79-813d-354cc63080a8	obj_rewards_bowl	Quest / Special Items	rewards.shapeset
+c3065683-98ff-4ef6-9862-ed0443ec71c2	bq_watchtower_01	Small Parts	builderguide.shapeset
+c349afdf-aded-47bc-9a5c-606372bc535b	obj_industrial_powergenerator7	Large Parts	industrial.shapeset
+c3990931-b471-4e89-beb5-0baaef47f0af	obj_containers_woodbox	Medium Parts	containers.shapeset
+c39b3537-d9b2-45f8-b2ea-0e9002c896d9	obj_interactive_saddle_02	Medium Parts	interactive_upgradeable.shapeset
+c3a520b3-8d0e-435c-8070-e0ef58d028be	obj_construction_rebarsmall	Small Parts	construction.shapeset
+c3b7163e-02d4-4b00-96ad-c15860be9419	obj_destructable_tape_cocoon01	Medium Parts	destructable_tape.shapeset
+c3ef3008-9367-4ab7-813a-24195d63e5a3	obj_interactive_driverseat_03	Large Parts	interactive_upgradeable.shapeset
+c40683f3-d9ce-4067-af24-3514c1867a1a	obj_industrial_metalsupport	Medium Parts	industrial.shapeset
+c410fd4e-2224-4ca6-bc70-c726b9a593a5	obj_survivalobject_bigelevatorbuttonpanel	Large Parts	survivalobject.shapeset
+c44b27da-88cf-4e17-b872-6236a1172688	obj_seed_pigmentflower	Plantables	plantables_creative.shapeset
+c4609540-bc32-4c3f-83b8-3b6926878012	obj_plants_seedplant	Small Parts	plants.shapeset
+c49296a9-9fb5-490b-aad9-3ce8de30d10b	bigbox04	Large Parts	survivalobject.shapeset
+c4a0a65b-3b24-4beb-bd7a-d687f4210169	obj_survivalobject_elevatorlamp	Large Parts	survivalobject.shapeset
+c4a2ffa8-c245-41fb-9496-966c6ee4648b	blk_framework	Blocks	blocks_blueprint.shapeset
+c4aa3807-0806-4202-a36d-b5fa254d3046	obj_spaceship_cranewheel	Medium Parts	spaceship.shapeset
+c4ec4d33-83f7-4e7e-bb0a-8df52f96aef5	obj_manmade_scraproof02	Large Parts	manmade.shapeset
+c52c6da1-dad9-4649-b02f-34dec0bbd411	obj_harvests_trees_leafy01_p02	Resources	harvests_trees.shapeset
+c5444340-52d3-44ff-bd27-c1800dd8ea7e	obj_resource_lemonium	Resources	resource.shapeset
+c563df47-9a8a-4338-9fec-06da1218c573	obj_spaceship_shipbed	Large Parts	spaceship.shapeset
+c56700d9-bbe5-4b17-95ed-cef05bd8be1b	blk_sand	Blocks	blocks.shapeset
+c5bdb30e-9675-4f8a-8fb9-07e5b98039d4	obj_spaceship_frame06	Medium Parts	spaceship_survivalobject.shapeset
+c5d4f725-0a67-4902-b6da-82a16aafd36a	obj_destructable_tape_taperoll03	Small Parts	destructable_tape.shapeset
+c5e56da5-bc3f-4519-91c2-b307d36e15aa	obj_decor_screw01	Small Parts	decor.shapeset
+c5e58c01-6e69-4477-ad60-02aef761ab00	obj_interactive_growbed_blueberry_sprout	Medium Parts	interactive.shapeset
+c63ac04f-aabe-4d74-9eb9-e870e4661383	obj_smelter_deposit	Large Parts	survivalobject.shapeset
+c654a023-ca53-4109-9f18-d297c18e9a02	obj_survivalobject_powercore	Medium Parts	survivalobject.shapeset
+c673cca4-c363-4a21-a576-5d3451a1f33d	obj_survivalobject_fluorescentlamp_warehouse	Large Parts	survivalobject_lights.shapeset
+c69a7855-d915-4784-af81-d0a8849e458f	obj_craftbot_craftbot4	Large Parts	craftbot_creative.shapeset
+c6ba886e-e84c-4cd1-bdd5-a480c9f52a5f	char_warehouse_botconverter	Large Parts	survivalobject.shapeset
+c6ebae46-8e69-4ddd-a3c0-895d887027bd	obj_small_5way_pipe	Small Parts	fittings.shapeset
+c713ed53-14fc-4a0d-93cf-9c2c865a2086	obj_harvests_trees_pine01_p03	Resources	harvests_trees.shapeset
+c7322cd1-3158-41d9-b15a-eff2f2f8d9f7	obj_consumable_inkammo	Consumables	consumable_shared.shapeset
+c76b89a3-7731-4ae1-99d4-788a29319360	obj_containers_haycrate	Large Parts	containers.shapeset
+c7772f74-f120-4008-8121-977e52a1d7c0	obj_road_signcurve	Large Parts	decor.shapeset
+c79a1857-a5c7-4616-b507-f1b151c31fe8	obj_decor_sign09	Medium Parts	decor.shapeset
+c807b38c-52b6-45cf-8cd3-1a46e6a9627f	obj_spaceship_wall02_damaged	Large Parts	spaceship_survivalobject.shapeset
+c844468a-8a31-4306-8af2-43e3f8cf0c13	obj_dekotora_railing02	Medium Parts	dekotora.shapeset
+c85957a1-c393-4352-ba79-5004bb4f07a2	obj_fittings_generatorpipemulti	Small Parts	fittings.shapeset
+c8650c34-30ec-42c5-8dc3-7652ba4034ff	obj_survivalobject_elevatorwallleft	Large Parts	survivalobject.shapeset
+c86c5cb8-7b68-4d55-b9ee-1840d1d9ea5a	obj_artifact_fossil01	Quest / Special Items	artifact_creative.shapeset
+c89f7bc8-5720-474d-989d-761916a411b2	obj_decor_boot	Small Parts	decor.shapeset
+c8b1bc7b-304e-44ce-9ca1-937b8e69d70c	obj_interactive_encryptor_destruction	Medium Parts	interactive.shapeset
+c8c07259-bc23-45a1-8a4c-585962274f19	obj_industrial_beamshelf	Medium Parts	industrial.shapeset
+c8ca8731-3af2-4554-9019-6b941affcb16	obj_manmade_scraproof01	Large Parts	manmade.shapeset
+c8d3b9ba-5bb1-49c5-aeb0-6c32f9b1e5c8	obj_destructable_tape_taperoll01	Small Parts	destructable_tape.shapeset
+c8ec5c2d-968c-45c3-9a6a-1da0137d3ba1	blk_spaceshipfloor_restricted	Blocks	blocks_survivalobject.shapeset
+c91caa70-f9a6-487a-bfe1-16400e5ab482	obj_harvests_crystal_large02_p01	Resources	harvests_crystal.shapeset
+c938e84c-ff59-4e7e-a87c-5211ac903927	obj_industrial_antenna02	Large Parts	industrial.shapeset
+c9396a42-67c3-4fa3-b682-31428ff9eced	obj_resource_flower	Resources	resource_creative.shapeset
+c96ab903-f238-4bae-a614-28a758716d00	obj_scrap_gasengine	Small Parts	interactive_scrap_creative.shapeset
+c9ce53cc-5838-4ae0-9feb-8ee6b6a01a5b	obj_harvests_nonepart_tier5_p07	Resources	harvests_nonepart.shapeset
+c9d61f53-ebd3-4bb5-8789-43b00edbcc8b	obj_harvests_stones_p03	Resources	harvests_stones.shapeset
+ca003562-fde7-463c-969e-f8334ae54387	obj_interactive_toilet	Medium Parts	interactive.shapeset
+ca208216-99f0-43d1-900d-cb0924223b65	obj_harvests_trees_pine02_p09	Resources	harvests_trees.shapeset
+cb3dc4fc-603b-4919-9a71-7ce7cb1593bb	obj_castedpart_t5	Large Parts	castedpart.shapeset
+cb40d51e-86dc-4bf4-999a-879dbfe91e4b	obj_rewards_lowriderwheel	Quest / Special Items	rewards.shapeset
+cb7305b2-d8b5-4302-aff3-6cdd9212ca64	obj_consumable_sunshake	Consumables	consumable_creative.shapeset
+cbc6fc23-dcc9-4d6f-a7aa-9a3ae37ca41f	obj_warehouse_overheadcranerope	Large Parts	warehouse.shapeset
+cbd2c2d3-ea26-4805-b9fe-5694f89f162f	obj_rewards_pictureframe	Quest / Special Items	rewards.shapeset
+cc454365-7262-4953-a190-4bead4f4a260	obj_warehouse_encryptorsign_destruction	Large Parts	warehouse.shapeset
+cc5f3b6e-d2de-45ed-bc26-d640bd1663ec	obj_interactive_builderguide_finished	Medium Parts	survivalobject.shapeset
+cc7fdd4a-ae17-44c8-9f91-089ea00f4891	obj_packingstation_screen_fruit	Large Parts	survivalobject.shapeset
+cc80b6e0-f756-4036-9cd6-77af13a6de36	obj_tool_bucket_oil	Small Parts	bucket.shapeset
+ccf8c454-6f8a-4f22-a64f-31e854daf103	bq_nicehouse_01	Small Parts	builderguide.shapeset
+cd0eff89-b693-40ee-bd4c-3500b23df44e	blk_concretetiles	Blocks	blocks.shapeset
+cd18840d-d4ee-4f36-8ab1-843c823b0dcf	obj_harvests_stones_p01	Resources	harvests_stones.shapeset
+cd5cf990-a08e-4e0b-9824-334fe13bf379	obj_rewards_bowlingball	Quest / Special Items	rewards.shapeset
+cdd6762b-263f-4dbc-b859-bceb56dbe92d	obj_dekotora_octalight	Medium Parts	dekotora.shapeset
+ce1117c1-35d4-4c77-9a31-740078c6b1d8	obj_destructable_tape_taperoll02	Small Parts	destructable_tape.shapeset
+ce350b5c-cebb-42b0-b8ba-1bf084a0090c	obj_industrial_satellite03	Medium Parts	industrial.shapeset
+ce37c509-2be6-4368-8ac7-a34a75fab248	obj_harvests_trees_birch02_p02	Resources	harvests_trees.shapeset
+ce66734b-2122-460e-94dc-ccc73d799e32	obj_building_slippery	Medium Parts	building.shapeset
+ce7b8345-9f10-42fe-a185-aa229d05f473	obj_voxelmaterial_t1	Resources	voxelmaterial.shapeset
+cec1d36c-b48a-43d2-9667-5e53b62dd4c5	obj_plants_poleplant	Large Parts	plants.shapeset
+cf3fdcfc-a7e5-4497-b000-ffda67dd8db7	obj_interactive_driverseat_creative	Large Parts	interactive.shapeset
+cf41bd2d-8bd3-432b-8a92-a36eda7e7740	obj_tool_sledgehammer	Components	tool_parts.shapeset
+cf46678b-c947-4267-ba85-f66930f5faa4	obj_interactive_sensor_02	Small Parts	interactive_upgradeable.shapeset
+cf4daf85-36a2-479f-96dc-b6201bc12d36	obj_warehouse_packingtablesign	Medium Parts	warehouse.shapeset
+cfeaa663-afeb-4ebb-bd3d-057b6f792382	obj_dekotora_scrollingstrip02	Small Parts	dekotora.shapeset
+cffd3eb7-21db-4dde-bbc3-453e6bd7d941	obj_jewel_02	Quest / Special Items	jewel_creative.shapeset
+d0084e20-90a8-4460-920c-f2dab4600c04	obj_interactive_growbed_potato_sprout	Medium Parts	interactive.shapeset
+d00f05c6-f704-49a0-acdc-b4391086d254	obj_harvests_trees_birch03_p05	Resources	harvests_trees.shapeset
+d053adac-e217-49de-b184-ad4bfbe1e52d	obj_decor_lidbarrel	Large Parts	decor.shapeset
+d0aa2676-5266-432a-bf7e-3887e6ddedd5	jnt_suspensionsport_03	Small Parts	interactive_upgradeable.shapeset
+d0afb527-e786-4a22-a907-6da7e7cba8cb	obj_interactive_locker	Large Parts	interactive_shared.shapeset
+d1421af8-6f80-4413-8099-2c6b217fb929	obj_plants_ballcactus	Small Parts	plants.shapeset
+d143e494-bef1-45c1-b842-0c81c9ae1a12	minidungeon_exit_portal	Medium Parts	survivalobject.shapeset
+d1840356-ad77-4505-a9a0-10d11a77986f	obj_hideout_dropoff	Large Parts	survivalobject.shapeset
+d2093f3c-178c-4220-bfe0-e8a3d87f96c0	obj_survivalobject_elevatorwallright	Large Parts	survivalobject.shapeset
+d21fc21f-085c-4de7-a6a1-12bddead653a	obj_harvests_crystal_large02_p05	Resources	harvests_crystal.shapeset
+d22164ab-fba8-4243-9059-77abc82eb995	d22164ab-fba8-4243-9059-77abc82eb995	Small Parts	effect_proxies.shapeset
+d296c1ad-e893-4866-ba73-1cbbb38ebd37	obj_containers_humidifier	Large Parts	containers.shapeset
+d2e0d468-858b-4a8b-98b4-8c5900309aef	obj_survivalobject_elevatorfloor	Large Parts	survivalobject.shapeset
+d2fab7ef-21db-4681-a22a-cd4f278fc355	obj_consumable_extinguisher	Consumables	consumable_shared.shapeset
+d30dcd12-ec39-43b9-a115-44c08e1b9091	obj_interactive_driverseat_04	Large Parts	interactive_upgradeable.shapeset
+d361b477-69b2-4a3a-b119-ec99a3938f5b	obj_decor_basketstack	Medium Parts	decor.shapeset
+d3c95e21-4608-44eb-8876-ca3f59cb7740	obj_harvests_crystal_large01_p01	Resources	harvests_crystal.shapeset
+d42cae51-343e-4847-83a4-e55c1b04aa80	obj_warehouse_beamframeend	Small Parts	warehouse.shapeset
+d48dc62b-ae26-4b0d-bc15-939f835ae19b	obj_rewards_kitchenpot01	Quest / Special Items	rewards.shapeset
+d4a74caa-6ffc-4f20-960c-b719e4402081	obj_spaceshipsurvivalobject_shipbed	Large Parts	spaceship_survivalobject.shapeset
+d4ae8963-40e9-4680-934d-5626a3bfc363	obj_decor_openclosedsign	Medium Parts	decor.shapeset
+d4d68946-aa03-4b8f-b1af-96b81ad4e305	obj_consumable_gas	Consumables	consumable_shared.shapeset
+d4e6c84c-a493-44b1-81aa-4f4741ea3ed8	obj_spaceship_microwave	Small Parts	spaceship.shapeset
+d509a432-85f9-419f-8b02-8d58b1082f97	obj_decor_sign07	Medium Parts	decor.shapeset
+d5da6d42-69e2-49ca-8def-3339bf9f0d35	obj_industrial_platform	Large Parts	industrial.shapeset
+d5e36413-b3c1-4636-8447-3410c352ec7b	obj_interactive_gasengine_creative	Small Parts	interactive.shapeset
+d69139ee-5b7f-479a-b9c1-6549017a1ea1	obj_resource_refinednimbolium	Resources	resource.shapeset
+d6ae871d-466e-4f28-99f1-90d6e281062a	obj_survivalobject_minidungeon_elevatorfloor	Large Parts	survivalobject.shapeset
+d6ce5127-c5be-42e3-a55f-0261bf1ac145	obj_interactive_ladder	Medium Parts	interactive_shared.shapeset
+d6e5bd19-b26d-4619-9df6-d451d3389513	obj_survivalobject_minidungeon_keycard	Small Parts	survivalobject.shapeset
+d6f0de5e-8ba9-42e6-9dac-bfe5fc4606be	obj_structure_concretefoundation02	Large Parts	structure.shapeset
+d71d8897-5af6-4adc-b626-50e45f931157	obj_industrial_cylindermedium	Medium Parts	industrial.shapeset
+d740a27d-cc0f-4866-9e07-6a5c516ad719	blk_wornmetal	Blocks	blocks.shapeset
+d76d0639-4b04-4fb2-8338-ff4f7bde5ea0	d76d0639-4b04-4fb2-8338-ff4f7bde5ea0	Small Parts	effect_proxies.shapeset
+d84d768a-774e-491e-8a95-da1d4afa6df7	obj_dekotora_sidelight	Medium Parts	dekotora.shapeset
+d8766548-a54d-436b-b086-c6b546a01b3b	blk_dekotora01	Blocks	blocks.shapeset
+d9509ce7-5a2e-4d4d-b39c-1332447cef41	obj_interactive_alarmclock	Small Parts	interactive_creative.shapeset
+d97a85c5-7c0f-4bfb-9ef4-ce6ecdab9539	obj_fittings_ductbend	Small Parts	fittings.shapeset
+d9adddcc-972d-4726-a376-67f950b99a44	jnt_suspensionsport_04	Small Parts	interactive_upgradeable.shapeset
+da2efa37-370d-4848-bc2e-2bae01173ce1	obj_office_officechair_taped	Medium Parts	survivalobject.shapeset
+da4833fd-f981-4e08-a9f7-48e630a7c146	obj_container_battery	Medium Parts	interactive_containers_shared.shapeset
+da6e54df-a223-4a0e-b42f-ddeddd33f5b3	obj_construction_light	Medium Parts	construction.shapeset
+da86d1c6-e29b-4741-8b65-eed067222dc7	obj_decor_stackedpaper	Small Parts	decor.shapeset
+da993c70-ba90-4748-8a22-6246bad32930	obj_characterobject_haybotpackage	Quest / Special Items	characterobject.shapeset
+dac97219-d076-41db-8bbb-2509facf0eb4	obj_construction_paintcan	Small Parts	construction.shapeset
+db2ce519-490e-4432-b329-c973ecc8f5d9	obj_decor_sunshakeudder	Medium Parts	decor.shapeset
+db66f0b1-0c50-4b74-bdc7-771374204b1f	obj_vehicle_bigwheel	Medium Parts	vehicle.shapeset
+dba4cbca-1504-4df0-97e7-19b3efe78d32	obj_robotparts_cablebot	Medium Parts	robotparts.shapeset
+dbd509b5-b7cc-43cf-9a89-b3befecfe991	obj_industrial_rack	Medium Parts	industrial.shapeset
+dbe08d9e-6d19-4475-b820-ce35733fa5fc	obj_voxelmaterial_rich	Resources	voxelmaterial.shapeset
+dd42e167-4dc8-4023-a65d-6966cb6415a1	dd42e167-4dc8-4023-a65d-6966cb6415a1	Small Parts	effect_proxies.shapeset
+ddaa82ea-22c5-4a2c-8367-c2ee12d5ea5b	obj_industrial_encryptstandfoundation	Large Parts	industrial.shapeset
+ddc45a73-e871-4e4d-a0e6-a10f2bed6ea9	obj_dekotora_spinningsign01	Medium Parts	dekotora.shapeset
+de018bc6-1db5-492c-bfec-045e63f9d64b	obj_interactive_sensor_04	Small Parts	interactive_upgradeable.shapeset
+de467c9b-a0ab-4e20-95ae-0e5fe8140989	obj_containers_vegboxonion	Large Parts	containers.shapeset
+de556b89-a4be-4d7e-ab49-e6485af16836	obj_harvests_trees_birch02_p05	Resources	harvests_trees.shapeset
+de637191-d84d-4c1e-8a55-7bb86e54ce70	obj_harvests_trees_spruce02_p03	Resources	harvests_trees.shapeset
+de7a75db-207d-48fe-a385-fc4c61b40cf6	obj_construction_stairs	Large Parts	construction.shapeset
+de7eea5b-9262-476b-a5bb-238d0e91f81f	obj_survivalobject_kobag	Medium Parts	survivalobject.shapeset
+de9ede75-5759-4d49-b3f1-6b274716945d	obj_harvests_nonepart_tier5_p05	Resources	harvests_nonepart.shapeset
+deabb19a-1acd-4bbf-8bd2-f8f17410170b	obj_containers_cowcrate	Large Parts	packingcrates.shapeset
+def1fe25-a33d-405b-ac04-2c1707c2101b	obj_spaceship_ceilingbeam02	Medium Parts	spaceship_survivalobject.shapeset
+df3734e2-f04b-443f-b568-fe5b076646c7	obj_plants_leafplant	Medium Parts	plants.shapeset
+df4724fa-b3ea-438d-b07f-75af46af4bfd	obj_destructable_tape_tape01	Small Parts	destructable_tape.shapeset
+df8528ed-15ad-4a39-a33a-698880684001	obj_interactive_thruster_01	Medium Parts	interactive_upgradeable.shapeset
+df953d9c-234f-4ac2-af5e-f0490b223e71	blk_wood1	Blocks	blocks.shapeset
+dfcff000-e027-4f43-9bfb-f9a84b3b50c4	obj_destructable_tape_cornertape04	Medium Parts	destructable_tape.shapeset
+dfefc9d7-db03-4d25-ad85-eae1d824d8c0	obj_interactive_radio	Small Parts	interactive.shapeset
+e02620a5-371b-4d63-be35-fd8a0552eba9	obj_industrial_stairwedge	Wedges	industrial.shapeset
+e086d2de-6224-4ebc-8152-add18793ee58	obj_destructable_tape_big_walltape03	Small Parts	destructable_tape.shapeset
+e08d860d-650e-4b81-8cfa-411ea8e6e9c0	obj_decor_wcsignfemale	Medium Parts	decor.shapeset
+e0ca4f27-4e44-4888-a74f-42c62a5fdf91	obj_structure_cableroll01	Large Parts	structure.shapeset
+e0f8dc49-c418-403b-a7a1-44bea7ecd3d0	obj_fittings_venthub	Large Parts	fittings.shapeset
+e0fcf485-d0e7-4279-b42d-6a9b4347f616	obj_survivalobject_carry	Large Parts	survivalobject.shapeset
+e1273b8a-945b-4080-81eb-cbf79961cccb	obj_small_3way_pipe	Small Parts	fittings.shapeset
+e1828741-2653-4a9c-8850-3f5b7eee37a9	quest_phone	Quest / Special Items	quest_items.shapeset
+e1e8551d-7787-4ab2-b620-09d2cf110bba	obj_nugget_t2	Resources	resource.shapeset
+e22c8acb-151f-4837-ba32-7c61896b4eec	obj_building_barracksupportlong	Medium Parts	building.shapeset
+e243f642-6934-42bb-8cdd-f8ff1704d411	obj_consumable_longsandwich	Consumables	consumable_creative.shapeset
+e27e871d-5eac-40af-8c70-65340e819878	obj_survivalobject_packagedburger	Medium Parts	survivalobject.shapeset
+e281599c-2343-4c86-886e-b2c1444e8810	blk_concrete3	Blocks	blocks.shapeset
+e2844132-31b4-4a2c-af5f-0abd173af1ef	obj_warehouse_beambigintersect	Small Parts	warehouse.shapeset
+e28c88fc-bd6d-4b03-a799-c0d39f0a799e	obj_resource_mud	Resources	resource.shapeset
+e2a0770b-9bb9-4b3b-b9f2-994b534b79f3	obj_decor_toiletroll	Small Parts	decor.shapeset
+e392d6d0-cfc3-48b5-8617-d5c9a7c624aa	obj_dekotora_stripelight03	Small Parts	dekotora.shapeset
+e3bc44d7-2173-47c0-86c3-0a9348812692	obj_harvests_trees_pine03_p03	Resources	harvests_trees.shapeset
+e3bdeea5-d349-4d08-9b5a-5695ea05537e	obj_consumable_cornade	Consumables	consumable_shared.shapeset
+e3e58881-69e6-4593-8211-017bcd72c907	obj_industrial_antennatowertop	Large Parts	industrial.shapeset
+e49a6a73-74a1-4c30-9e32-66dd07b4843c	obj_harvests_crystal_large01_p02	Resources	harvests_crystal.shapeset
+e49b210a-0d46-4f06-bcd8-08862379d156	obj_survivalobject_keycard	Small Parts	survivalobject.shapeset
+e4df268d-5845-4532-ba75-75bb7b71fcdf	obj_harvests_trees_pine01_p04	Resources	harvests_trees.shapeset
+e555a792-9d1c-4672-8a8c-08387fe2a28e	obj_voxelmaterialchunk_t3_large	Resources	voxelmaterialchunk.shapeset
+e559dc2f-cbf9-47cc-95f3-42c2bb1b77a7	obj_interactive_growbed_tomato_sprout	Medium Parts	interactive.shapeset
+e585bcd6-5828-4a37-8ec7-dffb561f0956	obj_industrial_antenna01	Large Parts	industrial.shapeset
+e59afe5b-2c5f-4934-95d7-8c187b22fd6d	obj_survivalobject_capsuledoor	Large Parts	survivalobject.shapeset
+e5b0392a-c149-47c1-aa9a-54ebd7082242	obj_growlab_key	Small Parts	survivalobject.shapeset
+e5e81f70-6477-4099-ad77-76bf6a4f364f	obj_rewards_tablelamp	Quest / Special Items	rewards.shapeset
+e6796f6a-138e-4086-9fe3-da6910e00484	obj_structure_postalcrate	Medium Parts	structure.shapeset
+e69e0466-8783-4cfd-8a0a-8794af743094	obj_structure_concretebarrier02	Large Parts	structure.shapeset
+e6db321c-6f98-47f6-9f7f-4e6794a62cb8	obj_interactive_thruster_04	Medium Parts	interactive_upgradeable.shapeset
+e71b55c7-8547-4bef-bb77-e976c8abde0b	obj_decor_sign_storage	Large Parts	decor.shapeset
+e77d9577-589a-446b-96c1-f6d0d7495489	obj_crates_blueberry	Large Parts	packingcrates.shapeset
+e7847840-48b9-47ec-8b9c-79dd4c4c3cfd	obj_harvests_crystal_large01_p04	Resources	harvests_crystal.shapeset
+e7eae129-9e3f-45d2-997c-637865c60a5e	obj_office_waterdispensertank	Medium Parts	building.shapeset
+e83a22c5-8783-413f-a199-46bc30ca8dac	obj_interactive_builderguide	Medium Parts	survivalobject.shapeset
+e84680b8-83ab-4cc3-af10-df857a300e9e	obj_spaceshipsurvivalovject_ceilinglight	Large Parts	spaceship_survivalobject.shapeset
+e846e3e7-b608-49c9-bbfd-e0bb859e6d3c	obj_fittings_ventbig04	Medium Parts	fittings.shapeset
+e85606e7-d602-40b7-9aab-4a79340971e2	obj_harvests_crystal_medium_p02	Resources	harvests_crystal.shapeset
+e858c1d5-8b16-4749-9119-b77e904520ac	obj_rewards_sidemirror	Quest / Special Items	rewards.shapeset
+e8beb527-e470-4934-bc06-0d7f6312e49c	obj_destructable_tape_acrosstheroom01	Small Parts	destructable_tape.shapeset
+e8cadcb0-9cdf-49d8-bac2-00193e8ac3cc	obj_spaceship_ceilingbeam01	Large Parts	spaceship_survivalobject.shapeset
+e8d88e1f-7025-4911-8d8a-d77574343632	obj_rewards_beachball	Quest / Special Items	rewards.shapeset
+e91b0bf2-dafa-439e-a503-286e91461bb0	obj_light_factorylamp	Medium Parts	lights.shapeset
+e94095bb-e1aa-4ad1-bfae-85d5f7d0915a	obj_dekotora_floorsquare02	Medium Parts	dekotora.shapeset
+e96e15d9-0997-4ed6-8c75-751848fb8edd	obj_shoprewards_bonsaitree	Quest / Special Items	shoprewards.shapeset
+e981c337-1c8a-449c-8602-1dd990cbba3a	blk_plasticwall	Blocks	blocks.shapeset
+e9a7a26a-6e72-4bd4-8a44-7d5ab8b83f4b	obj_destructable_tape_big_walltape02	Small Parts	destructable_tape.shapeset
+e9efc008-8fae-4391-9ad1-6a62dbab5760	obj_container_chest_looting	Medium Parts	interactive_shared.shapeset
+ea10d1af-b97a-46fb-8895-dfd1becb53bb	obj_container_water	Medium Parts	interactive_containers_shared.shapeset
+ea16ec2e-5135-49e9-9543-9bdcd818d90a	obj_destructable_tape_big_walltape05	Small Parts	destructable_tape.shapeset
+ea3678fc-fcf3-475c-9a5e-8150a938af82	obj_survivalobject_chastermechanics	Small Parts	survivalobject.shapeset
+ea42ac82-47cc-4e13-889c-de38f8478b91	obj_rewards_backmirror	Quest / Special Items	rewards.shapeset
+ea64acf0-c0a8-44c4-a946-f358d232e965	obj_road_signpost	Small Parts	decor.shapeset
+ea6864db-bb4f-4a89-b9ec-977849b6713a	blk_tryponet	Blocks	blocks.shapeset
+ea77b8ae-579a-4c37-9eaf-191f0049f1f5	bigbox02	Large Parts	survivalobject.shapeset
+eabc9e68-6172-4719-ace5-5d64333233c0	obj_vehicle_mediumpipe	Small Parts	vehicle.shapeset
+eb0b62d6-3557-428b-a6e2-a98ff25e16c8	obj_dekotora_bigwheel	Medium Parts	vehicle.shapeset
+eb1ef696-5c05-4662-9e47-fe1e0875ff84	obj_seed_potato	Plantables	plantables_creative.shapeset
+eb3d3125-d022-4624-a8bc-55b085ef8bd2	obj_rewards_carfrontpanel	Quest / Special Items	rewards.shapeset
+eb5ba645-ef8c-430c-a037-d15d752bbcd3	obj_dekotora_archlight	Small Parts	dekotora.shapeset
+eb608c5d-c418-49db-a2c5-1c8186b3d314	obj_vehicle_mediumpipebent	Small Parts	vehicle.shapeset
+eb8554ae-46de-4217-9906-3aa2d402429f	obj_dekotora_bulbframing02	Small Parts	dekotora.shapeset
+ebb60949-9dd9-4914-b56c-2e7c974be3b7	bq_garden_01	Small Parts	builderguide.shapeset
+ebd73cee-988f-4ffb-95d1-d3c3c81fd506	obj_survivalobject_dispenserbot	Large Parts	survivalobject.shapeset
+ebe2782e-a4f5-4d91-83cc-db110179393b	obj_interactive_seat_03	Medium Parts	interactive_upgradeable.shapeset
+ebefa387-fe4a-4839-bdd9-b6b4da39368f	obj_manmade_shacklight	Small Parts	manmade.shapeset
+ec0bb005-f3c1-425a-94c4-6feca8567068	obj_survivalobject_terminal	Large Parts	survivalobject.shapeset
+ec334737-1467-4a29-a3b7-e04f662bca1b	obj_warehouse_overheadcranetrolley	Medium Parts	warehouse.shapeset
+ec757a7d-a27b-4688-ae85-46167659bf00	obj_construction_ramp01	Wedges	construction.shapeset
+ed27f5e2-cac5-4a32-a5d9-49f116acc6af	obj_light_headlight	Small Parts	lights.shapeset
+ed4fd579-535e-4a44-ac2c-52f805f1a875	bq_carousel_01	Small Parts	builderguide.shapeset
+ed8cb110-bf48-43f6-9e86-273cfc0a7080	obj_destructable_tape_big_walltape01	Small Parts	destructable_tape.shapeset
+edd445cc-c298-4ce3-9a58-745c1bee1bc7	obj_decor_screw02	Small Parts	decor.shapeset
+eecc076e-c9a0-4f40-a966-ebc3a34e487a	mounted propanetank02	Large Parts	survivalobject.shapeset
+eed5ea94-2b85-4c1d-881d-7e07574480f9	obj_survivalobject_dispenserbot_spawner	Large Parts	survivalobject.shapeset
+ef4cc633-3cd1-4e13-9502-b498c4a4c7af	obj_resource_drillcasingmixedt3	Resources	resource.shapeset
+ef7115ea-a497-4a4a-a1ec-44b810094ef1	obj_harvests_trees_leafy03_p00	Resources	harvests_trees.shapeset
+efb2837c-f1d2-412b-bff1-a210b3426fd9	obj_resource_wonkstonks	Resources	resource_creative.shapeset
+efbf45f8-62ec-4541-9eb1-d529966f6a29	obj_interactive_driverseat_02	Large Parts	interactive_upgradeable.shapeset
+efd779ef-ce99-4507-bafb-9e2c7ff8a46c	obj_warehouse_banner1	Large Parts	warehouse.shapeset
+f0438bd7-6307-4991-943f-d78b04877d96	obj_containers_vegboxcucumber	Medium Parts	containers.shapeset
+f0713386-8c95-493d-b013-e8e53e32d1ed	obj_fittings_wireconvexbend	Medium Parts	fittings.shapeset
+f08d772f-9851-400f-a014-d847900458a7	obj_interactive_fridge	Medium Parts	interactive.shapeset
+f092e8b5-4b10-48be-8ad1-2ac5625f49b8	obj_building_plunger	Medium Parts	building.shapeset
+f0c365f6-fcb4-4135-9769-79f7e7aba240	obj_interactive_growbed_pigmentflower_mature	Medium Parts	interactive.shapeset
+f0cba95b-2dc4-4492-8fd9-36546a4cb5aa	blk_cardboard	Blocks	blocks.shapeset
+f152e4df-bc40-44fb-8d20-3b3ff70cdfe3	obj_resource_circuitboard	Resources	resource_creative.shapeset
+f15b5fa7-6113-4af8-b3e1-b05560ed946a	obj_spaceship_corner01	Large Parts	spaceship_survivalobject.shapeset
+f1831414-735f-4323-834a-85d5953fc160	obj_industrial_encryptstandhinge	Medium Parts	industrial.shapeset
+f27cf05c-f6f9-43dc-93db-f810372110ec	obj_shootingrange_farmbottarget	Large Parts	shootingrange.shapeset
+f293a245-2415-4da5-b012-01134652611f	obj_robotparts_tapebotshooter	Medium Parts	robotparts.shapeset
+f2aa1e44-aea8-4431-9b7e-f7e35163dd7c	f2aa1e44-aea8-4431-9b7e-f7e35163dd7c	Small Parts	character_shape.shapeset
+f2f3209d-9df3-410e-b87e-603ddd0d9918	obj_interactive_growbed_tomato_mature	Medium Parts	interactive.shapeset
+f3012975-5006-4a3a-b441-14f433070600	f3012975-5006-4a3a-b441-14f433070600	Small Parts	effect_proxies.shapeset
+f35266b5-30ca-40bc-8504-cc0ead2ab528	obj_survivalobject_minidungeon_cardreader	Large Parts	survivalobject.shapeset
+f37b101c-508b-4630-9f9d-47ef1c834183	obj_industrial_cylindersmall	Medium Parts	industrial.shapeset
+f3cfef9d-faef-4be8-9283-476eb99614d7	jnt_suspensionoffroad_01	Medium Parts	interactive_upgradeable.shapeset
+f406bf6e-9fd5-4aa0-97c1-0b3c2118198e	blk_bubblewrap	Blocks	blocks.shapeset
+f4107fbf-2c39-455c-9aaf-2bb94d915ae8	obj_structure_metalbarrier	Medium Parts	structure.shapeset
+f47612db-e035-4d62-81e2-64fc3453ccc3	obj_survivalobject_bananabox	Medium Parts	survivalobject.shapeset
+f4d77a3b-6568-4630-9d4d-888323b325f8	jnt_suspensionsport_bearing_04	Small Parts	interactive_upgradeable.shapeset
+f5098301-1693-457b-8efc-83b3504105ac	obj_plantables_orange	Plantables	plantables_creative.shapeset
+f554be5a-2012-4d2d-9a10-776d31aa1fd7	obj_resource_silica	Resources	resource.shapeset
+f5670a5a-7782-4683-bed0-a6eda785a5e2	obj_decor_poster01	Large Parts	decor.shapeset
+f56d7788-122e-421a-b63b-2938466125e9	obj_survivalobject_gasengine	Small Parts	survivalobject.shapeset
+f5786e5d-8366-4ebf-be00-f3a4b036a77b	obj_industrial_stairplatform	Large Parts	industrial.shapeset
+f57e4a93-f61b-4418-83c1-3d8cbcd6322a	obj_rewards_ivypipe01	Quest / Special Items	rewards.shapeset
+f5b5acb3-afd5-4755-a7fe-2151f0559d43	obj_warehouse_beambigend	Small Parts	warehouse.shapeset
+f5ceb7e3-5576-41d2-82d2-29860cf6e20e	blk_crackedconcrete	Blocks	blocks.shapeset
+f6687d52-efc1-4f00-b573-bee4363ee14f	obj_containers_vegboxcarrot	Medium Parts	containers.shapeset
+f6874702-a226-4f32-8753-d642e2124ebc	obj_survivalobject_botspawner	Large Parts	survivalobject.shapeset
+f708c190-6155-4769-ae0e-884cc8c21300	obj_harvests_trees_leafy02_p00	Resources	harvests_trees.shapeset
+f74c2891-79a9-45e0-982e-4896651c2e25	obj_consumable_chemical	Consumables	consumable_shared.shapeset
+f74dc766-3d8b-4f63-925c-dce2e3227133	obj_rewards_windshield_leftpart	Quest / Special Items	rewards.shapeset
+f7744922-3b4d-4deb-a593-129c449acd09	f7744922-3b4d-4deb-a593-129c449acd09	Small Parts	effect_proxies.shapeset
+f7d4bfed-1093-49b9-be32-394c872a1ef4	blk_treadplate	Blocks	blocks.shapeset
+f80026c5-2019-4f87-8abd-345bd23aa156	obj_industrial_racklong	Medium Parts	industrial.shapeset
+f81851f6-a7a6-4dd3-b36c-b5d735f88128	obj_voxelmaterial_t4	Resources	voxelmaterial.shapeset
+f82df260-a92a-411e-80fb-182768cb71d7	obj_consumables_key	Consumables	consumable.shapeset
+f876dd01-e276-46ea-acbb-7b3dc46e6ba1	f876dd01-e276-46ea-acbb-7b3dc46e6ba1	Small Parts	effect_proxies.shapeset
+f8b43c14-1594-480f-9032-9d726b2f17df	char_npc_scoutfarmer_binoculars	Small Parts	char_npc_scoutfarmer_stuff.shapeset
+f8b984da-4b24-4e36-b440-86ead126b6dc	obj_containers_treecrate	Large Parts	containers.shapeset
+f8c057f3-5b05-40d0-a37e-30f24fcb1aa7	obj_containers_smallbox	Medium Parts	containers.shapeset
+f8da6b41-03d7-4bc1-ba94-011a351b1569	obj_containers_cardboardstack_medium	Medium Parts	containers.shapeset
+f993ed50-f6db-4f38-a559-d86dd1efda2a	f993ed50-f6db-4f38-a559-d86dd1efda2a	Large Parts	effect_proxies.shapeset
+f99ebc34-4821-4b39-a625-b839c5802ed5	obj_harvest_wood2	Resources	harvests_shared.shapeset
+f9a71b9b-d872-4097-863c-a11783642221	obj_harvests_trees_pine01_p11	Resources	harvests_trees.shapeset
+f9e8707a-62f8-4051-84e9-c2e17b686d9e	obj_industrial_antennatower	Large Parts	industrial.shapeset
+fa401b4e-da43-40f2-805d-5c73ade1ac86	obj_interactive_turretseat_04_base	Large Parts	interactive_shared.shapeset
+fa776f45-0bac-44da-ac43-543592b01a97	obj_artifact_fossil05b	Quest / Special Items	artifact_creative.shapeset
+faae6e1a-f431-49fd-b8b8-16f12139ee88	obj_containers_plantcontainerclosed	Small Parts	containers.shapeset
+fb0f128c-e607-4c52-9c25-f44dfd2dd95e	obj_resource_steak	Resources	resource_creative.shapeset
+fba945c7-a50f-4515-af38-57d768706078	obj_warehouse_container6	Small Parts	warehouse.shapeset
+fbc0fbfb-803c-42dd-aace-1ae10e55a785	obj_fittings_ductpipe	Medium Parts	fittings.shapeset
+fbc59ea5-993f-48a7-8b49-c1cdf67f75e2	obj_harvests_trees_leafy03_p09	Resources	harvests_trees.shapeset
+fc0d73fa-d01f-407d-b5e2-2318a61d27df	obj_dekotora_pillshapelight	Medium Parts	dekotora.shapeset
+fc4f1fd8-2544-45f0-8e3b-4684bc45e5f9	obj_spaceship_floor_panel	Large Parts	spaceship_survivalobject.shapeset
+fcf0958c-084d-4854-9b1b-b06594b4262a	obj_resource_beewax	Resources	resource_creative.shapeset
+fcf0a5ca-66d3-437b-b106-adcdb527e218	obj_survivalobject_doorsensor_controller	Small Parts	survivalobject.shapeset
+fcfae5e2-1df9-47d8-bb9a-30bec9b5b1f5	obj_container_smallchest	Medium Parts	interactive_shared.shapeset
+fd381577-bcd2-4b72-b86c-de47d7783820	obj_harvests_trees_leafy01_p01	Resources	harvests_trees.shapeset
+fd3d0098-9b80-48dd-b82c-4a35c8093cb1	obj_harvests_crystal_large02_p06	Resources	harvests_crystal.shapeset
+fdfcdb68-af22-4bb3-87d6-bd44b3c8b671	jnt_suspensionoffroad_bearing_01	Medium Parts	interactive_upgradeable.shapeset
+fe1d102e-992a-4a24-a942-5fb37e8879d3	obj_harvests_trees_pine01_p00	Resources	harvests_trees.shapeset
+fe7a9d5c-a44a-48f8-b29b-5ae3f2bf7449	bq_wochouse_01	Small Parts	builderguide.shapeset
+fe8bfeba-850b-4827-9785-10e2468c9c23	obj_resource_corn	Resources	resource_creative.shapeset
+febce8a6-6c05-4e5d-803b-dfa930286944	blk_carpet	Blocks	blocks.shapeset
+ff09d816-843a-43e9-aab6-dc35e73787fd	obj_survivalobject_cardreader	Large Parts	survivalobject.shapeset
+ff2207c1-e40b-416f-8bdd-66a9efd6d1a9	obj_decor_pillow	Medium Parts	decor.shapeset
+ff234e42-5da4-43cc-8893-940547c97882	blk_concrete2	Blocks	blocks.shapeset
+ff5bee6a-81a3-49ba-a4b7-d94dbd4b8519	obj_harvests_trees_pine02_p01	Resources	harvests_trees.shapeset
+ffa3a47e-fc0d-4977-802f-bd15683bbe5c	obj_interactive_driverseat_05	Large Parts	interactive_upgradeable.shapeset
+ffdfd59f-fdf1-470f-84a9-a9789b48d5c7	obj_harvests_crystal_medium_p00	Resources	harvests_crystal.shapeset
+fff76292-79aa-4f0d-814f-72e51159d6d7	obj_industrial_encryptstandside	Small Parts	industrial.shapeset

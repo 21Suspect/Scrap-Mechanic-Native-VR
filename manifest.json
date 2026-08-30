@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "patchId": "scrap-mechanic-native-vr-chapter2",
-  "patchVersion": "1.2.1-chapter2-20260830",
-  "description": "Scrap Mechanic Chapter 2 native OpenXR VR with tracked Quest hands, complete held-item and tool adapters, barrel-aimed weapons, spatial live game menus, native queued UI input, transparent composition, and restrained haptics",
+  "patchVersion": "1.3.0-chapter2-20260831",
+  "description": "Scrap Mechanic Chapter 2 native OpenXR VR with tracked Quest Touch and Valve Index controllers, optional Quest optical hands, Custom Game content bridging, complete held-item geometry, grouped live pose calibration, barrel-aimed weapons, spatial live game menus, native queued UI input, transparent composition, and restrained haptics",
   "game": {
     "appId": "387990",
     "buildId": "24529696",
@@ -62,7 +62,7 @@
     },
     {
       "path": "Release\\smvr_native_vr_v1.addon64",
-      "patchedSha256": "C52AE1EBBB7308EFADAC050EE14C5A189DAB5CA0AB06DBC01D2AB115C6C1CBE1",
+      "patchedSha256": "542B8E9AC3F5C544A979D6DB499BE47B994D9A0358E9C022EE166E1D3E8C42A1",
       "originalMayBeMissing": true,
       "module": "chapter2-native-openxr"
     },
@@ -86,8 +86,33 @@
       "module": "chapter2-clay-live-calibration"
     },
     {
+      "path": "Release\\ScrapMechanicVR-HeldCalibration.exe",
+      "patchedSha256": "76DC7311590FCF75BA36D2E247C53279F62D9D26C4A3688665D6E572AD514D03",
+      "originalMayBeMissing": true,
+      "module": "chapter2-held-item-live-calibrator"
+    },
+    {
+      "path": "Release\\ScrapMechanicVR-HeldCalibration.ini",
+      "patchedSha256": "851FFC999DDA8B4B5CCD856B7D8D455C9472705A725DA73A9998BBB818CF92DE",
+      "originalMayBeMissing": true,
+      "runtimeMutable": true,
+      "module": "chapter2-held-item-live-calibration"
+    },
+    {
+      "path": "Release\\ScrapMechanicVR-HeldItems.bin",
+      "patchedSha256": "C27DE18C8C2F879237136A86B3A3CA24F74FABA7E6A3F9B2B96F96516DA555E2",
+      "originalMayBeMissing": true,
+      "module": "chapter2-held-item-geometry-catalog"
+    },
+    {
+      "path": "Release\\ScrapMechanicVR-HeldItems.tsv",
+      "patchedSha256": "3BD3F22EEDD684AB9B8AF636CBA67A5095ABA101A915AE02DBF7508DED94B7EC",
+      "originalMayBeMissing": true,
+      "module": "chapter2-held-item-catalog-index"
+    },
+    {
       "path": "Survival\\Scripts\\game\\Chapter2VR.lua",
-      "patchedSha256": "28BF2D39EEDC75DD19BA9A54EF29DA724E24DA800044D1D522896DB070BC097B",
+      "patchedSha256": "925AFE10792D0155517FA41A14E58376D9CBB29E96BEA61D6B3EB3F12F89A515",
       "originalMayBeMissing": true,
       "module": "chapter2-gameplay-bridge"
     },

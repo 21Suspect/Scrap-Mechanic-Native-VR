@@ -36,9 +36,9 @@ Only use the payload with the exact executable hash documented in `README.md`. D
 .\Build-OneFileInstaller.ps1
 ```
 
-The public artifact is `dist/ScrapMechanicVR-Installer.exe`. It validates its embedded patcher, manifest, native add-on, branded UI assets, soundtrack, and all 43 managed payload files before installation. It discovers Steam and the active 64-bit OpenXR runtime, rejects unsupported game builds, backs up original files, and supports verify, repair/restore, and uninstall.
+The public artifact is `dist/ScrapMechanicVR-Installer.exe`. It validates its embedded patcher, manifest, native add-on, branded UI assets, soundtrack, and all 47 managed payload files before installation. It discovers Steam and the active 64-bit OpenXR runtime, rejects unsupported game builds, backs up original files, and supports verify, repair/restore, and uninstall.
 
-Current version: `1.2.1-chapter2-20260830`
+Current version: `1.3.0-chapter2-20260831`
 
 The installer SHA-256 is recorded in `SHA256SUMS.txt`.
 

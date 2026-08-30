@@ -1,22 +1,37 @@
 #include "vr_tools.hpp"
+#include "custom_content_bridge.hpp"
 #include "native_tool_asset.hpp"
 #include "chapter2_tool_asset.hpp"
 #include "held_item_asset.hpp"
+#include "held_item_catalog.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cwchar>
 #include <cstring>
 #include <fstream>
+#include <iterator>
+#include <limits>
 #include <string>
 #include <vector>
 
 namespace scrapvr::tools
-{
-	namespace
+	{
+		namespace
 	{
 		using Vertex = native_tool_asset::Vertex;
+		#pragma pack(push, 1)
+		struct PackedCatalogVertex
+		{
+			float position[3];
+			int16_t normal[3];
+			uint16_t uv[2];
+		};
+		#pragma pack(pop)
+		static_assert(sizeof(PackedCatalogVertex) == 22);
+		static_assert(sizeof(PackedCatalogVertex) == held_item_catalog::packed_vertex_size);
 		struct Matrix { float m[16]; };
 		struct Constants { Matrix mvp; Matrix model; float eye_position[4]; };
 		struct TgaHeader
@@ -31,7 +46,15 @@ namespace scrapvr::tools
 		{
 			none, hammer, connect, paint, weld, rifle, shotgun, gatling, scrap, launcher, clay,
 			lift, handbook, bucket, glowstick, cornade, loose_clay, extinguisher, planter,
-			fertilizer, food, feeder, soilbag, key, resource, carry, logbook, count
+			fertilizer, food, feeder, soilbag, key, resource, carry, logbook, catalog, count
+		};
+		enum class HeldProfile
+		{
+			hammer, connect, paint, weld, rifle, shotgun, gatling, scrap, launcher, clay,
+			lift, handbook, bucket, glowstick, cornade, loose_clay, extinguisher, planter,
+			fertilizer, food, feeder, soilbag, key, powercore, resource, carry, logbook,
+			blocks, wedges, small_parts, medium_parts, large_parts, consumables, resources,
+			components, plantables, quest_items, other_parts, count
 		};
 		enum class ItemVariant
 		{
@@ -61,6 +84,12 @@ namespace scrapvr::tools
 			float tool_x = 0.0f, tool_y = -0.035f, tool_z = -0.045f;
 			float laser_x = 0.0f, laser_y = 0.0f, laser_z = -0.300f;
 		};
+		struct PoseCalibration
+		{
+			float x = 0.0f, y = -0.035f, z = -0.065f;
+			float pitch = 0.0f, yaw = 0.0f, roll = 0.0f;
+			float scale = 0.16f;
+		};
 		struct ClayCalibration
 		{
 			float tool_x = -0.122f, tool_y = -0.031f, tool_z = -0.172f;
@@ -78,6 +107,7 @@ namespace scrapvr::tools
 		LogFunction g_log = nullptr;
 		DrawResource g_draws[draw_count];
 		DrawResource g_held_draws[held_item_asset::mesh_count];
+		std::vector<DrawResource> g_catalog_draws;
 		ID3D11Buffer *g_constant_buffer = nullptr;
 		ID3D11Buffer *g_laser_buffer = nullptr;
 		ID3D11VertexShader *g_vertex_shader = nullptr;
@@ -90,6 +120,9 @@ namespace scrapvr::tools
 		std::wstring g_game_root;
 		Tool g_active_tool = Tool::none;
 		ItemVariant g_active_variant = ItemVariant::none;
+		int g_active_catalog_item = -1;
+		int g_loaded_catalog_item = -1;
+		std::string g_active_item_uuid;
 		bool g_player_seated = false;
 		bool g_player_first_person = false;
 		bool g_render_suppressed = false;
@@ -97,6 +130,8 @@ namespace scrapvr::tools
 		ULONGLONG g_player_state_last_valid_ms = 0;
 		uint64_t g_player_state_sequence = 0;
 		bool g_player_state_sequence_valid = false;
+		std::wstring g_player_state_source_path;
+		bool g_player_state_source_custom = false;
 		ULONGLONG g_gatling_animation_ms = 0;
 		float g_gatling_angle = 0.0f;
 		float g_gatling_speed = 0.0f;
@@ -108,8 +143,39 @@ namespace scrapvr::tools
 		ULONGLONG g_clay_calibration_poll_ms = 0;
 		FILETIME g_clay_calibration_write_time = {};
 		bool g_clay_calibration_loaded = false;
+		PoseCalibration g_pose_calibrations[static_cast<size_t>(HeldProfile::count)];
+		std::wstring g_held_calibration_path;
+		std::wstring g_held_catalog_path;
+		std::wstring g_held_status_path;
+		ULONGLONG g_held_calibration_poll_ms = 0;
+		FILETIME g_held_calibration_write_time = {};
+		bool g_held_calibration_loaded = false;
 
 		template <typename T> void release(T *&value) { if (value) { value->Release(); value = nullptr; } }
+
+		float half_to_float(uint16_t half)
+		{
+			const uint32_t sign = static_cast<uint32_t>(half & 0x8000u) << 16;
+			uint32_t exponent = (half >> 10) & 0x1fu;
+			uint32_t mantissa = half & 0x03ffu;
+			uint32_t bits = 0;
+			if (exponent == 0)
+			{
+				if (mantissa == 0) bits = sign;
+				else
+				{
+					exponent = 127u - 15u + 1u;
+					while ((mantissa & 0x0400u) == 0) { mantissa <<= 1; --exponent; }
+					mantissa &= 0x03ffu;
+					bits = sign | (exponent << 23) | (mantissa << 13);
+				}
+			}
+			else if (exponent == 0x1fu) bits = sign | 0x7f800000u | (mantissa << 13);
+			else bits = sign | ((exponent + 127u - 15u) << 23) | (mantissa << 13);
+			float result = 0.0f;
+			std::memcpy(&result, &bits, sizeof(result));
+			return result;
+		}
 
 		Matrix identity()
 		{
@@ -233,12 +299,156 @@ namespace scrapvr::tools
 			return result;
 		}
 
-		float read_ini_float(const wchar_t *section, const wchar_t *key, float fallback)
+		const wchar_t *profile_section(HeldProfile profile)
+		{
+			switch (profile)
+			{
+			case HeldProfile::hammer: return L"Hammer";
+			case HeldProfile::connect: return L"ConnectionTool";
+			case HeldProfile::paint: return L"PaintTool";
+			case HeldProfile::weld: return L"WeldTool";
+			case HeldProfile::rifle: return L"Spudgun";
+			case HeldProfile::shotgun: return L"Shotgun";
+			case HeldProfile::gatling: return L"GatlingGun";
+			case HeldProfile::scrap: return L"ScrapSpudgun";
+			case HeldProfile::launcher: return L"PotatoLauncher";
+			case HeldProfile::clay: return L"ClayGun";
+			case HeldProfile::lift: return L"Lift";
+			case HeldProfile::handbook: return L"Handbook";
+			case HeldProfile::bucket: return L"Bucket";
+			case HeldProfile::glowstick: return L"Glowstick";
+			case HeldProfile::cornade: return L"Cornade";
+			case HeldProfile::loose_clay: return L"LooseClay";
+			case HeldProfile::extinguisher: return L"FireExtinguisher";
+			case HeldProfile::planter: return L"SeedPlanter";
+			case HeldProfile::fertilizer: return L"Fertilizer";
+			case HeldProfile::food: return L"FoodAndDrink";
+			case HeldProfile::feeder: return L"LongSandwich";
+			case HeldProfile::soilbag: return L"SoilBag";
+			case HeldProfile::key: return L"KeyItems";
+			case HeldProfile::powercore: return L"PowerCore";
+			case HeldProfile::resource: return L"ResourceTool";
+			case HeldProfile::carry: return L"CarryItems";
+			case HeldProfile::logbook: return L"Logbook";
+			case HeldProfile::blocks: return L"Blocks";
+			case HeldProfile::wedges: return L"Wedges";
+			case HeldProfile::small_parts: return L"SmallParts";
+			case HeldProfile::medium_parts: return L"MediumParts";
+			case HeldProfile::large_parts: return L"LargeParts";
+			case HeldProfile::consumables: return L"Consumables";
+			case HeldProfile::resources: return L"Resources";
+			case HeldProfile::components: return L"Components";
+			case HeldProfile::plantables: return L"Plantables";
+			case HeldProfile::quest_items: return L"QuestSpecial";
+			case HeldProfile::other_parts: return L"OtherParts";
+			default: return L"OtherParts";
+			}
+		}
+
+		const char *profile_name(HeldProfile profile)
+		{
+			switch (profile)
+			{
+			case HeldProfile::hammer: return "Hammer";
+			case HeldProfile::connect: return "Connection Tool";
+			case HeldProfile::paint: return "Paint Tool";
+			case HeldProfile::weld: return "Weld Tool";
+			case HeldProfile::rifle: return "Spudgun";
+			case HeldProfile::shotgun: return "Shotgun";
+			case HeldProfile::gatling: return "Gatling Gun";
+			case HeldProfile::scrap: return "Scrap Spudgun";
+			case HeldProfile::launcher: return "Potato Launcher";
+			case HeldProfile::clay: return "Clay Gun";
+			case HeldProfile::lift: return "Lift";
+			case HeldProfile::handbook: return "Handbook";
+			case HeldProfile::bucket: return "Bucket";
+			case HeldProfile::glowstick: return "Glowstick";
+			case HeldProfile::cornade: return "Cornade";
+			case HeldProfile::loose_clay: return "Loose Clay";
+			case HeldProfile::extinguisher: return "Fire Extinguisher";
+			case HeldProfile::planter: return "Seed Planter";
+			case HeldProfile::fertilizer: return "Fertilizer";
+			case HeldProfile::food: return "Food and Drink";
+			case HeldProfile::feeder: return "Long Sandwich";
+			case HeldProfile::soilbag: return "Soil Bag";
+			case HeldProfile::key: return "Key Items";
+			case HeldProfile::powercore: return "Power Core";
+			case HeldProfile::resource: return "Resource Tool";
+			case HeldProfile::carry: return "Carry Items";
+			case HeldProfile::logbook: return "Logbook";
+			case HeldProfile::blocks: return "Blocks";
+			case HeldProfile::wedges: return "Wedges";
+			case HeldProfile::small_parts: return "Small Parts";
+			case HeldProfile::medium_parts: return "Medium Parts";
+			case HeldProfile::large_parts: return "Large Parts";
+			case HeldProfile::consumables: return "Consumables";
+			case HeldProfile::resources: return "Resources";
+			case HeldProfile::components: return "Components";
+			case HeldProfile::plantables: return "Plantables";
+			case HeldProfile::quest_items: return "Quest / Special";
+			case HeldProfile::other_parts: return "Other Parts";
+			default: return "Other Parts";
+			}
+		}
+
+		PoseCalibration default_pose(HeldProfile profile)
+		{
+			switch (profile)
+			{
+			case HeldProfile::hammer: return { 0.000f, -0.025f, -0.065f, 0, 0, 0, 0.160f };
+			case HeldProfile::connect: return { -0.020f, -0.035f, -0.055f, 0, 0, 0, 0.160f };
+			case HeldProfile::paint: return { -0.015f, -0.040f, -0.060f, 0, 0, 0, 0.160f };
+			case HeldProfile::weld: return { -0.030f, -0.035f, -0.065f, 0, 0, 0, 0.150f };
+			case HeldProfile::rifle:
+			case HeldProfile::shotgun:
+			case HeldProfile::gatling:
+			case HeldProfile::scrap:
+			case HeldProfile::launcher: return { -0.020f, -0.035f, -0.060f, 0, 0, 0, 0.145f };
+			case HeldProfile::clay: return { -0.122f, -0.031f, -0.172f, 0, 0, 0, 0.145f };
+			case HeldProfile::lift: return { -0.010f, -0.030f, -0.060f, 0, 0, 0, 0.190f };
+			case HeldProfile::handbook: return { -0.010f, -0.045f, -0.100f, 0, 0, 0, 0.130f };
+			case HeldProfile::bucket: return { -0.015f, -0.060f, -0.090f, 0, 0, 0, 0.110f };
+			case HeldProfile::glowstick: return { -0.010f, -0.030f, -0.045f, 0, 0, 0, 0.160f };
+			case HeldProfile::cornade: return { -0.015f, -0.035f, -0.060f, 0, 0, 0, 0.085f };
+			case HeldProfile::loose_clay: return { -0.010f, -0.045f, -0.080f, 0, 0, 0, 0.105f };
+			case HeldProfile::extinguisher: return { -0.020f, -0.045f, -0.075f, 0, 0, 0, 0.115f };
+			case HeldProfile::planter: return { -0.010f, -0.025f, -0.045f, 0, 0, 0, 0.140f };
+			case HeldProfile::fertilizer: return { -0.010f, -0.040f, -0.065f, 0, 0, 0, 0.120f };
+			case HeldProfile::food: return { -0.010f, -0.035f, -0.055f, 0, 0, 0, 0.120f };
+			case HeldProfile::feeder: return { -0.010f, -0.040f, -0.085f, 0, 0, 0, 0.075f };
+			case HeldProfile::soilbag: return { -0.010f, -0.040f, -0.075f, 0, 0, 0, 0.100f };
+			case HeldProfile::key: return { -0.010f, -0.030f, -0.045f, 0, 0, 0, 0.130f };
+			case HeldProfile::powercore: return { -0.010f, -0.030f, -0.045f, 0, 0, 0, 0.140f };
+			case HeldProfile::resource: return { -0.010f, -0.035f, -0.055f, 0, 0, 0, 0.140f };
+			case HeldProfile::carry: return { -0.010f, -0.090f, -0.160f, 0, 0, 0, 0.210f };
+			case HeldProfile::logbook: return { -0.010f, -0.040f, -0.085f, 0, 0, 0, 0.130f };
+			case HeldProfile::blocks: return { -0.010f, -0.040f, -0.085f, 0, 0, 0, 0.075f };
+			case HeldProfile::wedges: return { -0.010f, -0.040f, -0.085f, 0, 0, 0, 0.075f };
+			case HeldProfile::small_parts: return { -0.010f, -0.040f, -0.085f, 0, 0, 0, 0.060f };
+			case HeldProfile::medium_parts: return { -0.010f, -0.045f, -0.095f, 0, 0, 0, 0.075f };
+			case HeldProfile::large_parts: return { -0.010f, -0.055f, -0.115f, 0, 0, 0, 0.095f };
+			case HeldProfile::consumables: return { -0.010f, -0.040f, -0.075f, 0, 0, 0, 0.070f };
+			case HeldProfile::resources: return { -0.010f, -0.045f, -0.090f, 0, 0, 0, 0.075f };
+			case HeldProfile::components: return { -0.010f, -0.040f, -0.075f, 0, 0, 0, 0.065f };
+			case HeldProfile::plantables: return { -0.010f, -0.040f, -0.080f, 0, 0, 0, 0.075f };
+			case HeldProfile::quest_items: return { -0.010f, -0.045f, -0.090f, 0, 0, 0, 0.075f };
+			case HeldProfile::other_parts:
+			default: return { -0.010f, -0.045f, -0.090f, 0, 0, 0, 0.075f };
+			}
+		}
+
+		void reset_pose_defaults()
+		{
+			for (size_t index = 0; index < static_cast<size_t>(HeldProfile::count); ++index)
+				g_pose_calibrations[index] = default_pose(static_cast<HeldProfile>(index));
+		}
+
+		float read_ini_float(const std::wstring &path, const wchar_t *section, const wchar_t *key, float fallback)
 		{
 			wchar_t fallback_text[64] = {}, value[128] = {};
 			swprintf_s(fallback_text, L"%.7g", fallback);
 			GetPrivateProfileStringW(section, key, fallback_text, value,
-				static_cast<DWORD>(sizeof(value) / sizeof(value[0])), g_clay_calibration_path.c_str());
+				static_cast<DWORD>(sizeof(value) / sizeof(value[0])), path.c_str());
 			wchar_t *end = nullptr;
 			const float parsed = std::wcstof(value, &end);
 			return end != value && std::isfinite(parsed) ? parsed : fallback;
@@ -258,31 +468,31 @@ namespace scrapvr::tools
 				return;
 
 			ClayCalibration next;
-			next.tool_x = read_ini_float(L"Tool", L"PositionX", next.tool_x);
-			next.tool_y = read_ini_float(L"Tool", L"PositionY", next.tool_y);
-			next.tool_z = read_ini_float(L"Tool", L"PositionZ", next.tool_z);
-			next.tool_pitch = read_ini_float(L"Tool", L"PitchDegrees", next.tool_pitch);
-			next.tool_yaw = read_ini_float(L"Tool", L"YawDegrees", next.tool_yaw);
-			next.tool_roll = read_ini_float(L"Tool", L"RollDegrees", next.tool_roll);
-			next.scale = std::clamp(read_ini_float(L"Tool", L"Scale", next.scale), 0.010f, 1.000f);
+			next.tool_x = read_ini_float(g_clay_calibration_path, L"Tool", L"PositionX", next.tool_x);
+			next.tool_y = read_ini_float(g_clay_calibration_path, L"Tool", L"PositionY", next.tool_y);
+			next.tool_z = read_ini_float(g_clay_calibration_path, L"Tool", L"PositionZ", next.tool_z);
+			next.tool_pitch = read_ini_float(g_clay_calibration_path, L"Tool", L"PitchDegrees", next.tool_pitch);
+			next.tool_yaw = read_ini_float(g_clay_calibration_path, L"Tool", L"YawDegrees", next.tool_yaw);
+			next.tool_roll = read_ini_float(g_clay_calibration_path, L"Tool", L"RollDegrees", next.tool_roll);
+			next.scale = std::clamp(read_ini_float(g_clay_calibration_path, L"Tool", L"Scale", next.scale), 0.010f, 1.000f);
 
-			next.container_pivot_x = read_ini_float(L"Container", L"PivotX", next.container_pivot_x);
-			next.container_pivot_y = read_ini_float(L"Container", L"PivotY", next.container_pivot_y);
-			next.container_pivot_z = read_ini_float(L"Container", L"PivotZ", next.container_pivot_z);
-			next.container_axis_x = read_ini_float(L"Container", L"AxisX", next.container_axis_x);
-			next.container_axis_y = read_ini_float(L"Container", L"AxisY", next.container_axis_y);
-			next.container_axis_z = read_ini_float(L"Container", L"AxisZ", next.container_axis_z);
-			next.container_speed = read_ini_float(L"Container", L"SpeedMultiplier", next.container_speed);
-			next.container_phase = read_ini_float(L"Container", L"PhaseDegrees", next.container_phase);
+			next.container_pivot_x = read_ini_float(g_clay_calibration_path, L"Container", L"PivotX", next.container_pivot_x);
+			next.container_pivot_y = read_ini_float(g_clay_calibration_path, L"Container", L"PivotY", next.container_pivot_y);
+			next.container_pivot_z = read_ini_float(g_clay_calibration_path, L"Container", L"PivotZ", next.container_pivot_z);
+			next.container_axis_x = read_ini_float(g_clay_calibration_path, L"Container", L"AxisX", next.container_axis_x);
+			next.container_axis_y = read_ini_float(g_clay_calibration_path, L"Container", L"AxisY", next.container_axis_y);
+			next.container_axis_z = read_ini_float(g_clay_calibration_path, L"Container", L"AxisZ", next.container_axis_z);
+			next.container_speed = read_ini_float(g_clay_calibration_path, L"Container", L"SpeedMultiplier", next.container_speed);
+			next.container_phase = read_ini_float(g_clay_calibration_path, L"Container", L"PhaseDegrees", next.container_phase);
 
-			next.wheel_pivot_x = read_ini_float(L"Wheel", L"PivotX", next.wheel_pivot_x);
-			next.wheel_pivot_y = read_ini_float(L"Wheel", L"PivotY", next.wheel_pivot_y);
-			next.wheel_pivot_z = read_ini_float(L"Wheel", L"PivotZ", next.wheel_pivot_z);
-			next.wheel_axis_x = read_ini_float(L"Wheel", L"AxisX", next.wheel_axis_x);
-			next.wheel_axis_y = read_ini_float(L"Wheel", L"AxisY", next.wheel_axis_y);
-			next.wheel_axis_z = read_ini_float(L"Wheel", L"AxisZ", next.wheel_axis_z);
-			next.wheel_speed = read_ini_float(L"Wheel", L"SpeedMultiplier", next.wheel_speed);
-			next.wheel_phase = read_ini_float(L"Wheel", L"PhaseDegrees", next.wheel_phase);
+			next.wheel_pivot_x = read_ini_float(g_clay_calibration_path, L"Wheel", L"PivotX", next.wheel_pivot_x);
+			next.wheel_pivot_y = read_ini_float(g_clay_calibration_path, L"Wheel", L"PivotY", next.wheel_pivot_y);
+			next.wheel_pivot_z = read_ini_float(g_clay_calibration_path, L"Wheel", L"PivotZ", next.wheel_pivot_z);
+			next.wheel_axis_x = read_ini_float(g_clay_calibration_path, L"Wheel", L"AxisX", next.wheel_axis_x);
+			next.wheel_axis_y = read_ini_float(g_clay_calibration_path, L"Wheel", L"AxisY", next.wheel_axis_y);
+			next.wheel_axis_z = read_ini_float(g_clay_calibration_path, L"Wheel", L"AxisZ", next.wheel_axis_z);
+			next.wheel_speed = read_ini_float(g_clay_calibration_path, L"Wheel", L"SpeedMultiplier", next.wheel_speed);
+			next.wheel_phase = read_ini_float(g_clay_calibration_path, L"Wheel", L"PhaseDegrees", next.wheel_phase);
 
 			g_clay_calibration = next;
 			g_clay_calibration_write_time = attributes.ftLastWriteTime;
@@ -290,6 +500,42 @@ namespace scrapvr::tools
 			if (g_log) g_log("VR CLAY CALIBRATION RELOADED: pos %.4f %.4f %.4f rot %.2f %.2f %.2f scale %.4f",
 				next.tool_x, next.tool_y, next.tool_z,
 				next.tool_pitch, next.tool_yaw, next.tool_roll, next.scale);
+		}
+
+		void poll_held_calibration()
+		{
+			const ULONGLONG now = GetTickCount64();
+			if (now - g_held_calibration_poll_ms < 75) return;
+			g_held_calibration_poll_ms = now;
+			WIN32_FILE_ATTRIBUTE_DATA attributes = {};
+			if (g_held_calibration_path.empty() ||
+				!GetFileAttributesExW(g_held_calibration_path.c_str(), GetFileExInfoStandard, &attributes))
+				return;
+			if (g_held_calibration_loaded &&
+				CompareFileTime(&attributes.ftLastWriteTime, &g_held_calibration_write_time) == 0)
+				return;
+
+			const bool first_load = !g_held_calibration_loaded;
+			PoseCalibration next[static_cast<size_t>(HeldProfile::count)] = {};
+			for (size_t index = 0; index < static_cast<size_t>(HeldProfile::count); ++index)
+			{
+				const HeldProfile profile = static_cast<HeldProfile>(index);
+				next[index] = default_pose(profile);
+				const wchar_t *section = profile_section(profile);
+				next[index].x = read_ini_float(g_held_calibration_path, section, L"PositionX", next[index].x);
+				next[index].y = read_ini_float(g_held_calibration_path, section, L"PositionY", next[index].y);
+				next[index].z = read_ini_float(g_held_calibration_path, section, L"PositionZ", next[index].z);
+				next[index].pitch = read_ini_float(g_held_calibration_path, section, L"PitchDegrees", next[index].pitch);
+				next[index].yaw = read_ini_float(g_held_calibration_path, section, L"YawDegrees", next[index].yaw);
+				next[index].roll = read_ini_float(g_held_calibration_path, section, L"RollDegrees", next[index].roll);
+				next[index].scale = std::clamp(
+					read_ini_float(g_held_calibration_path, section, L"Scale", next[index].scale), 0.005f, 2.000f);
+			}
+			std::copy(std::begin(next), std::end(next), std::begin(g_pose_calibrations));
+			g_held_calibration_write_time = attributes.ftLastWriteTime;
+			g_held_calibration_loaded = true;
+			if (first_load && g_log) g_log("VR HELD ITEM CALIBRATION READY: %u grouped live profiles",
+				static_cast<unsigned int>(HeldProfile::count));
 		}
 
 		std::wstring module_root()
@@ -338,7 +584,7 @@ namespace scrapvr::tools
 		bool create_texture(const wchar_t *relative, ID3D11ShaderResourceView **output)
 		{
 			std::vector<uint8_t> pixels; uint32_t width = 0, height = 0;
-			if (!load_tga(relative, pixels, width, height)) { if (g_log) g_log("VR TOOL RENDERER: texture decode failed"); return false; }
+			if (!load_tga(relative, pixels, width, height)) return false;
 			D3D11_TEXTURE2D_DESC desc = {}; desc.Width = width; desc.Height = height; desc.MipLevels = 1; desc.ArraySize = 1;
 			desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; desc.SampleDesc.Count = 1; desc.Usage = D3D11_USAGE_IMMUTABLE; desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
 			D3D11_SUBRESOURCE_DATA data = {}; data.pSysMem = pixels.data(); data.SysMemPitch = width * 4;
@@ -364,16 +610,20 @@ namespace scrapvr::tools
 		bool create_resource(DrawResource &draw, const Vertex *vertices, uint32_t count,
 			const wchar_t *texture, uint32_t rgba = 0xffffffffu)
 		{
+			release(draw.vertices);
+			release(draw.texture);
 			draw.count = count;
 			D3D11_BUFFER_DESC desc = {}; desc.ByteWidth = count * sizeof(Vertex); desc.Usage = D3D11_USAGE_IMMUTABLE; desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 			D3D11_SUBRESOURCE_DATA data = {}; data.pSysMem = vertices;
 			if (FAILED(g_device->CreateBuffer(&desc, &data, &draw.vertices))) return false;
-			if (texture) return create_texture(texture, &draw.texture);
-			return create_solid_texture(
+			if (texture && create_texture(texture, &draw.texture)) return true;
+			const bool ok = create_solid_texture(
 				static_cast<uint8_t>(rgba & 0xffu),
 				static_cast<uint8_t>((rgba >> 8) & 0xffu),
 				static_cast<uint8_t>((rgba >> 16) & 0xffu),
 				static_cast<uint8_t>((rgba >> 24) & 0xffu), &draw.texture);
+			if (!ok) { release(draw.vertices); draw.count = 0; }
+			return ok;
 		}
 
 		bool create_draw(DrawId id, const Vertex *vertices, uint32_t count, const wchar_t *texture)
@@ -415,6 +665,170 @@ namespace scrapvr::tools
 			}
 		}
 
+		void release_catalog_draws()
+		{
+			for (auto &draw : g_catalog_draws)
+			{
+				release(draw.vertices);
+				release(draw.texture);
+				draw.count = 0;
+			}
+			g_catalog_draws.clear();
+			g_loaded_catalog_item = -1;
+		}
+
+		int find_catalog_item(std::string uuid)
+		{
+			std::transform(uuid.begin(), uuid.end(), uuid.begin(), [](unsigned char c) {
+				return static_cast<char>(std::tolower(c));
+			});
+			const auto *begin = held_item_catalog::items;
+			const auto *end = begin + held_item_catalog::item_count;
+			const auto *found = std::lower_bound(begin, end, uuid.c_str(),
+				[](const held_item_catalog::Item &item, const char *value) {
+					return std::strcmp(item.uuid, value) < 0;
+				});
+			if (found == end || std::strcmp(found->uuid, uuid.c_str()) != 0) return -1;
+			return static_cast<int>(found - begin);
+		}
+
+		bool load_catalog_item(int item_index)
+		{
+			if (item_index == g_loaded_catalog_item && !g_catalog_draws.empty()) return true;
+			release_catalog_draws();
+			if (item_index < 0 || static_cast<unsigned int>(item_index) >= held_item_catalog::item_count)
+				return false;
+			const auto &item = held_item_catalog::items[item_index];
+			if (item.asset >= held_item_catalog::asset_count) return false;
+			const auto &asset = held_item_catalog::assets[item.asset];
+			if (asset.first_submesh > held_item_catalog::submesh_count ||
+				asset.submesh_count > held_item_catalog::submesh_count - asset.first_submesh)
+				return false;
+
+			std::ifstream stream(g_held_catalog_path.c_str(), std::ios::binary);
+			if (!stream)
+			{
+				if (g_log) g_log("VR HELD ITEM CATALOG: binary geometry file is missing");
+				return false;
+			}
+			g_catalog_draws.reserve(asset.submesh_count);
+			for (unsigned int offset = 0; offset < asset.submesh_count; ++offset)
+			{
+				const auto &submesh = held_item_catalog::submeshes[asset.first_submesh + offset];
+				if (!submesh.vertex_count || submesh.first_vertex >
+					static_cast<unsigned long long>(std::numeric_limits<std::streamoff>::max() / sizeof(PackedCatalogVertex)))
+				{
+					release_catalog_draws();
+					return false;
+				}
+				std::vector<PackedCatalogVertex> packed(submesh.vertex_count);
+				stream.clear();
+				stream.seekg(static_cast<std::streamoff>(submesh.first_vertex * sizeof(PackedCatalogVertex)), std::ios::beg);
+				stream.read(reinterpret_cast<char *>(packed.data()),
+					static_cast<std::streamsize>(packed.size() * sizeof(PackedCatalogVertex)));
+				if (!stream)
+				{
+					release_catalog_draws();
+					return false;
+				}
+				std::vector<Vertex> vertices(submesh.vertex_count);
+				for (size_t index = 0; index < packed.size(); ++index)
+				{
+					const auto &source = packed[index];
+					vertices[index] = {
+						source.position[0], source.position[1], source.position[2],
+						static_cast<float>(source.normal[0]) / 32767.0f,
+						static_cast<float>(source.normal[1]) / 32767.0f,
+						static_cast<float>(source.normal[2]) / 32767.0f,
+						half_to_float(source.uv[0]), half_to_float(source.uv[1])
+					};
+				}
+				g_catalog_draws.emplace_back();
+				if (!create_resource(g_catalog_draws.back(), vertices.data(), submesh.vertex_count,
+					submesh.texture, submesh.rgba ? submesh.rgba : item.tint))
+				{
+					release_catalog_draws();
+					return false;
+				}
+			}
+			g_loaded_catalog_item = item_index;
+			return true;
+		}
+
+		void draw_catalog_item(ID3D11DeviceContext *context)
+		{
+			for (auto &draw : g_catalog_draws)
+			{
+				if (!draw.vertices || !draw.texture) continue;
+				UINT stride = sizeof(Vertex), offset = 0;
+				context->IASetVertexBuffers(0, 1, &draw.vertices, &stride, &offset);
+				context->PSSetShaderResources(0, 1, &draw.texture);
+				context->Draw(draw.count, 0);
+			}
+		}
+
+		HeldProfile catalog_profile(held_item_catalog::Profile profile)
+		{
+			switch (profile)
+			{
+			case held_item_catalog::Profile::blocks: return HeldProfile::blocks;
+			case held_item_catalog::Profile::wedges: return HeldProfile::wedges;
+			case held_item_catalog::Profile::small_parts: return HeldProfile::small_parts;
+			case held_item_catalog::Profile::medium_parts: return HeldProfile::medium_parts;
+			case held_item_catalog::Profile::large_parts: return HeldProfile::large_parts;
+			case held_item_catalog::Profile::consumables: return HeldProfile::consumables;
+			case held_item_catalog::Profile::resources: return HeldProfile::resources;
+			case held_item_catalog::Profile::components: return HeldProfile::components;
+			case held_item_catalog::Profile::plantables: return HeldProfile::plantables;
+			case held_item_catalog::Profile::quest_items: return HeldProfile::quest_items;
+			case held_item_catalog::Profile::other_parts:
+			default: return HeldProfile::other_parts;
+			}
+		}
+
+		HeldProfile profile_for_tool(Tool tool, ItemVariant variant, int catalog_item)
+		{
+			switch (tool)
+			{
+			case Tool::hammer: return HeldProfile::hammer;
+			case Tool::connect: return HeldProfile::connect;
+			case Tool::paint: return HeldProfile::paint;
+			case Tool::weld: return HeldProfile::weld;
+			case Tool::rifle: return HeldProfile::rifle;
+			case Tool::shotgun: return HeldProfile::shotgun;
+			case Tool::gatling: return HeldProfile::gatling;
+			case Tool::scrap: return HeldProfile::scrap;
+			case Tool::launcher: return HeldProfile::launcher;
+			case Tool::clay: return HeldProfile::clay;
+			case Tool::lift: return HeldProfile::lift;
+			case Tool::handbook: return HeldProfile::handbook;
+			case Tool::bucket: return HeldProfile::bucket;
+			case Tool::glowstick: return HeldProfile::glowstick;
+			case Tool::cornade: return HeldProfile::cornade;
+			case Tool::loose_clay: return HeldProfile::loose_clay;
+			case Tool::extinguisher: return HeldProfile::extinguisher;
+			case Tool::planter: return HeldProfile::planter;
+			case Tool::fertilizer: return HeldProfile::fertilizer;
+			case Tool::food: return HeldProfile::food;
+			case Tool::feeder: return HeldProfile::feeder;
+			case Tool::soilbag: return HeldProfile::soilbag;
+			case Tool::key: return variant == ItemVariant::powercore ? HeldProfile::powercore : HeldProfile::key;
+			case Tool::resource: return HeldProfile::resource;
+			case Tool::carry: return HeldProfile::carry;
+			case Tool::logbook: return HeldProfile::logbook;
+			case Tool::catalog:
+				if (catalog_item >= 0 && static_cast<unsigned int>(catalog_item) < held_item_catalog::item_count)
+					return catalog_profile(held_item_catalog::items[catalog_item].profile);
+				return HeldProfile::other_parts;
+			default: return HeldProfile::other_parts;
+			}
+		}
+
+		HeldProfile active_profile()
+		{
+			return profile_for_tool(g_active_tool, g_active_variant, g_active_catalog_item);
+		}
+
 		const char *tool_name(Tool tool)
 		{
 			switch (tool)
@@ -432,6 +846,7 @@ namespace scrapvr::tools
 			case Tool::feeder: return "long sandwich"; case Tool::soilbag: return "soil bag";
 			case Tool::key: return "key item"; case Tool::resource: return "resource item";
 			case Tool::carry: return "carry item"; case Tool::logbook: return "logbook";
+			case Tool::catalog: return "catalog item";
 			default: return "none";
 			}
 		}
@@ -663,13 +1078,69 @@ namespace scrapvr::tools
 			return true;
 		}
 
-		void apply_player_state(Tool tool, ItemVariant variant, bool seated, bool first_person)
+		std::string json_escape(const char *value)
 		{
-			if (tool != g_active_tool || variant != g_active_variant)
+			std::string result;
+			if (!value) return result;
+			for (const unsigned char c : std::string(value))
+			{
+				switch (c)
+				{
+				case '\\': result += "\\\\"; break;
+				case '"': result += "\\\""; break;
+				case '\n': result += "\\n"; break;
+				case '\r': result += "\\r"; break;
+				case '\t': result += "\\t"; break;
+				default: if (c >= 32) result.push_back(static_cast<char>(c)); break;
+				}
+			}
+			return result;
+		}
+
+		void write_held_status()
+		{
+			if (g_held_status_path.empty()) return;
+			const HeldProfile profile = active_profile();
+			const char *item_name = tool_name(g_active_tool);
+			if (g_active_tool == Tool::catalog && g_active_catalog_item >= 0 &&
+				static_cast<unsigned int>(g_active_catalog_item) < held_item_catalog::item_count)
+				item_name = held_item_catalog::items[g_active_catalog_item].name;
+			const std::wstring temporary = g_held_status_path + L".tmp";
+			std::ofstream stream(temporary.c_str(), std::ios::binary | std::ios::trunc);
+			if (!stream) return;
+			stream << "{\n"
+				<< "  \"active\": " << (g_active_tool != Tool::none ? "true" : "false") << ",\n"
+				<< "  \"uuid\": \"" << json_escape(g_active_item_uuid.c_str()) << "\",\n"
+				<< "  \"item\": \"" << json_escape(item_name) << "\",\n"
+				<< "  \"profile\": \"" << json_escape(profile_name(profile)) << "\",\n"
+				<< "  \"section\": \"";
+			for (const wchar_t *p = profile_section(profile); *p; ++p)
+				stream << static_cast<char>(*p);
+			stream << "\",\n"
+				<< "  \"catalog\": " << (g_active_tool == Tool::catalog ? "true" : "false") << "\n"
+				<< "}\n";
+			stream.close();
+			MoveFileExW(temporary.c_str(), g_held_status_path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+		}
+
+		void apply_player_state(Tool tool, ItemVariant variant, int catalog_item, const std::string &item_uuid,
+			bool seated, bool first_person)
+		{
+			if (tool != g_active_tool || variant != g_active_variant || catalog_item != g_active_catalog_item ||
+				item_uuid != g_active_item_uuid)
 			{
 				g_active_tool = tool;
 				g_active_variant = variant;
-				if (g_log) g_log("VR TOOL ACTIVE: %s", tool_name(tool));
+				g_active_catalog_item = catalog_item;
+				g_active_item_uuid = item_uuid;
+				if (g_log)
+				{
+					if (tool == Tool::catalog && catalog_item >= 0)
+						g_log("VR TOOL ACTIVE: %s [%s]", held_item_catalog::items[catalog_item].name,
+							profile_name(active_profile()));
+					else g_log("VR TOOL ACTIVE: %s [%s]", tool_name(tool), profile_name(active_profile()));
+				}
+				write_held_status();
 			}
 			if (seated != g_player_seated)
 			{
@@ -688,8 +1159,13 @@ namespace scrapvr::tools
 			const ULONGLONG now = GetTickCount64();
 			if (now - g_last_poll < 75) return;
 			g_last_poll = now;
-			HANDLE file = CreateFileW((g_game_root + L"\\Data\\NativeVR\\player_state.json").c_str(), GENERIC_READ,
-				FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+			std::wstring state_path;
+			bool custom_content = false;
+			const bool source_available = custom_content_bridge::select_player_state_path(
+				state_path, custom_content);
+			HANDLE file = source_available ? CreateFileW(state_path.c_str(), GENERIC_READ,
+				FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+				FILE_ATTRIBUTE_NORMAL, nullptr) : INVALID_HANDLE_VALUE;
 			bool new_packet = false;
 			if (file != INVALID_HANDLE_VALUE)
 			{
@@ -702,13 +1178,14 @@ namespace scrapvr::tools
 					bool active = false, seated = false, first_person = false;
 					uint64_t sequence = 0;
 					std::string item, adapter;
+					const bool source_changed = state_path != g_player_state_source_path;
 					if (json_uint64(text, "sequence", sequence) &&
-						(!g_player_state_sequence_valid || sequence != g_player_state_sequence) &&
+						(source_changed || !g_player_state_sequence_valid || sequence != g_player_state_sequence) &&
 						json_bool(text, "active", active))
 					{
 						if (!active)
 						{
-							apply_player_state(Tool::none, ItemVariant::none, false, false);
+							apply_player_state(Tool::none, ItemVariant::none, -1, {}, false, false);
 							new_packet = true;
 						}
 						else if (json_bool(text, "seated", seated) && json_bool(text, "firstPerson", first_person) &&
@@ -716,7 +1193,15 @@ namespace scrapvr::tools
 						{
 							json_string(text, "activeAdapter", adapter);
 							ItemVariant variant = ItemVariant::none;
-							apply_player_state(parse_tool(item, adapter, variant), variant, seated, first_person);
+							Tool tool = parse_tool(item, {}, variant);
+							int catalog_item = -1;
+							if (tool == Tool::none)
+							{
+								catalog_item = find_catalog_item(item);
+								if (catalog_item >= 0) tool = Tool::catalog;
+								else tool = parse_tool(item, adapter, variant);
+							}
+							apply_player_state(tool, variant, catalog_item, item, seated, first_person);
 							new_packet = true;
 						}
 						if (new_packet)
@@ -724,39 +1209,66 @@ namespace scrapvr::tools
 							g_player_state_sequence = sequence;
 							g_player_state_sequence_valid = true;
 							g_player_state_last_valid_ms = now;
+							g_player_state_source_path = state_path;
+							g_player_state_source_custom = custom_content;
+							if (custom_content) custom_content_bridge::mirror_world_state(active);
 						}
 					}
 				}
 			}
 			if (g_player_state_last_valid_ms == 0 || now - g_player_state_last_valid_ms > 1000)
-				apply_player_state(Tool::none, ItemVariant::none, false, false);
+			{
+				apply_player_state(Tool::none, ItemVariant::none, -1, {}, false, false);
+				if (g_player_state_source_custom)
+				{
+					custom_content_bridge::mirror_world_state(false);
+					custom_content_bridge::clear_custom_source();
+					g_player_state_source_path.clear();
+					g_player_state_source_custom = false;
+					g_player_state_sequence_valid = false;
+				}
+			}
 		}
 
-		float scale_for(Tool tool)
+		const PoseCalibration &pose_for_active()
 		{
-			switch (tool)
-			{
-			case Tool::weld: return 0.15f;
-			case Tool::rifle: case Tool::shotgun: case Tool::gatling: case Tool::scrap:
-			case Tool::launcher: case Tool::clay: return 0.145f;
-			case Tool::lift: return 0.19f;
-			case Tool::handbook: return 0.13f;
-			case Tool::bucket: return 0.11f;
-			case Tool::glowstick: return 0.16f;
-			case Tool::cornade: return 0.085f;
-			case Tool::loose_clay: return 0.105f;
-			case Tool::extinguisher: return 0.115f;
-			case Tool::planter: return 0.14f;
-			case Tool::fertilizer: return 0.12f;
-			case Tool::food: return 0.12f;
-			case Tool::feeder: return 0.075f;
-			case Tool::soilbag: return 0.10f;
-			case Tool::key: return g_active_variant == ItemVariant::powercore ? 0.14f : 0.13f;
-			case Tool::resource: return 0.14f;
-			case Tool::carry: return 0.21f;
-			case Tool::logbook: return 0.13f;
-			default: return 0.16f;
-			}
+			return g_pose_calibrations[static_cast<size_t>(active_profile())];
+		}
+
+		Matrix orientation_for_pose(const PoseCalibration &pose)
+		{
+			constexpr float radians = 0.01745329251994329577f;
+			return multiply(rotation_x(pose.pitch * radians),
+				multiply(rotation_y(pose.yaw * radians), rotation_z(pose.roll * radians)));
+		}
+
+		XrVector3f transform_direction(const Matrix &matrix, const XrVector3f &value)
+		{
+			return {
+				matrix.m[0] * value.x + matrix.m[4] * value.y + matrix.m[8] * value.z,
+				matrix.m[1] * value.x + matrix.m[5] * value.y + matrix.m[9] * value.z,
+				matrix.m[2] * value.x + matrix.m[6] * value.y + matrix.m[10] * value.z
+			};
+		}
+
+		XrVector3f adjusted_pointer_offset(Tool tool, const XrVector3f &original)
+		{
+			const HeldProfile profile = profile_for_tool(tool, g_active_variant, g_active_catalog_item);
+			const PoseCalibration base = default_pose(profile);
+			const PoseCalibration &pose = g_pose_calibrations[static_cast<size_t>(profile)];
+			const float ratio = base.scale > 0.00001f ? pose.scale / base.scale : 1.0f;
+			XrVector3f relative = {
+				(original.x - base.x) * ratio,
+				(original.y - base.y) * ratio,
+				(original.z - base.z) * ratio
+			};
+			relative = transform_direction(orientation_for_pose(pose), relative);
+			return { pose.x + relative.x, pose.y + relative.y, pose.z + relative.z };
+		}
+
+		XrVector3f adjusted_gun_direction()
+		{
+			return transform_direction(orientation_for_pose(pose_for_active()), { 0.0f, 0.0f, -1.0f });
 		}
 
 		held_item_asset::MeshRange food_range(ItemVariant variant)
@@ -789,7 +1301,14 @@ namespace scrapvr::tools
 		if (g_initialized) return true;
 		g_device = device; g_log = log; g_game_root = module_root(); if (!g_device || g_game_root.empty()) return false;
 		g_clay_calibration_path = g_game_root + L"\\Release\\ScrapMechanicVR-ClayCalibration.ini";
+		g_held_calibration_path = g_game_root + L"\\Release\\ScrapMechanicVR-HeldCalibration.ini";
+		g_held_catalog_path = g_game_root + L"\\Release\\ScrapMechanicVR-HeldItems.bin";
+		g_held_status_path = g_game_root + L"\\Data\\NativeVR\\held_item_status.json";
+		CreateDirectoryW((g_game_root + L"\\Data\\NativeVR").c_str(), nullptr);
+		custom_content_bridge::initialize(g_game_root, g_log);
+		reset_pose_defaults();
 		poll_clay_calibration();
+		poll_held_calibration();
 		const char *shader = R"(
 			cbuffer ToolConstants : register(b0) { float4x4 mvp; float4x4 model; float4 eye_position; };
 			struct VSIn { float3 position : POSITION; float3 normal : NORMAL; float2 uv : TEXCOORD0; };
@@ -876,7 +1395,9 @@ namespace scrapvr::tools
 			}
 		}
 		g_initialized = true;
-		if (g_log) g_log("VR TOOL RENDERER READY: 12 standard tools and 14 Chapter 2 held-item adapters use the direct stereo hand pass");
+		write_held_status();
+		if (g_log) g_log("VR TOOL RENDERER READY: dedicated tools plus %u catalogued blocks and parts use grouped live calibration",
+			held_item_catalog::item_count);
 		return true;
 	}
 
@@ -885,7 +1406,9 @@ namespace scrapvr::tools
 	{
 		if (!g_initialized || !context || !target || !depth) return false;
 		poll_active_tool(); if (g_render_suppressed || !right_hand_active || g_active_tool == Tool::none) return false;
+		poll_held_calibration();
 		if (g_active_tool == Tool::clay) poll_clay_calibration();
+		if (g_active_tool == Tool::catalog && !load_catalog_item(g_active_catalog_item)) return false;
 		context->OMSetRenderTargets(1, &target, depth);
 		D3D11_VIEWPORT viewport = { 0, 0, static_cast<float>(width), static_cast<float>(height), 0, 1 };
 		context->RSSetViewports(1, &viewport); context->RSSetState(g_rasterizer); context->OMSetDepthStencilState(g_depth_state, 0);
@@ -894,16 +1417,9 @@ namespace scrapvr::tools
 		context->PSSetShader(g_pixel_shader, nullptr, 0); context->PSSetSamplers(0, 1, &g_sampler);
 		const Matrix view_projection = multiply(projection(eye.fov), inverse_pose(eye.pose));
 		const auto &calibration = calibration_for(g_active_tool);
-		Matrix local = multiply(translation(calibration.tool_x, calibration.tool_y, calibration.tool_z),
-			multiply(tool_basis(), uniform_scale(scale_for(g_active_tool))));
-		if (g_active_tool == Tool::clay)
-		{
-			constexpr float radians = 0.01745329251994329577f;
-			const Matrix orientation = multiply(rotation_x(g_clay_calibration.tool_pitch * radians),
-				multiply(rotation_y(g_clay_calibration.tool_yaw * radians), rotation_z(g_clay_calibration.tool_roll * radians)));
-			local = multiply(translation(g_clay_calibration.tool_x, g_clay_calibration.tool_y, g_clay_calibration.tool_z),
-				multiply(orientation, multiply(tool_basis(), uniform_scale(g_clay_calibration.scale))));
-		}
+		const PoseCalibration &pose = pose_for_active();
+		const Matrix local = multiply(translation(pose.x, pose.y, pose.z),
+			multiply(orientation_for_pose(pose), multiply(tool_basis(), uniform_scale(pose.scale))));
 		const Matrix model = multiply(pose_matrix(right_hand_pose), local);
 		Constants constants = { multiply(view_projection, model), model,
 			{ eye.pose.position.x, eye.pose.position.y, eye.pose.position.z, 1.0f } };
@@ -938,6 +1454,7 @@ namespace scrapvr::tools
 			case Tool::resource: draw_held_range(context, held_item_asset::resource); break;
 			case Tool::carry: draw_held_range(context, held_item_asset::carry); break;
 			case Tool::logbook: draw_held_range(context, held_item_asset::logbook); break;
+			case Tool::catalog: draw_catalog_item(context); break;
 			case Tool::clay:
 			{
 				update_spinner_animation(right_firing, true);
@@ -1001,9 +1518,13 @@ namespace scrapvr::tools
 		if (g_active_tool == Tool::connect || g_active_tool == Tool::paint ||
 			g_active_tool == Tool::weld)
 		{
+			const XrVector3f laser_origin = adjusted_pointer_offset(g_active_tool,
+				{ calibration.laser_x, calibration.laser_y, calibration.laser_z });
+			const XrVector3f laser_direction = transform_direction(orientation_for_pose(pose), { 0.0f, 0.0f, -1.0f });
 			Vertex laser[2] = {
-				{ calibration.laser_x, calibration.laser_y, calibration.laser_z, 0, 0, 1, 0, 0 },
-				{ calibration.laser_x, calibration.laser_y, -8.0f, 0, 0, 1, 0, 0 }
+				{ laser_origin.x, laser_origin.y, laser_origin.z, 0, 0, 1, 0, 0 },
+				{ laser_origin.x + laser_direction.x * 8.0f, laser_origin.y + laser_direction.y * 8.0f,
+					laser_origin.z + laser_direction.z * 8.0f, 0, 0, 1, 0, 0 }
 			};
 			D3D11_MAPPED_SUBRESOURCE mapped = {};
 			if (SUCCEEDED(context->Map(g_laser_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped))) { std::memcpy(mapped.pData, laser, sizeof(laser)); context->Unmap(g_laser_buffer, 0); }
@@ -1023,27 +1544,34 @@ namespace scrapvr::tools
 		return true;
 	}
 
-	bool get_interaction_laser_offset(XrVector3f &offset)
+	bool get_interaction_laser_offset(XrVector3f &offset, XrVector3f *local_direction)
 	{
 		poll_active_tool();
+		poll_held_calibration();
 		if (g_active_tool != Tool::connect && g_active_tool != Tool::paint &&
 			g_active_tool != Tool::weld)
 			return false;
 		const auto &calibration = calibration_for(g_active_tool);
-		offset = { calibration.laser_x, calibration.laser_y, calibration.laser_z };
+		offset = adjusted_pointer_offset(g_active_tool,
+			{ calibration.laser_x, calibration.laser_y, calibration.laser_z });
+		if (local_direction) *local_direction = transform_direction(
+			orientation_for_pose(pose_for_active()), { 0.0f, 0.0f, -1.0f });
 		return true;
 	}
 
-	bool get_gun_muzzle_offset(XrVector3f &offset, const char *&item_uuid)
+	bool get_gun_muzzle_offset(XrVector3f &offset, XrVector3f &local_direction, const char *&item_uuid)
 	{
 		poll_active_tool();
+		poll_held_calibration();
 		if (!is_gun(g_active_tool))
 		{
 			item_uuid = nullptr;
 			return false;
 		}
 		const auto &calibration = calibration_for(g_active_tool);
-		offset = { calibration.laser_x, calibration.laser_y, calibration.laser_z };
+		offset = adjusted_pointer_offset(g_active_tool,
+			{ calibration.laser_x, calibration.laser_y, calibration.laser_z });
+		local_direction = adjusted_gun_direction();
 		switch (g_active_tool)
 		{
 		case Tool::rifle: item_uuid = "c5ea0c2f-185b-48d6-b4df-45c386a575cc"; break;
@@ -1092,15 +1620,20 @@ namespace scrapvr::tools
 	{
 		for (auto &draw : g_draws) { release(draw.vertices); release(draw.texture); draw.count = 0; }
 		for (auto &draw : g_held_draws) { release(draw.vertices); release(draw.texture); draw.count = 0; }
+		release_catalog_draws();
 		release(g_depth_state); release(g_rasterizer); release(g_sampler); release(g_input_layout);
 		release(g_laser_pixel_shader); release(g_pixel_shader); release(g_vertex_shader); release(g_laser_buffer); release(g_constant_buffer);
 		g_device = nullptr; g_log = nullptr; g_game_root.clear(); g_active_tool = Tool::none;
-		g_active_variant = ItemVariant::none;
+		g_active_variant = ItemVariant::none; g_active_catalog_item = -1; g_active_item_uuid.clear();
 		g_clay_calibration = ClayCalibration{}; g_clay_calibration_path.clear();
 		g_clay_calibration_poll_ms = 0; g_clay_calibration_write_time = {}; g_clay_calibration_loaded = false;
+		reset_pose_defaults(); g_held_calibration_path.clear(); g_held_catalog_path.clear(); g_held_status_path.clear();
+		g_held_calibration_poll_ms = 0; g_held_calibration_write_time = {}; g_held_calibration_loaded = false;
 		g_player_seated = false; g_player_first_person = false;
 		g_render_suppressed = false; g_last_poll = 0; g_player_state_last_valid_ms = 0;
 		g_player_state_sequence = 0; g_player_state_sequence_valid = false;
+		g_player_state_source_path.clear(); g_player_state_source_custom = false;
+		custom_content_bridge::shutdown();
 		g_gatling_animation_ms = 0; g_gatling_angle = 0.0f; g_gatling_speed = 0.0f; g_gatling_spin_logged = false;
 		g_initialized = false; g_render_logged = false;
 	}

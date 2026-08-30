@@ -23,10 +23,22 @@ local VrActionLocalOffsets = {
 	["d2fab7ef-21db-4681-a22a-cd4f278fc355"] = { -0.090, -0.035, -0.310 }
 }
 
-local VrWorldStatePath = "$GAME_DATA/NativeVR/world_state.json"
-local VrPlayerStatePath = "$GAME_DATA/NativeVR/player_state.json"
-local VrHandBridgePath = "$GAME_DATA/NativeVR/hand_physics.json"
-local VrGunFireDebugPath = "$GAME_DATA/NativeVR/gun_fire_debug.json"
+local VrBaseWorldStatePath = "$GAME_DATA/NativeVR/world_state.json"
+local VrBasePlayerStatePath = "$GAME_DATA/NativeVR/player_state.json"
+local VrBaseHandBridgePath = "$GAME_DATA/NativeVR/hand_physics.json"
+local VrBaseGunFireDebugPath = "$GAME_DATA/NativeVR/gun_fire_debug.json"
+-- A Custom Game script executes under that Custom Game's content id. Scrap
+-- Mechanic deliberately rejects writes into $GAME_DATA from that caller even
+-- when the imported script itself lives in Survival. The native add-on finds
+-- this root-level state marker and mirrors hand tracking back into the same
+-- content id, keeping the bridge legal without modifying the Custom Game.
+local VrContentWorldStatePath = "$CONTENT_DATA/ScrapMechanicVR_world_state.json"
+local VrContentPlayerStatePath = "$CONTENT_DATA/ScrapMechanicVR_player_state.json"
+local VrContentHandBridgePath = "$CONTENT_DATA/ScrapMechanicVR_hand_physics.json"
+local VrContentGunFireDebugPath = "$CONTENT_DATA/ScrapMechanicVR_gun_fire_debug.json"
+local VrHandBridgePath = VrBaseHandBridgePath
+local VrGunFireDebugPath = VrBaseGunFireDebugPath
+local VrContentBridgeActive = false
 local VrDirectBridgeFreshTicks = 10
 local VrDirectPoseFreshTicks = 6
 local VrDirectAuthorityFreshTicks = 12
@@ -82,22 +94,52 @@ local function clearClientAim()
 	g_vrBridgeLastTick = -1000
 end
 
+local function activateContentBridge()
+	if VrContentBridgeActive then return end
+	VrContentBridgeActive = true
+	VrHandBridgePath = VrContentHandBridgePath
+	VrGunFireDebugPath = VrContentGunFireDebugPath
+	sm.log.warning( "SCRAPVR_CUSTOM_CONTENT_BRIDGE active=1 reason=content_id_sandbox" )
+end
+
+local function resetContentBridge()
+	VrContentBridgeActive = false
+	VrHandBridgePath = VrBaseHandBridgePath
+	VrGunFireDebugPath = VrBaseGunFireDebugPath
+	Chapter2VR.bridgeWriteErrorTick = nil
+end
+
+local function saveBridgePayload( payload, basePath, contentPath, label )
+	local targetPath = VrContentBridgeActive and contentPath or basePath
+	local ok, errorMessage = pcall( sm.json.save, payload, targetPath )
+	if not ok and not VrContentBridgeActive then
+		activateContentBridge()
+		ok, errorMessage = pcall( sm.json.save, payload, contentPath )
+	end
+	if not ok then
+		local tick = sm.game.getCurrentTick()
+		if Chapter2VR.bridgeWriteErrorTick == nil or tick - Chapter2VR.bridgeWriteErrorTick >= 200 then
+			Chapter2VR.bridgeWriteErrorTick = tick
+			sm.log.error( "SCRAPVR_" .. label .. "_WRITE_FAILED " .. tostring( errorMessage ) )
+		end
+	end
+	return ok
+end
+
 local function publishWorldState( active )
-	local ok, errorMessage = pcall( sm.json.save, {
+	local ok = saveBridgePayload( {
 		version = 1,
 		active = active == true,
 		tick = sm.game.getCurrentTick()
-	}, VrWorldStatePath )
+	}, VrBaseWorldStatePath, VrContentWorldStatePath, "WORLD_STATE" )
 	if ok then
 		sm.log.warning( "SCRAPVR_WORLD_STATE active=" .. tostring( active == true ) )
-	else
-		sm.log.error( "SCRAPVR_WORLD_STATE_WRITE_FAILED " .. tostring( errorMessage ) )
 	end
 end
 
 local function publishPlayerState( active, seated, firstPerson, activeItem, activeAdapter )
 	Chapter2VR.playerStateSequence = ( Chapter2VR.playerStateSequence or 0 ) + 1
-	local ok, errorMessage = pcall( sm.json.save, {
+	saveBridgePayload( {
 		version = 1,
 		sequence = Chapter2VR.playerStateSequence,
 		active = active == true,
@@ -105,10 +147,7 @@ local function publishPlayerState( active, seated, firstPerson, activeItem, acti
 		firstPerson = firstPerson == true,
 		activeItem = activeItem or "00000000-0000-0000-0000-000000000000",
 		activeAdapter = activeAdapter or ""
-	}, VrPlayerStatePath )
-	if not ok then
-		sm.log.error( "SCRAPVR_PLAYER_STATE_WRITE_FAILED " .. tostring( errorMessage ) )
-	end
+	}, VrBasePlayerStatePath, VrContentPlayerStatePath, "PLAYER_STATE" )
 end
 
 local function validNumber( value )
@@ -142,6 +181,12 @@ local function handLocalPosition( pose, offset )
 	return pose.position + pose.right * offset[1] + pose.up * offset[2] - pose.forward * offset[3]
 end
 
+local function handLocalDirection( pose, offset )
+	local direction = pose.right * offset[1] + pose.up * offset[2] - pose.forward * offset[3]
+	if direction:length() < 0.5 then return pose.forward end
+	return direction:normalize()
+end
+
 local function resolveGunMuzzleOffset( activeItem, muzzle )
 	if type( muzzle ) == "table" and muzzle.active == true and muzzle.item == activeItem and
 		validNumber( muzzle.x ) and validNumber( muzzle.y ) and validNumber( muzzle.z ) then
@@ -150,6 +195,14 @@ local function resolveGunMuzzleOffset( activeItem, muzzle )
 	local offset = VrGunMuzzleLocalOffsets[activeItem]
 	if offset then return offset, "lua_calibration" end
 	return nil, "gun_calibration_inactive"
+end
+
+local function resolveGunDirection( pose, muzzle )
+	if type( muzzle ) == "table" and validNumber( muzzle.dx ) and
+		validNumber( muzzle.dy ) and validNumber( muzzle.dz ) then
+		return handLocalDirection( pose, { muzzle.dx, muzzle.dy, muzzle.dz } )
+	end
+	return pose.forward
 end
 
 function Chapter2VR.serverCreate( self )
@@ -179,6 +232,7 @@ function Chapter2VR.clientCreate( self )
 	self.cl.vrFirstPerson = nil
 	self.cl.vrActiveAdapter = ""
 	if self.player == sm.localPlayer.getPlayer() then
+		resetContentBridge()
 		publishWorldState( true )
 		publishPlayerState( false, false, false, nil )
 		sm.log.warning( "SCRAPVR_BRIDGE_CREATE" )
@@ -217,7 +271,7 @@ local function updateToolAim( self, data )
 	if muzzleOffset then
 		g_vrGunAimActive = true
 		g_vrGunMuzzlePosition = handLocalPosition( pose, muzzleOffset )
-		g_vrGunDirection = pose.forward
+		g_vrGunDirection = resolveGunDirection( pose, data.gunMuzzle )
 		g_vrGunItem = activeItem
 		self.cl.vrGunFreshTimer = 0.0
 		if self.cl.vrGunAimItem ~= activeItem then
@@ -580,7 +634,7 @@ local function refreshDirectGunPose()
 		return tick
 	end
 
-	local direction = pose.forward
+	local direction = resolveGunDirection( pose, data.gunMuzzle )
 	local position = handLocalPosition( pose, muzzleOffset )
 	Chapter2VR.directGunPose = {
 		position = position,

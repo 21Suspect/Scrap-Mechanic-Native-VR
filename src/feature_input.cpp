@@ -164,7 +164,7 @@ bool InputBridge::initialize(XrInstance instance, XrSession session, XrSpace bas
     }
     create_optical_trackers(hand_tracking_extension_enabled && config_.optical_hand_tracking);
     initialized_ = true;
-    log_line("VR_FEATURE_INPUT_READY touch=1 poses=1 locomotion=1 turn=1 buttons=1 recenter=1 haptics=%u strength=%.2f optical_hands=%u",
+    log_line("VR_FEATURE_INPUT_READY controllers=oculus_touch,valve_index poses=1 locomotion=1 turn=1 buttons=1 recenter=1 haptics=%u strength=%.2f optical_hands=%u",
         config_.haptics ? 1u : 0u, config_.haptic_strength,
         optical_trackers_[0] != XR_NULL_HANDLE && optical_trackers_[1] != XR_NULL_HANDLE ? 1u : 0u);
     return true;
@@ -208,51 +208,90 @@ bool InputBridge::create_actions()
         !create(XR_ACTION_TYPE_BOOLEAN_INPUT, "secondary_button", "Secondary Button", 2, hand_paths_, secondary_button_action_) ||
         !create(XR_ACTION_TYPE_BOOLEAN_INPUT, "stick_click", "Thumbstick Click", 2, hand_paths_, stick_click_action_) ||
         !create(XR_ACTION_TYPE_BOOLEAN_INPUT, "menu_button", "Menu Button", 1, &hand_paths_[0], menu_button_action_) ||
+        !create(XR_ACTION_TYPE_FLOAT_INPUT, "index_menu_force", "Index Trackpad Menu Press", 1,
+            &hand_paths_[0], index_menu_force_action_) ||
         !create(XR_ACTION_TYPE_VIBRATION_OUTPUT, "haptic_output", "Subtle Haptic Feedback", 2,
             hand_paths_, haptic_action_))
         return false;
 
-    XrPath profile = XR_NULL_PATH;
-    XrPath binding_paths[19]{};
-    if (!path("/interaction_profiles/oculus/touch_controller", profile) ||
-        !path("/user/hand/left/input/grip/pose", binding_paths[0]) ||
-        !path("/user/hand/right/input/grip/pose", binding_paths[1]) ||
-        !path("/user/hand/left/input/aim/pose", binding_paths[2]) ||
-        !path("/user/hand/right/input/aim/pose", binding_paths[3]) ||
-        !path("/user/hand/left/input/trigger/value", binding_paths[4]) ||
-        !path("/user/hand/right/input/trigger/value", binding_paths[5]) ||
-        !path("/user/hand/left/input/thumbstick", binding_paths[6]) ||
-        !path("/user/hand/right/input/thumbstick", binding_paths[7]) ||
-        !path("/user/hand/left/input/squeeze/value", binding_paths[8]) ||
-        !path("/user/hand/right/input/squeeze/value", binding_paths[9]) ||
-        !path("/user/hand/left/input/x/click", binding_paths[10]) ||
-        !path("/user/hand/right/input/a/click", binding_paths[11]) ||
-        !path("/user/hand/left/input/y/click", binding_paths[12]) ||
-        !path("/user/hand/right/input/b/click", binding_paths[13]) ||
-        !path("/user/hand/left/input/thumbstick/click", binding_paths[14]) ||
-        !path("/user/hand/right/input/thumbstick/click", binding_paths[15]) ||
-        !path("/user/hand/left/input/menu/click", binding_paths[16]) ||
-        !path("/user/hand/left/output/haptic", binding_paths[17]) ||
-        !path("/user/hand/right/output/haptic", binding_paths[18])) return false;
+    XrPath common[16]{};
+    if (!path("/interaction_profiles/oculus/touch_controller", touch_profile_path_) ||
+        !path("/interaction_profiles/valve/index_controller", index_profile_path_) ||
+        !path("/user/hand/left/input/grip/pose", common[0]) ||
+        !path("/user/hand/right/input/grip/pose", common[1]) ||
+        !path("/user/hand/left/input/aim/pose", common[2]) ||
+        !path("/user/hand/right/input/aim/pose", common[3]) ||
+        !path("/user/hand/left/input/trigger/value", common[4]) ||
+        !path("/user/hand/right/input/trigger/value", common[5]) ||
+        !path("/user/hand/left/input/thumbstick", common[6]) ||
+        !path("/user/hand/right/input/thumbstick", common[7]) ||
+        !path("/user/hand/left/input/squeeze/value", common[8]) ||
+        !path("/user/hand/right/input/squeeze/value", common[9]) ||
+        !path("/user/hand/left/input/thumbstick/click", common[10]) ||
+        !path("/user/hand/right/input/thumbstick/click", common[11]) ||
+        !path("/user/hand/left/output/haptic", common[12]) ||
+        !path("/user/hand/right/output/haptic", common[13]) ||
+        !path("/user/hand/left/input/a/click", common[14]) ||
+        !path("/user/hand/left/input/b/click", common[15])) return false;
 
-    const XrActionSuggestedBinding bindings[19]{
-        {grip_pose_action_, binding_paths[0]}, {grip_pose_action_, binding_paths[1]},
-        {aim_pose_action_, binding_paths[2]}, {aim_pose_action_, binding_paths[3]},
-        {trigger_action_, binding_paths[4]}, {trigger_action_, binding_paths[5]},
-        {thumbstick_action_, binding_paths[6]}, {thumbstick_action_, binding_paths[7]},
-        {squeeze_action_, binding_paths[8]}, {squeeze_action_, binding_paths[9]},
-        {primary_button_action_, binding_paths[10]}, {primary_button_action_, binding_paths[11]},
-        {secondary_button_action_, binding_paths[12]}, {secondary_button_action_, binding_paths[13]},
-        {stick_click_action_, binding_paths[14]}, {stick_click_action_, binding_paths[15]},
-        {menu_button_action_, binding_paths[16]},
-        {haptic_action_, binding_paths[17]}, {haptic_action_, binding_paths[18]}
+    XrPath touch[5]{};
+    if (!path("/user/hand/left/input/x/click", touch[0]) ||
+        !path("/user/hand/right/input/a/click", touch[1]) ||
+        !path("/user/hand/left/input/y/click", touch[2]) ||
+        !path("/user/hand/right/input/b/click", touch[3]) ||
+        !path("/user/hand/left/input/menu/click", touch[4])) return false;
+
+    XrPath index[4]{};
+    if (!path("/user/hand/right/input/a/click", index[0]) ||
+        !path("/user/hand/right/input/b/click", index[1]) ||
+        !path("/user/hand/left/input/system/click", index[2]) ||
+        !path("/user/hand/left/input/trackpad/force", index[3])) return false;
+
+    const XrActionSuggestedBinding touch_bindings[19]{
+        {grip_pose_action_, common[0]}, {grip_pose_action_, common[1]},
+        {aim_pose_action_, common[2]}, {aim_pose_action_, common[3]},
+        {trigger_action_, common[4]}, {trigger_action_, common[5]},
+        {thumbstick_action_, common[6]}, {thumbstick_action_, common[7]},
+        {squeeze_action_, common[8]}, {squeeze_action_, common[9]},
+        {primary_button_action_, touch[0]}, {primary_button_action_, touch[1]},
+        {secondary_button_action_, touch[2]}, {secondary_button_action_, touch[3]},
+        {stick_click_action_, common[10]}, {stick_click_action_, common[11]},
+        {menu_button_action_, touch[4]},
+        {haptic_action_, common[12]}, {haptic_action_, common[13]}
     };
-    XrInteractionProfileSuggestedBinding suggested{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
-    suggested.interactionProfile = profile;
-    suggested.countSuggestedBindings = static_cast<uint32_t>(std::size(bindings));
-    suggested.suggestedBindings = bindings;
-    result = xrSuggestInteractionProfileBindings(instance_, &suggested);
-    if (XR_FAILED(result)) return false;
+    const XrActionSuggestedBinding index_bindings[20]{
+        {grip_pose_action_, common[0]}, {grip_pose_action_, common[1]},
+        {aim_pose_action_, common[2]}, {aim_pose_action_, common[3]},
+        {trigger_action_, common[4]}, {trigger_action_, common[5]},
+        {thumbstick_action_, common[6]}, {thumbstick_action_, common[7]},
+        {squeeze_action_, common[8]}, {squeeze_action_, common[9]},
+        {primary_button_action_, common[14]}, {primary_button_action_, index[0]},
+        {secondary_button_action_, common[15]}, {secondary_button_action_, index[1]},
+        {stick_click_action_, common[10]}, {stick_click_action_, common[11]},
+        {menu_button_action_, index[2]}, {index_menu_force_action_, index[3]},
+        {haptic_action_, common[12]}, {haptic_action_, common[13]}
+    };
+    auto suggest = [&](const char *name, XrPath profile, const XrActionSuggestedBinding *bindings,
+                       uint32_t count) -> bool {
+        XrInteractionProfileSuggestedBinding suggested{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
+        suggested.interactionProfile = profile;
+        suggested.countSuggestedBindings = count;
+        suggested.suggestedBindings = bindings;
+        const XrResult suggest_result = xrSuggestInteractionProfileBindings(instance_, &suggested);
+        if (XR_FAILED(suggest_result))
+        {
+            log_line("VR_INPUT_PROFILE_UNAVAILABLE profile=%s xr=%d continuing_with_other_profiles=1",
+                name, static_cast<int>(suggest_result));
+            return false;
+        }
+        log_line("VR_INPUT_PROFILE_BINDINGS profile=%s bindings=%u", name, count);
+        return true;
+    };
+    const bool touch_available = suggest("oculus_touch", touch_profile_path_, touch_bindings,
+        static_cast<uint32_t>(std::size(touch_bindings)));
+    const bool index_available = suggest("valve_index", index_profile_path_, index_bindings,
+        static_cast<uint32_t>(std::size(index_bindings)));
+    if (!touch_available && !index_available) return false;
 
     XrSessionActionSetsAttachInfo attach{XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO};
     attach.countActionSets = 1;
@@ -273,6 +312,38 @@ bool InputBridge::create_actions()
         if (XR_FAILED(result)) return false;
     }
     return true;
+}
+
+const char *InputBridge::interaction_profile_name(XrPath profile) const
+{
+    if (profile == touch_profile_path_) return "oculus_touch";
+    if (profile == index_profile_path_) return "valve_index";
+    if (profile == XR_NULL_PATH) return "none";
+    return "other";
+}
+
+void InputBridge::update_interaction_profiles()
+{
+    for (uint32_t hand = 0; hand < kHandCount; ++hand)
+    {
+        XrInteractionProfileState state{XR_TYPE_INTERACTION_PROFILE_STATE};
+        const XrResult result = xrGetCurrentInteractionProfile(session_, hand_paths_[hand], &state);
+        if (XR_FAILED(result) || state.interactionProfile == active_profile_paths_[hand]) continue;
+        active_profile_paths_[hand] = state.interactionProfile;
+
+        char profile_path[XR_MAX_PATH_LENGTH]{};
+        uint32_t written = 0;
+        if (state.interactionProfile != XR_NULL_PATH &&
+            XR_FAILED(xrPathToString(instance_, state.interactionProfile,
+                static_cast<uint32_t>(std::size(profile_path)), &written, profile_path)))
+            strcpy_s(profile_path, "<unavailable>");
+        else if (state.interactionProfile == XR_NULL_PATH)
+            strcpy_s(profile_path, "<none>");
+        log_line("VR_CONTROLLER_PROFILE hand=%s profile=%s path=%s",
+            hand == 0 ? "left" : "right",
+            interaction_profile_name(state.interactionProfile), profile_path);
+        input_active_logged_ = false;
+    }
 }
 
 void InputBridge::create_optical_trackers(bool extension_enabled)
@@ -438,10 +509,11 @@ bool InputBridge::update_controller_pose(uint32_t hand, XrTime display_time)
     if (!hand_pose_logged_[hand])
     {
         hand_pose_logged_[hand] = true;
-        log_line("VR_TOUCH_POSE hand=%s position=%.4f,%.4f,%.4f orientation=%.5f,%.5f,%.5f,%.5f",
-            hand == 0 ? "left" : "right", location.pose.position.x, location.pose.position.y,
-            location.pose.position.z, location.pose.orientation.x, location.pose.orientation.y,
-            location.pose.orientation.z, location.pose.orientation.w);
+        log_line("VR_CONTROLLER_POSE hand=%s profile=%s position=%.4f,%.4f,%.4f orientation=%.5f,%.5f,%.5f,%.5f",
+            hand == 0 ? "left" : "right", interaction_profile_name(active_profile_paths_[hand]),
+            location.pose.position.x, location.pose.position.y, location.pose.position.z,
+            location.pose.orientation.x, location.pose.orientation.y, location.pose.orientation.z,
+            location.pose.orientation.w);
     }
     return true;
 }
@@ -463,8 +535,8 @@ bool InputBridge::update_controller_aim_pose(uint32_t hand, XrTime display_time)
     if (!aim_pose_logged_[hand])
     {
         aim_pose_logged_[hand] = true;
-        log_line("VR_TOUCH_AIM_POSE hand=%s source=openxr_aim_pose laser_axis=minus_z",
-            hand == 0 ? "left" : "right");
+        log_line("VR_CONTROLLER_AIM_POSE hand=%s profile=%s source=openxr_aim_pose laser_axis=minus_z",
+            hand == 0 ? "left" : "right", interaction_profile_name(active_profile_paths_[hand]));
     }
     return true;
 }
@@ -571,7 +643,7 @@ void InputBridge::update_optical_hands(XrTime display_time, const bool controlle
         if (!optical_hand_logged_[hand])
         {
             optical_hand_logged_[hand] = true;
-            log_line("VR_OPTICAL_HAND_TRACKED hand=%s fallback_when_touch_inactive=1 pinch_hysteresis=1 articulation=per_joint_12dof open_range=v2",
+            log_line("VR_OPTICAL_HAND_TRACKED hand=%s fallback_when_controller_inactive=1 pinch_hysteresis=1 articulation=per_joint_12dof open_range=v2",
                 hand == 0 ? "left" : "right");
         }
     }
@@ -601,6 +673,7 @@ bool InputBridge::sync(XrTime display_time, const XrPosef &head_pose)
         return false;
     }
     sync_failure_logged_ = false;
+    update_interaction_profiles();
     for (HandState &hand_state : hands_)
     {
         hand_state.active = false;
@@ -630,7 +703,8 @@ bool InputBridge::sync(XrTime display_time, const XrPosef &head_pose)
         else
         {
             // Runtime profiles without an aim binding retain the old grip-pose
-            // fallback, but Oculus Touch uses the dedicated aim pose above.
+            // fallback; supported Touch and Index controllers use the dedicated
+            // OpenXR aim pose above.
             pointer_poses_[hand] = hands_[hand].pose;
             pointer_pose_active_[hand] = hands_[hand].active;
         }
@@ -644,13 +718,15 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     XrVector2f move{}, turn{};
     bool a = false, b = false, x = false, y = false, left_click = false, right_click = false;
     bool menu = false;
-    float trigger[2]{}, squeeze[2]{};
+    float trigger[2]{}, squeeze[2]{}, index_menu_force = 0.0f;
     bool trigger_active[2]{};
+    bool index_menu_force_active = false;
     if (!get_vector(thumbstick_action_, 0, move) || !get_vector(thumbstick_action_, 1, turn) ||
         !get_boolean(primary_button_action_, 1, a) || !get_boolean(secondary_button_action_, 1, b) ||
         !get_boolean(primary_button_action_, 0, x) || !get_boolean(secondary_button_action_, 0, y) ||
         !get_boolean(stick_click_action_, 0, left_click) || !get_boolean(stick_click_action_, 1, right_click) ||
         !get_boolean(menu_button_action_, 0, menu) ||
+        !get_float(index_menu_force_action_, 0, index_menu_force, &index_menu_force_active) ||
         !get_float(trigger_action_, 0, trigger[0], &trigger_active[0]) ||
         !get_float(trigger_action_, 1, trigger[1], &trigger_active[1]) ||
         !get_float(squeeze_action_, 0, squeeze[0]) || !get_float(squeeze_action_, 1, squeeze[1]))
@@ -658,6 +734,10 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         release_injected_input();
         return;
     }
+    // SteamVR commonly reserves the Index system button for its dashboard.
+    // Keep that standard binding, but also make a deliberate left trackpad
+    // press a reliable application-level Menu input.
+    menu = menu || (index_menu_force_active && index_menu_force > 0.55f);
 
     for (uint32_t hand = 0; hand < kHandCount; ++hand)
     {
@@ -780,7 +860,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         send_key('C', false, key_zoom_out_);
         send_key('I', false, key_inventory_);
         send_key(VK_ESCAPE, menu, key_menu_);
-        // UI selection must react to the current Touch trigger sample. Waiting
+        // UI selection must react to the current controller trigger sample. Waiting
         // for the gameplay-oriented debouncer made controller clicks dependent
         // on several subsequent action-sync frames, while optical pinch used
         // its live state. Preserve the same private game-input queue downstream;
@@ -924,7 +1004,9 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     if (!input_active_logged_)
     {
         input_active_logged_ = true;
-        log_line("VR_INPUT_ACTIVE mapping=touch locomotion=hmd_relative turn=right_stick triggers=mouse buttons=A_jump,B_use,X_Y_hotbar_or_seated_zoom,X+Y_inventory,menu_escape recenter=dual_stick_1s");
+        log_line("VR_INPUT_ACTIVE mapping=openxr_controller left_profile=%s right_profile=%s locomotion=hmd_relative turn=right_stick triggers=mouse buttons=right_A_jump,right_B_use,left_A_B_hotbar_or_seated_zoom,left_A+B_inventory,menu=dedicated_or_index_trackpad recenter=dual_stick_1s",
+            interaction_profile_name(active_profile_paths_[0]),
+            interaction_profile_name(active_profile_paths_[1]));
     }
 }
 
@@ -969,6 +1051,7 @@ void InputBridge::reset_runtime_state()
     input_active_logged_ = false;
     input_suspended_logged_ = false;
     sync_failure_logged_ = false;
+    active_profile_paths_[0] = active_profile_paths_[1] = XR_NULL_PATH;
     hand_pose_logged_[0] = hand_pose_logged_[1] = false;
     aim_pose_logged_[0] = aim_pose_logged_[1] = false;
     pointer_pose_active_[0] = pointer_pose_active_[1] = false;
@@ -1027,8 +1110,9 @@ void InputBridge::shutdown()
     action_set_ = XR_NULL_HANDLE;
     grip_pose_action_ = aim_pose_action_ = trigger_action_ = thumbstick_action_ = squeeze_action_ = XR_NULL_HANDLE;
     primary_button_action_ = secondary_button_action_ = stick_click_action_ = menu_button_action_ =
-        haptic_action_ = XR_NULL_HANDLE;
+        index_menu_force_action_ = haptic_action_ = XR_NULL_HANDLE;
     hand_paths_[0] = hand_paths_[1] = XR_NULL_PATH;
+    touch_profile_path_ = index_profile_path_ = XR_NULL_PATH;
     create_hand_tracker_ = nullptr;
     destroy_hand_tracker_ = nullptr;
     locate_hand_joints_ = nullptr;

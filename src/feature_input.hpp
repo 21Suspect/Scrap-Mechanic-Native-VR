@@ -68,6 +68,8 @@ public:
 private:
     bool create_actions();
     void create_optical_trackers(bool extension_enabled);
+    void update_interaction_profiles();
+    const char *interaction_profile_name(XrPath profile) const;
     bool update_controller_pose(uint32_t hand, XrTime display_time);
     bool update_controller_aim_pose(uint32_t hand, XrTime display_time);
     void update_optical_hands(XrTime display_time, const bool controller_pose_active[2]);
@@ -94,8 +96,12 @@ private:
     XrAction secondary_button_action_ = XR_NULL_HANDLE;
     XrAction stick_click_action_ = XR_NULL_HANDLE;
     XrAction menu_button_action_ = XR_NULL_HANDLE;
+    XrAction index_menu_force_action_ = XR_NULL_HANDLE;
     XrAction haptic_action_ = XR_NULL_HANDLE;
     XrPath hand_paths_[2]{XR_NULL_PATH, XR_NULL_PATH};
+    XrPath touch_profile_path_ = XR_NULL_PATH;
+    XrPath index_profile_path_ = XR_NULL_PATH;
+    XrPath active_profile_paths_[2]{XR_NULL_PATH, XR_NULL_PATH};
     XrSpace hand_spaces_[2]{XR_NULL_HANDLE, XR_NULL_HANDLE};
     XrSpace aim_spaces_[2]{XR_NULL_HANDLE, XR_NULL_HANDLE};
 
