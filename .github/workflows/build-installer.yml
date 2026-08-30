@@ -1,0 +1,38 @@
+name: Build installer
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build one-file installer
+        shell: powershell
+        run: |
+          $csc = 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+          if (-not (Test-Path -LiteralPath $csc -PathType Leaf)) {
+            throw "Missing $csc"
+          }
+          .\Build-OneFileInstaller.ps1
+
+      - name: Record installer hash
+        shell: powershell
+        run: |
+          $path = 'dist\ScrapMechanicVR-Installer.exe'
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash
+          Write-Host "Built $path"
+          Write-Host "SHA256 $hash"
+          "INSTALLER_SHA256=$hash" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "INSTALLER_SIZE=$((Get-Item -LiteralPath $path).Length)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScrapMechanicVR-Installer
+          path: dist/ScrapMechanicVR-Installer.exe
+          if-no-files-found: error

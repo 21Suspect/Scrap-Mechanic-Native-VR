@@ -13,7 +13,7 @@ Native OpenXR VR for the current Scrap Mechanic Chapter 2 / 1.0 release, made by
 ## Easy installation
 
 1. Close Scrap Mechanic.
-2. Download and run **[ScrapMechanicVR-Installer.exe](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/raw/refs/heads/main/dist/ScrapMechanicVR-Installer.exe)**.
+2. Download and run **[ScrapMechanicVR-Installer.exe](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases/latest)** from the latest GitHub release.
 3. Click **Install VR Mod** and approve the administrator prompt.
 4. Connect Quest Link, then use the new **Start Scrap Mechanic VR - Chapter 2** shortcut.
 

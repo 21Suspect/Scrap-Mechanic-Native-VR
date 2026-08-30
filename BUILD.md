@@ -36,7 +36,7 @@ Only use the payload with the exact executable hash documented in `README.md`. D
 .\Build-OneFileInstaller.ps1
 ```
 
-The public artifact is `dist/ScrapMechanicVR-Installer.exe`. It validates its embedded patcher, manifest, native add-on, branded UI assets, soundtrack, and all 29 managed payload files before installation. It discovers Steam and the active 64-bit OpenXR runtime, rejects unsupported game builds, backs up original files, and supports verify, repair/restore, and uninstall.
+The public artifact is `dist/ScrapMechanicVR-Installer.exe`. Build it only with Windows PowerShell and `C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe` (`Build-OneFileInstaller.ps1`). A Linux/Mono `mcs` binary is a different PE layout; Windows Defender has already flagged one of those as `Trojan:Win32/Wacatac.B!ml`.
 
 Current version: `1.1.3-chapter2-20260830`
 
