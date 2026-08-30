@@ -1,6 +1,6 @@
 # Chapter 2 release status
 
-Release: `1.1.1-chapter2-20260830`
+Release: `1.1.2-chapter2-20260830`
 
 Branch: `main`
 

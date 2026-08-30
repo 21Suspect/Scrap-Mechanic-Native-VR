@@ -41,6 +41,39 @@ if (-not (Test-Path -LiteralPath $logoSource -PathType Leaf)) {
     throw 'The packaged installer logo is missing.'
 }
 
+# Keep the installer's embedded trust anchors synchronized with the exact files
+# it is about to package. A stale constant produces an installer that compiles
+# successfully but rejects its own payload during extraction.
+$source = Join-Path $PSScriptRoot 'installer\Program.cs'
+$programText = Get-Content -Raw -LiteralPath $source
+function Assert-EmbeddedString([string]$Name, [string]$Expected) {
+    $pattern = 'internal const string ' + [Regex]::Escape($Name) + ' = "([^"]+)";'
+    $match = [Regex]::Match($programText, $pattern)
+    if (-not $match.Success -or $match.Groups[1].Value -ne $Expected) {
+        throw "installer/Program.cs $Name is stale. Expected '$Expected'."
+    }
+}
+function Get-Sha256([string]$Path) {
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+}
+$addonSource = Join-Path $PSScriptRoot 'payload\Release\smvr_native_vr_v1.addon64'
+$dxgiSource = Join-Path $PSScriptRoot 'payload\Release\dxgi.dll'
+$loaderSource = Join-Path $PSScriptRoot 'payload\Release\libopenxr_loader.dll'
+Assert-EmbeddedString 'Version' ([string]$manifest.patchVersion)
+Assert-EmbeddedString 'GameBuild' ([string]$manifest.game.buildId)
+Assert-EmbeddedString 'GameExeHash' ([string]$manifest.game.executableSha256)
+Assert-EmbeddedString 'AddonHash' (Get-Sha256 $addonSource)
+Assert-EmbeddedString 'DxgiHash' (Get-Sha256 $dxgiSource)
+Assert-EmbeddedString 'LoaderHash' (Get-Sha256 $loaderSource)
+Assert-EmbeddedString 'MusicHash' (Get-Sha256 $musicSource)
+Assert-EmbeddedString 'LogoHash' (Get-Sha256 $logoSource)
+Assert-EmbeddedString 'ManifestHash' (Get-Sha256 (Join-Path $PSScriptRoot 'manifest.json'))
+Assert-EmbeddedString 'PatcherHash' (Get-Sha256 (Join-Path $PSScriptRoot 'Patcher.ps1'))
+$managedCountMatch = [Regex]::Match($programText, 'internal const int ManagedFileCount = ([0-9]+);')
+if (-not $managedCountMatch.Success -or [int]$managedCountMatch.Groups[1].Value -ne @($manifest.files).Count) {
+    throw "installer/Program.cs ManagedFileCount is stale. Expected $(@($manifest.files).Count)."
+}
+
 $workingRoot = Join-Path $env:TEMP ( 'ScrapMechanicVR-Chapter2-OneFile-' + [Guid]::NewGuid().ToString('N') )
 $stage = Join-Path $workingRoot 'stage'
 $zip = Join-Path $workingRoot 'installer-payload.zip'
@@ -65,7 +98,6 @@ try {
     $outputDirectory = Split-Path -Parent $OutputPath
     New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
     $outputFullPath = [IO.Path]::GetFullPath($OutputPath)
-    $source = Join-Path $PSScriptRoot 'installer\Program.cs'
     $applicationManifest = Join-Path $PSScriptRoot 'installer\app.manifest'
 
     $arguments = @(

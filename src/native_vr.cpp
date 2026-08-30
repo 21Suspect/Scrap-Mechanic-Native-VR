@@ -86,7 +86,10 @@ std::atomic<ID3D11DeviceContext *> g_context{nullptr};
 std::atomic<ID3D11Texture2D *> g_final_target{nullptr};
 std::atomic<uint64_t> g_backbuffer_handle{0};
 std::atomic<IUnknown *> g_backbuffer_identity{nullptr};
-std::atomic<bool> g_native_device_from_reshade{false};
+std::atomic<reshade::api::device *> g_game_api_device{nullptr};
+std::atomic<reshade::api::swapchain *> g_game_api_swapchain{nullptr};
+std::atomic<bool> g_game_device_pinned{false};
+std::atomic<uint64_t> g_observed_d3d11_devices{0};
 std::atomic<bool> g_enabled{false};
 std::atomic<bool> g_hook_reached{false};
 std::atomic<bool> g_target_found{false};
@@ -250,6 +253,58 @@ bool restore_viewmodel_pass_patch()
 template <typename T> void release_atomic(std::atomic<T *> &slot)
 {
     if (T *value = slot.exchange(nullptr, std::memory_order_acq_rel)) value->Release();
+}
+
+bool is_current_process_swapchain(reshade::api::swapchain *swapchain,
+                                  const DXGI_SWAP_CHAIN_DESC &desc)
+{
+    if (!swapchain) return false;
+    HWND window = static_cast<HWND>(swapchain->get_hwnd());
+    if (!window) window = desc.OutputWindow;
+    if (!window) return false;
+    DWORD process_id = 0;
+    GetWindowThreadProcessId(window, &process_id);
+    return process_id == GetCurrentProcessId();
+}
+
+bool pin_game_device(reshade::api::device *api_device, const char *source)
+{
+    if (!api_device || api_device->get_api() != reshade::api::device_api::d3d11) return false;
+    reshade::api::device *selected = g_game_api_device.load(std::memory_order_acquire);
+    if (selected && selected != api_device) return false;
+
+    auto *native = reinterpret_cast<ID3D11Device *>(static_cast<uintptr_t>(api_device->get_native()));
+    if (!native) return false;
+    native->AddRef();
+    ID3D11DeviceContext *context = nullptr;
+    native->GetImmediateContext(&context);
+    if (!context)
+    {
+        native->Release();
+        return false;
+    }
+
+    if (!selected)
+    {
+        reshade::api::device *expected = nullptr;
+        if (!g_game_api_device.compare_exchange_strong(expected, api_device,
+                std::memory_order_acq_rel, std::memory_order_acquire) && expected != api_device)
+        {
+            context->Release();
+            native->Release();
+            return false;
+        }
+    }
+
+    ID3D11Device *old_device = g_device.exchange(native, std::memory_order_acq_rel);
+    ID3D11DeviceContext *old_context = g_context.exchange(context, std::memory_order_acq_rel);
+    if (old_context) old_context->Release();
+    if (old_device) old_device->Release();
+    const bool first_pin = !g_game_device_pinned.exchange(true, std::memory_order_acq_rel);
+    if (first_pin)
+        log_line("D3D11_GAME_DEVICE_PINNED source=%s api_device=%p device=%p context=%p",
+            source ? source : "unknown", api_device, native, context);
+    return true;
 }
 
 struct Mat4 { float m[16]{}; };
@@ -1000,6 +1055,9 @@ struct OpenXrState
     XrSessionState state = XR_SESSION_STATE_UNKNOWN;
     bool running = false;
     bool initialized = false;
+    ID3D11Device *graphics_device = nullptr;
+    ID3D11DeviceContext *graphics_context = nullptr;
+    bool foreign_context_logged = false;
     IDXGISwapChain *game_swapchain = nullptr;
     bool anchor_valid = false;
     bool eye_math_logged = false;
@@ -1063,6 +1121,55 @@ struct OpenXrState
         if (value) value->AddRef();
         if (game_swapchain) game_swapchain->Release();
         game_swapchain = value;
+    }
+
+    ID3D11DeviceContext *bound_context(ID3D11DeviceContext *candidate, const char *stage)
+    {
+        if (!graphics_context) return nullptr;
+        if (candidate && candidate != graphics_context && !foreign_context_logged)
+        {
+            foreign_context_logged = true;
+            log_line("D3D11_FOREIGN_CONTEXT_IGNORED stage=%s candidate=%p bound=%p",
+                stage ? stage : "unknown", candidate, graphics_context);
+        }
+        return graphics_context;
+    }
+
+    void wait_for_gpu_idle_before_destroy()
+    {
+        if (!graphics_device || !graphics_context) return;
+        D3D11_QUERY_DESC query_desc{};
+        query_desc.Query = D3D11_QUERY_EVENT;
+        ID3D11Query *query = nullptr;
+        HRESULT hr = graphics_device->CreateQuery(&query_desc, &query);
+        if (FAILED(hr) || !query)
+        {
+            graphics_context->Flush();
+            log_line("D3D11_GPU_IDLE_WAIT_UNAVAILABLE stage=xr_destroy hr=%08x",
+                static_cast<unsigned>(hr));
+            return;
+        }
+
+        const uint64_t started = GetTickCount64();
+        graphics_context->End(query);
+        graphics_context->Flush();
+        BOOL complete = FALSE;
+        for (;;)
+        {
+            hr = graphics_context->GetData(query, &complete, sizeof(complete),
+                D3D11_ASYNC_GETDATA_DONOTFLUSH);
+            if (hr == S_OK && complete) break;
+            if (FAILED(hr) || GetTickCount64() - started >= 2000)
+            {
+                const HRESULT removed = graphics_device->GetDeviceRemovedReason();
+                log_line("D3D11_GPU_IDLE_WAIT_FAILED stage=xr_destroy hr=%08x removed=%08x elapsed_ms=%llu",
+                    static_cast<unsigned>(hr), static_cast<unsigned>(removed),
+                    static_cast<unsigned long long>(GetTickCount64() - started));
+                break;
+            }
+            SwitchToThread();
+        }
+        query->Release();
     }
 
     void restore_render_size_override()
@@ -1425,13 +1532,15 @@ struct OpenXrState
     bool finish_pending_frame(ID3D11DeviceContext *context, bool from_present_callback = false)
     {
         if (!frame_pending) return true;
+        context = bound_context(context, "finish_pending_frame");
+        if (!context) return fail("bound_d3d11_context_missing", XR_ERROR_GRAPHICS_DEVICE_INVALID);
         const bool startup_menu_composited = pending_startup_menu_composited;
         if (context && mirror_texture && pending_acquired[0])
         {
             context->CopyResource(mirror_texture, eyes[0].images[pending_indices[0]].texture);
             mirror_ready = true;
             ++mirror_source_copies;
-            ID3D11Device *device = g_device.load(std::memory_order_acquire);
+            ID3D11Device *device = graphics_device;
             if (device && game_swapchain)
             {
                 // Only the game's real Present boundary is after its UI pass.
@@ -1527,6 +1636,10 @@ struct OpenXrState
     void destroy()
     {
         abandon_pending_frame();
+        // xrDestroySwapchain requires all graphics commands that reference its
+        // images to have completed. Keep this blocking wait on teardown only;
+        // per-frame image release is intentionally asynchronous.
+        wait_for_gpu_idle_before_destroy();
         // Keep a valid inactive bridge on disk. Deleting it makes the Lua side
         // call sm.json.open on a missing file every update while no HMD exists.
         deactivate_hand_bridge();
@@ -1552,6 +1665,11 @@ struct OpenXrState
         if (session != XR_NULL_HANDLE) xrDestroySession(session);
         if (instance != XR_NULL_HANDLE) xrDestroyInstance(instance);
         set_game_swapchain(nullptr);
+        if (graphics_context) graphics_context->Release();
+        if (graphics_device) graphics_device->Release();
+        graphics_context = nullptr;
+        graphics_device = nullptr;
+        foreign_context_logged = false;
         instance = XR_NULL_HANDLE; system = XR_NULL_SYSTEM_ID; session = XR_NULL_HANDLE; space = XR_NULL_HANDLE;
         initialized = false; anchor_valid = false; eye_math_logged = false; state = XR_SESSION_STATE_UNKNOWN;
         source_width = source_height = desktop_width = desktop_height = 0;
@@ -1567,6 +1685,15 @@ struct OpenXrState
 
     bool initialize(ID3D11Device *device, const D3D11_TEXTURE2D_DESC &source)
     {
+        if (!device) return fail("d3d11_graphics_device_missing", XR_ERROR_GRAPHICS_DEVICE_INVALID);
+        device->AddRef();
+        graphics_device = device;
+        device->GetImmediateContext(&graphics_context);
+        if (!graphics_context)
+            return fail("d3d11_graphics_context_missing", XR_ERROR_GRAPHICS_DEVICE_INVALID);
+        log_line("XR_D3D11_BINDING_READY device=%p context=%p source_format=%u",
+            graphics_device, graphics_context, static_cast<unsigned>(source.Format));
+
         uint32_t extension_count = 0;
         XrResult result = xrEnumerateInstanceExtensionProperties(nullptr, 0, &extension_count, nullptr);
         if (XR_FAILED(result)) return fail("xrEnumerateInstanceExtensionProperties.count", result);
@@ -1835,6 +1962,8 @@ struct OpenXrState
             restore_viewmodel_pass_patch();
             return false;
         }
+        context = bound_context(context, "render_stereo");
+        if (!context) return fail("bound_d3d11_context_missing", XR_ERROR_GRAPHICS_DEVICE_INVALID);
         D3D11_TEXTURE2D_DESC desc{}; source->GetDesc(&desc);
         if (desc.Format != source_format || desc.SampleDesc.Count != 1 || desc.ArraySize != 1 || desc.MipLevels != 1)
         {
@@ -2211,9 +2340,9 @@ bool capture_native_renderer(void *manager)
         return false;
     }
 
-    const bool keep_reshade_native = g_native_device_from_reshade.load(std::memory_order_acquire) &&
+    const bool keep_pinned_game_device = g_game_device_pinned.load(std::memory_order_acquire) &&
         g_device.load(std::memory_order_acquire) && g_context.load(std::memory_order_acquire);
-    if (keep_reshade_native)
+    if (keep_pinned_game_device)
     {
         context->Release();
         device->Release();
@@ -2225,8 +2354,10 @@ bool capture_native_renderer(void *manager)
     }
     if (IUnknown *old = g_backbuffer_identity.exchange(backbuffer_identity, std::memory_order_acq_rel)) old->Release();
     g_backbuffer_handle.store(reinterpret_cast<uint64_t>(backbuffer_field), std::memory_order_release);
-    log_line("NATIVE_RENDERER_READY renderer=%p device=%p context=%p backbuffer=%p size=%ux%u format=%u",
-        low_renderer, device, context, backbuffer_field, desc.Width, desc.Height, static_cast<unsigned>(desc.Format));
+    log_line("NATIVE_RENDERER_READY renderer=%p renderer_device=%p renderer_context=%p selected_device=%p selected_context=%p source=%s backbuffer=%p size=%ux%u format=%u",
+        low_renderer, device, context, g_device.load(std::memory_order_acquire),
+        g_context.load(std::memory_order_acquire), keep_pinned_game_device ? "game_swapchain" : "renderer_fallback",
+        backbuffer_field, desc.Width, desc.Height, static_cast<unsigned>(desc.Format));
     backbuffer->Release();
     return true;
 }
@@ -2540,37 +2671,41 @@ void __fastcall hk_render_setup(void *renderer, float scalar, const float *world
 void on_init_device(reshade::api::device *device)
 {
     if (!device || device->get_api() != reshade::api::device_api::d3d11) return;
-    auto *native = reinterpret_cast<ID3D11Device *>(static_cast<uintptr_t>(device->get_native()));
-    if (!native) return;
-    native->AddRef();
-    ID3D11DeviceContext *context = nullptr;
-    native->GetImmediateContext(&context);
-    if (!context)
-    {
-        native->Release();
-        return;
-    }
-    if (ID3D11Device *old = g_device.exchange(native, std::memory_order_acq_rel)) old->Release();
-    if (ID3D11DeviceContext *old = g_context.exchange(context, std::memory_order_acq_rel)) old->Release();
-    g_native_device_from_reshade.store(true, std::memory_order_release);
-    log_line("D3D11_NATIVE_DEVICE_READY device=%p context=%p", native, context);
+    const uint64_t sequence = g_observed_d3d11_devices.fetch_add(1, std::memory_order_relaxed) + 1;
+    reshade::api::device *selected = g_game_api_device.load(std::memory_order_acquire);
+    if (sequence <= 4 || selected == device)
+        log_line("D3D11_DEVICE_OBSERVED sequence=%llu api_device=%p native=%p role=%s action=no_global_replacement",
+            static_cast<unsigned long long>(sequence), device,
+            reinterpret_cast<void *>(static_cast<uintptr_t>(device->get_native())),
+            selected == device ? "game" : (selected ? "non_game" : "unclassified"));
 }
 
-void on_destroy_device(reshade::api::device *)
+void on_destroy_device(reshade::api::device *device)
 {
+    if (!device || device != g_game_api_device.load(std::memory_order_acquire))
+    {
+        if (device && device->get_api() == reshade::api::device_api::d3d11)
+            log_line("D3D11_DEVICE_DESTROY_IGNORED api_device=%p role=non_game", device);
+        return;
+    }
     std::lock_guard lock(g_xr_mutex);
     g_xr.destroy();
     release_atomic(g_final_target);
     release_atomic(g_backbuffer_identity);
     release_atomic(g_context);
     release_atomic(g_device);
-    g_native_device_from_reshade.store(false, std::memory_order_release);
+    g_game_api_swapchain.store(nullptr, std::memory_order_release);
+    g_game_api_device.store(nullptr, std::memory_order_release);
+    g_game_device_pinned.store(false, std::memory_order_release);
+    log_line("D3D11_GAME_DEVICE_RELEASED api_device=%p", device);
 }
 
-bool on_copy_texture(reshade::api::command_list *, reshade::api::resource source, uint32_t source_subresource,
+bool on_copy_texture(reshade::api::command_list *command_list, reshade::api::resource source, uint32_t source_subresource,
                      const reshade::api::subresource_box *source_box, reshade::api::resource dest, uint32_t dest_subresource,
                      const reshade::api::subresource_box *dest_box, reshade::api::filter_mode)
 {
+    reshade::api::device *selected_device = g_game_api_device.load(std::memory_order_acquire);
+    if (selected_device && (!command_list || command_list->get_device() != selected_device)) return false;
     // During either real eye render the engine copies its completed scene toward
     // the desktop-present chain. That desktop resource is not the VR eye source.
     // Tracking it here caused g_final_target to oscillate between 1920x1080 and
@@ -2614,11 +2749,14 @@ bool on_copy_texture(reshade::api::command_list *, reshade::api::resource source
     return false;
 }
 
-void on_present(reshade::api::command_queue *, reshade::api::swapchain *swapchain,
+void on_present(reshade::api::command_queue *queue, reshade::api::swapchain *swapchain,
                 const reshade::api::rect *, const reshade::api::rect *, uint32_t,
                 const reshade::api::rect *)
 {
     if (!g_enabled.load(std::memory_order_acquire) || !swapchain) return;
+    if (swapchain != g_game_api_swapchain.load(std::memory_order_acquire)) return;
+    reshade::api::device *selected_device = g_game_api_device.load(std::memory_order_acquire);
+    if (selected_device && queue && queue->get_device() != selected_device) return;
     auto *native_swapchain = reinterpret_cast<IDXGISwapChain *>(
         static_cast<uintptr_t>(swapchain->get_native()));
     ID3D11Device *device = g_device.load(std::memory_order_acquire);
@@ -2644,6 +2782,7 @@ void on_present(reshade::api::command_queue *, reshade::api::swapchain *swapchai
 void on_destroy_swapchain(reshade::api::swapchain *swapchain, bool resize)
 {
     if (!swapchain) return;
+    if (swapchain != g_game_api_swapchain.load(std::memory_order_acquire)) return;
     std::lock_guard lock(g_xr_mutex);
     if (g_xr.frame_pending) g_xr.abandon_pending_frame();
     g_startup_menu.reset_state();
@@ -2661,6 +2800,7 @@ void on_destroy_swapchain(reshade::api::swapchain *swapchain, bool resize)
     // reacquires the new buffer identity through the validated renderer fields.
     release_atomic(g_backbuffer_identity);
     g_backbuffer_handle.store(0, std::memory_order_release);
+    if (!resize) g_game_api_swapchain.store(nullptr, std::memory_order_release);
     log_line("DESKTOP_SWAPCHAIN_RESET_BEGIN resize=%u mirror_backbuffer_released=1 renderer_backbuffer_identity_released=1",
         resize ? 1u : 0u);
 }
@@ -2672,6 +2812,31 @@ void on_init_swapchain(reshade::api::swapchain *swapchain, bool resize)
         static_cast<uintptr_t>(swapchain->get_native()));
     DXGI_SWAP_CHAIN_DESC desc{};
     const HRESULT hr = native_swapchain ? native_swapchain->GetDesc(&desc) : E_POINTER;
+    reshade::api::swapchain *selected_swapchain = g_game_api_swapchain.load(std::memory_order_acquire);
+    if (selected_swapchain && selected_swapchain != swapchain) return;
+    bool claimed_swapchain = false;
+    if (!selected_swapchain)
+    {
+        if (FAILED(hr) || desc.BufferDesc.Width == 0 || desc.BufferDesc.Height == 0 ||
+            desc.BufferDesc.Format != DXGI_FORMAT_R8G8B8A8_UNORM ||
+            !is_current_process_swapchain(swapchain, desc)) return;
+        reshade::api::swapchain *expected = nullptr;
+        if (g_game_api_swapchain.compare_exchange_strong(expected, swapchain,
+                std::memory_order_acq_rel, std::memory_order_acquire)) claimed_swapchain = true;
+        else if (expected != swapchain) return;
+    }
+    if (!pin_game_device(swapchain->get_device(), resize ? "game_swapchain_resize" : "game_swapchain_create"))
+    {
+        if (claimed_swapchain)
+        {
+            reshade::api::swapchain *expected = swapchain;
+            g_game_api_swapchain.compare_exchange_strong(expected, nullptr,
+                std::memory_order_acq_rel, std::memory_order_acquire);
+        }
+        log_line("FAIL stage=pin_game_d3d11_device resize=%u", resize ? 1u : 0u);
+        mark_openxr_failed();
+        return;
+    }
     std::lock_guard lock(g_xr_mutex);
     g_xr.set_game_swapchain(native_swapchain);
     if (SUCCEEDED(hr) && desc.BufferDesc.Width != 0 && desc.BufferDesc.Height != 0)
@@ -2855,6 +3020,9 @@ extern "C" __declspec(dllexport) void AddonUninit(HMODULE addon_module, HMODULE 
     smvr::release_atomic(smvr::g_backbuffer_identity);
     smvr::release_atomic(smvr::g_context);
     smvr::release_atomic(smvr::g_device);
+    smvr::g_game_api_swapchain.store(nullptr, std::memory_order_release);
+    smvr::g_game_api_device.store(nullptr, std::memory_order_release);
+    smvr::g_game_device_pinned.store(false, std::memory_order_release);
     smvr::log_line("SMVR_V1_STOP engine_frames=%llu stereo_frames=%llu xr_success=%llu camera_builds=%llu viewmodel_camera_matches=%llu viewmodel_pass_patched=%u mirror_present_failures=%llu failed=%u",
         static_cast<unsigned long long>(smvr::g_engine_frames.load()),
         static_cast<unsigned long long>(smvr::g_stereo_frames.load()),
