@@ -1,6 +1,7 @@
 #include "vr_tools.hpp"
 #include "native_tool_asset.hpp"
 #include "chapter2_tool_asset.hpp"
+#include "bucket_tool_asset.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -26,14 +27,17 @@ namespace scrapvr::tools
 			uint16_t x_origin, y_origin, width, height;
 			uint8_t pixel_depth, descriptor;
 		};
-		enum class Tool { none, hammer, connect, paint, weld, rifle, shotgun, gatling, scrap, launcher, clay };
+		enum class Tool { none, hammer, connect, paint, weld, rifle, shotgun, gatling, scrap, launcher, clay, bucket };
+		enum class BucketFill { empty, water, oil, chemical };
 		enum DrawId
 		{
 			hammer_mesh, connect_mesh, paint_body, paint_can, weld_mesh,
 			gun_grip, gun_body, gun_sight_screw, gun_sight, gun_stock, gun_tank,
 			rifle_barrel, shotgun_barrel, shotgun_oil, gatling_barrel,
 			scrap_barrel, launcher_barrel,
-			clay_body, clay_wheel, clay_container_fill, clay_container_glass, clay_grip, draw_count
+			clay_body, clay_wheel, clay_container_fill, clay_container_glass, clay_grip,
+			bucket_body, bucket_handle, bucket_liquid_water, bucket_liquid_oil, bucket_liquid_chemical,
+			draw_count
 		};
 		struct DrawResource
 		{
@@ -73,6 +77,7 @@ namespace scrapvr::tools
 		ID3D11DepthStencilState *g_depth_state = nullptr;
 		std::wstring g_game_root;
 		Tool g_active_tool = Tool::none;
+		BucketFill g_bucket_fill = BucketFill::empty;
 		bool g_player_seated = false;
 		bool g_player_first_person = false;
 		bool g_render_suppressed = false;
@@ -172,6 +177,17 @@ namespace scrapvr::tools
 			Matrix result = identity();
 			result.m[0] = 0.0f; result.m[1] = -1.0f; result.m[2] = 0.0f;
 			result.m[4] = -1.0f; result.m[5] = 0.0f; result.m[6] = 0.0f;
+			result.m[8] = 0.0f; result.m[9] = 0.0f; result.m[10] = -1.0f;
+			return result;
+		}
+
+		Matrix bucket_basis()
+		{
+			// Procedural mesh is Y-up with the handle above the rim. Keep the
+			// opening upright in the grip instead of the gun/tool +Y-to-hand -X map.
+			Matrix result = identity();
+			result.m[0] = 1.0f; result.m[1] = 0.0f; result.m[2] = 0.0f;
+			result.m[4] = 0.0f; result.m[5] = 1.0f; result.m[6] = 0.0f;
 			result.m[8] = 0.0f; result.m[9] = 0.0f; result.m[10] = -1.0f;
 			return result;
 		}
@@ -372,8 +388,18 @@ namespace scrapvr::tools
 			context->Draw(draw.count, 0);
 		}
 
-		const char *tool_name(Tool tool)
+		const char *tool_name(Tool tool, BucketFill fill = BucketFill::empty)
 		{
+			if (tool == Tool::bucket)
+			{
+				switch (fill)
+				{
+				case BucketFill::water: return "bucket (water)";
+				case BucketFill::oil: return "bucket (oil)";
+				case BucketFill::chemical: return "bucket (chemical)";
+				default: return "bucket (empty)";
+				}
+			}
 			switch (tool) { case Tool::hammer: return "hammer"; case Tool::connect: return "connect"; case Tool::paint: return "paint"; case Tool::weld: return "weld"; case Tool::rifle: return "spudgun"; case Tool::shotgun: return "shotgun"; case Tool::gatling: return "gatling"; case Tool::scrap: return "scrap spudgun"; case Tool::launcher: return "potato launcher"; case Tool::clay: return "clay gun"; default: return "none"; }
 		}
 
@@ -392,14 +418,26 @@ namespace scrapvr::tools
 			if (line.find("d51ec758-057b-4263-bd16-7a731e149480") != std::string::npos) return Tool::scrap;
 			if (line.find("a2a2bb33-a841-4b23-88da-b758063d9206") != std::string::npos) return Tool::launcher;
 			if (line.find("6993e5df-6852-4e84-88ae-df49f765e784") != std::string::npos) return Tool::clay;
+			if (line.find("798c2c81-1f8e-481b-8c32-b71b5dc5511a") != std::string::npos) return Tool::bucket;
+			if (line.find("103fc4e6-7e57-465e-a86d-983343415877") != std::string::npos) return Tool::bucket;
+			if (line.find("2e792123-4a10-4cc6-b9ef-c5a518655cb4") != std::string::npos) return Tool::bucket;
+			if (line.find("cc80b6e0-f756-4036-9cd6-77af13a6de36") != std::string::npos) return Tool::bucket;
 			return Tool::none;
+		}
+
+		BucketFill parse_bucket_fill(const std::string &line)
+		{
+			if (line.find("103fc4e6-7e57-465e-a86d-983343415877") != std::string::npos) return BucketFill::water;
+			if (line.find("cc80b6e0-f756-4036-9cd6-77af13a6de36") != std::string::npos) return BucketFill::oil;
+			if (line.find("2e792123-4a10-4cc6-b9ef-c5a518655cb4") != std::string::npos) return BucketFill::chemical;
+			return BucketFill::empty;
 		}
 
 		const ToolCalibration &calibration_for(Tool tool)
 		{
 			// Final values tuned in-headset on 2026-07-18. These are intentionally
 			// baked so normal play performs no calibration-file polling.
-			static const ToolCalibration values[11] = {
+			static const ToolCalibration values[12] = {
 				{  0.000f, -0.035f, -0.045f,  0.000f,  0.000f, -0.300f }, // none
 				{  0.000f, -0.025f, -0.065f,  0.000f,  0.000f, -0.300f }, // hammer
 				{ -0.020f, -0.035f, -0.055f, -0.152f, -0.035f, -0.280f }, // connect
@@ -412,7 +450,9 @@ namespace scrapvr::tools
 				{ -0.020f, -0.035f, -0.060f, -0.198f, -0.035f, -0.509f }, // gatling
 				{ -0.020f, -0.035f, -0.060f, -0.234f, -0.050f, -0.384f }, // scrap spudgun
 				{ -0.020f, -0.035f, -0.060f, -0.198f, -0.035f, -0.426f }, // launcher
-				{ -0.020f, -0.035f, -0.060f, -0.085f, -0.035f, -0.424f }  // clay gun
+				{ -0.020f, -0.035f, -0.060f, -0.085f, -0.035f, -0.424f }, // clay gun
+				// Hang the procedural bucket from its handle in the right-hand grip.
+				{  0.000f, -0.148f, -0.020f,  0.000f,  0.000f, -0.300f }  // bucket
 			};
 			return values[static_cast<size_t>(tool)];
 		}
@@ -509,9 +549,15 @@ namespace scrapvr::tools
 			return true;
 		}
 
-		void apply_player_state(Tool tool, bool seated, bool first_person)
+		void apply_player_state(Tool tool, bool seated, bool first_person, BucketFill fill = BucketFill::empty)
 		{
-			if (tool != g_active_tool) { g_active_tool = tool; if (g_log) g_log("VR TOOL ACTIVE: %s", tool_name(tool)); }
+			const BucketFill next_fill = (tool == Tool::bucket) ? fill : BucketFill::empty;
+			if (tool != g_active_tool || next_fill != g_bucket_fill)
+			{
+				g_active_tool = tool;
+				g_bucket_fill = next_fill;
+				if (g_log) g_log("VR TOOL ACTIVE: %s", tool_name(tool, g_bucket_fill));
+			}
 			if (seated != g_player_seated)
 			{
 				g_player_seated = seated;
@@ -555,7 +601,7 @@ namespace scrapvr::tools
 						else if (json_bool(text, "seated", seated) && json_bool(text, "firstPerson", first_person) &&
 							json_string(text, "activeItem", item))
 						{
-							apply_player_state(parse_tool(item), seated, first_person);
+							apply_player_state(parse_tool(item), seated, first_person, parse_bucket_fill(item));
 							new_packet = true;
 						}
 						if (new_packet)
@@ -634,6 +680,7 @@ namespace scrapvr::tools
 
 		using namespace native_tool_asset;
 		using namespace chapter2_tool_asset;
+		using namespace scrapvr::bucket_tool_asset;
 		const wchar_t *root = L"Data\\Character\\Char_Tools\\";
 		auto path = [&](const wchar_t *tail) { return std::wstring(root) + tail; };
 		if (!create_draw(hammer_mesh, hammer_main_0_NewUV_sledgehammer_new_initialShadingGroup4_vertices, hammer_main_0_NewUV_sledgehammer_new_initialShadingGroup4_vertex_count, path(L"Char_sledgehammer\\char_sledgehammer_dif.tga").c_str()) ||
@@ -657,10 +704,15 @@ namespace scrapvr::tools
 			!create_draw(clay_wheel, clay_wheel_vertices, clay_wheel_vertex_count, path(L"Char_claygun\\char_claygun_dif.tga").c_str()) ||
 			!create_solid_draw(clay_container_fill, clay_container_fill_vertices, clay_container_fill_vertex_count, 107, 107, 107) ||
 			!create_solid_draw(clay_container_glass, clay_container_glass_vertices, clay_container_glass_vertex_count, 18, 99, 137) ||
-			!create_draw(clay_grip, clay_grip_vertices, clay_grip_vertex_count, path(L"Char_spudgun\\Base\\char_spudgun_grip_dif.tga").c_str()))
+			!create_draw(clay_grip, clay_grip_vertices, clay_grip_vertex_count, path(L"Char_spudgun\\Base\\char_spudgun_grip_dif.tga").c_str()) ||
+			!create_solid_draw(bucket_body, bucket_body_vertices, bucket_body_vertex_count, 168, 166, 160) ||
+			!create_solid_draw(bucket_handle, bucket_handle_vertices, bucket_handle_vertex_count, 92, 90, 88) ||
+			!create_solid_draw(bucket_liquid_water, bucket_liquid_vertices, bucket_liquid_vertex_count, 46, 124, 196) ||
+			!create_solid_draw(bucket_liquid_oil, bucket_liquid_vertices, bucket_liquid_vertex_count, 36, 26, 16) ||
+			!create_solid_draw(bucket_liquid_chemical, bucket_liquid_vertices, bucket_liquid_vertex_count, 86, 186, 62))
 		{ if (g_log) g_log("VR TOOL RENDERER: a native mesh or texture resource failed to initialize"); return false; }
 		g_initialized = true;
-		if (g_log) g_log("VR TOOL RENDERER READY: hammer, connect, paint, weld, legacy spudguns, scrap/launcher and the Chapter 2 clay gun use the direct stereo hand pass");
+		if (g_log) g_log("VR TOOL RENDERER READY: hammer, connect, paint, weld, legacy spudguns, scrap/launcher, the Chapter 2 clay gun, and the Survival bucket use the direct stereo hand pass");
 		return true;
 	}
 
@@ -687,6 +739,11 @@ namespace scrapvr::tools
 				multiply(rotation_y(g_clay_calibration.tool_yaw * radians), rotation_z(g_clay_calibration.tool_roll * radians)));
 			local = multiply(translation(g_clay_calibration.tool_x, g_clay_calibration.tool_y, g_clay_calibration.tool_z),
 				multiply(orientation, multiply(tool_basis(), uniform_scale(g_clay_calibration.scale))));
+		}
+		else if (g_active_tool == Tool::bucket)
+		{
+			local = multiply(translation(calibration.tool_x, calibration.tool_y, calibration.tool_z),
+				multiply(bucket_basis(), uniform_scale(scale_for(g_active_tool))));
 		}
 		const Matrix model = multiply(pose_matrix(right_hand_pose), local);
 		Constants constants = { multiply(view_projection, model), model,
@@ -754,6 +811,13 @@ namespace scrapvr::tools
 					context->UpdateSubresource(g_constant_buffer, 0, nullptr, &spinner_constants, 0, 0);
 					draw_resource(context, gatling_barrel);
 				}
+				break;
+			case Tool::bucket:
+				draw_resource(context, bucket_body);
+				draw_resource(context, bucket_handle);
+				if (g_bucket_fill == BucketFill::water) draw_resource(context, bucket_liquid_water);
+				else if (g_bucket_fill == BucketFill::oil) draw_resource(context, bucket_liquid_oil);
+				else if (g_bucket_fill == BucketFill::chemical) draw_resource(context, bucket_liquid_chemical);
 				break;
 			default: break;
 		}
@@ -828,7 +892,7 @@ namespace scrapvr::tools
 		if (g_active_tool == Tool::hammer) return HapticProfile::hammer;
 		if (is_gun(g_active_tool)) return HapticProfile::gun;
 		if (g_active_tool == Tool::connect || g_active_tool == Tool::paint ||
-			g_active_tool == Tool::weld) return HapticProfile::tool;
+			g_active_tool == Tool::weld || g_active_tool == Tool::bucket) return HapticProfile::tool;
 		return HapticProfile::none;
 	}
 
@@ -855,6 +919,7 @@ namespace scrapvr::tools
 		release(g_depth_state); release(g_rasterizer); release(g_sampler); release(g_input_layout);
 		release(g_laser_pixel_shader); release(g_pixel_shader); release(g_vertex_shader); release(g_laser_buffer); release(g_constant_buffer);
 		g_device = nullptr; g_log = nullptr; g_game_root.clear(); g_active_tool = Tool::none;
+		g_bucket_fill = BucketFill::empty;
 		g_clay_calibration = ClayCalibration{}; g_clay_calibration_path.clear();
 		g_clay_calibration_poll_ms = 0; g_clay_calibration_write_time = {}; g_clay_calibration_loaded = false;
 		g_player_seated = false; g_player_first_person = false;
