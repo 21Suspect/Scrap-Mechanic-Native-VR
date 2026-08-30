@@ -1,6 +1,6 @@
 # Chapter 2 release status
 
-Release: `1.1.3-chapter2-20260830`
+Release: `1.1.2-chapter2-20260830`
 
 Branch: `main`
 
@@ -11,7 +11,7 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 - Native stereo OpenXR rendering at `2064 × 2272` per eye with six-degree-of-freedom head tracking.
 - Exact runtime FOV, correct depth and perspective, VR seam correction, and normal Scrap Mechanic color and contrast.
 - Quest Touch controllers and optional Meta optical hand tracking with tracked mechanic gloves.
-- Tracked tools and Chapter 2 weapons, including physical hammer swings, gunfire from the VR barrel pose, and the Survival bucket with empty/water/oil/chemical fill.
+- Tracked tools and Chapter 2 weapons, including physical hammer swings and gunfire from the VR barrel pose.
 - World-locked startup and in-game spatial UI with the live native game menus, transparent composition, hover, click, hold, and drag.
 - UI events are queued directly into Scrap Mechanic's input manager without Windows mouse simulation.
 - Restrained native OpenXR haptics for controller interaction.
