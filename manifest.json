@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "patchId": "scrap-mechanic-native-vr-chapter2",
-  "patchVersion": "1.2.0-chapter2-20260830",
+  "patchVersion": "1.2.1-chapter2-20260830",
   "description": "Scrap Mechanic Chapter 2 native OpenXR VR with tracked Quest hands, complete held-item and tool adapters, barrel-aimed weapons, spatial live game menus, native queued UI input, transparent composition, and restrained haptics",
   "game": {
     "appId": "387990",
@@ -62,7 +62,7 @@
     },
     {
       "path": "Release\\smvr_native_vr_v1.addon64",
-      "patchedSha256": "C750B8DA83FC7ABAB6227B5FAC39ED22F1A7313492BE5CBD92F11E40E93D12CD",
+      "patchedSha256": "C52AE1EBBB7308EFADAC050EE14C5A189DAB5CA0AB06DBC01D2AB115C6C1CBE1",
       "originalMayBeMissing": true,
       "module": "chapter2-native-openxr"
     },
@@ -87,7 +87,7 @@
     },
     {
       "path": "Survival\\Scripts\\game\\Chapter2VR.lua",
-      "patchedSha256": "DE8918DB540BDB32042A79078A5A78AA5613D0B960F47C9A369E0B5304181452",
+      "patchedSha256": "28BF2D39EEDC75DD19BA9A54EF29DA724E24DA800044D1D522896DB070BC097B",
       "originalMayBeMissing": true,
       "module": "chapter2-gameplay-bridge"
     },

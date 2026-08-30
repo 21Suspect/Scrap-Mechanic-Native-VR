@@ -29,8 +29,22 @@ local VrHandBridgePath = "$GAME_DATA/NativeVR/hand_physics.json"
 local VrGunFireDebugPath = "$GAME_DATA/NativeVR/gun_fire_debug.json"
 local VrDirectBridgeFreshTicks = 10
 local VrDirectPoseFreshTicks = 6
+local VrDirectAuthorityFreshTicks = 12
 local VrPrimaryBridgeFreshTicks = 8
 local VrInactiveBridgePollSeconds = 0.25
+
+-- These are the same calibrated barrel-tip offsets used by the native tracked
+-- tool renderer. Keeping a validated copy here makes projectile aiming depend
+-- only on the live right-hand pose, not on the timing of the native tool-state
+-- classifier packet.
+local VrGunMuzzleLocalOffsets = {
+	["c5ea0c2f-185b-48d6-b4df-45c386a575cc"] = { -0.198, -0.035, -0.466 },
+	["f6250bf4-9726-406f-a29a-945c06e460e5"] = { -0.199, -0.035, -0.503 },
+	["9fde0601-c2ba-4c70-8d5c-2a7a9fdd122b"] = { -0.198, -0.035, -0.509 },
+	["d51ec758-057b-4263-bd16-7a731e149480"] = { -0.234, -0.050, -0.384 },
+	["a2a2bb33-a841-4b23-88da-b758063d9206"] = { -0.198, -0.035, -0.426 },
+	["6993e5df-6852-4e84-88ae-df49f765e784"] = { -0.085, -0.035, -0.424 }
+}
 
 local VrToolLaserItems = {
 	["8c7efc37-cd7c-4262-976e-39585f8527bf"] = true,
@@ -128,6 +142,16 @@ local function handLocalPosition( pose, offset )
 	return pose.position + pose.right * offset[1] + pose.up * offset[2] - pose.forward * offset[3]
 end
 
+local function resolveGunMuzzleOffset( activeItem, muzzle )
+	if type( muzzle ) == "table" and muzzle.active == true and muzzle.item == activeItem and
+		validNumber( muzzle.x ) and validNumber( muzzle.y ) and validNumber( muzzle.z ) then
+		return { muzzle.x, muzzle.y, muzzle.z }, "native_calibration"
+	end
+	local offset = VrGunMuzzleLocalOffsets[activeItem]
+	if offset then return offset, "lua_calibration" end
+	return nil, "gun_calibration_inactive"
+end
+
 function Chapter2VR.serverCreate( self )
 	self.sv.vrHands = {
 		sequence = -1,
@@ -189,17 +213,16 @@ local function updateToolAim( self, data )
 	g_vrToolPointerOrigin = laserOffset and handLocalPosition( pose, laserOffset ) or nil
 	g_vrToolPointerDirection = laserOffset and pose.forward or nil
 
-	local muzzle = data.gunMuzzle
-	if type( muzzle ) == "table" and muzzle.active == true and muzzle.item == activeItem and
-		validNumber( muzzle.x ) and validNumber( muzzle.y ) and validNumber( muzzle.z ) then
+	local muzzleOffset, muzzleSource = resolveGunMuzzleOffset( activeItem, data.gunMuzzle )
+	if muzzleOffset then
 		g_vrGunAimActive = true
-		g_vrGunMuzzlePosition = handLocalPosition( pose, { muzzle.x, muzzle.y, muzzle.z } )
+		g_vrGunMuzzlePosition = handLocalPosition( pose, muzzleOffset )
 		g_vrGunDirection = pose.forward
 		g_vrGunItem = activeItem
 		self.cl.vrGunFreshTimer = 0.0
 		if self.cl.vrGunAimItem ~= activeItem then
 			self.cl.vrGunAimItem = activeItem
-			sm.log.warning( "SCRAPVR_GUN_MUZZLE_READY " .. activeItem )
+			sm.log.warning( "SCRAPVR_GUN_MUZZLE_READY " .. activeItem .. " source=" .. muzzleSource )
 		end
 	else
 		clearGunAim()
@@ -517,11 +540,23 @@ local function refreshDirectGunPose()
 	if Chapter2VR.directGunReadTick == tick then return tick end
 	Chapter2VR.directGunReadTick = tick
 	Chapter2VR.directGunReadReason = "bridge_missing"
+	Chapter2VR.directGunBridgeVrActive = false
+	Chapter2VR.directGunBridgeAuthoritative = false
+	Chapter2VR.directGunBridgeSequenceObserved = -1
+	Chapter2VR.directGunMuzzleActive = false
+	Chapter2VR.directGunMuzzleSource = nil
 
 	local ok, data = pcall( sm.json.open, VrHandBridgePath )
 	if not ok or type( data ) ~= "table" then
 		Chapter2VR.directGunReadReason = "bridge_unavailable"
 		return tick
+	end
+	Chapter2VR.directGunBridgeVrActive = data.vrActive == true
+	Chapter2VR.directGunBridgeAuthoritative = data.vrAuthoritative == true or data.vrActive == true
+	Chapter2VR.directGunBridgeSequenceObserved = type( data.sequence ) == "number" and data.sequence or -1
+	Chapter2VR.directGunMuzzleActive = type( data.gunMuzzle ) == "table" and data.gunMuzzle.active == true
+	if Chapter2VR.directGunBridgeAuthoritative then
+		Chapter2VR.directGunAuthorityTick = tick
 	end
 	if data.vrActive ~= true or type( data.sequence ) ~= "number" then
 		Chapter2VR.directGunReadReason = "bridge_inactive"
@@ -534,35 +569,29 @@ local function refreshDirectGunPose()
 	end
 
 	local activeItem = tostring( sm.localPlayer.getActiveItem() )
-	local muzzle = data.gunMuzzle
 	local pose = resolveHandPose( data )
 	if not pose then
 		Chapter2VR.directGunReadReason = "right_hand_inactive"
 		return tick
 	end
-	if type( muzzle ) ~= "table" or muzzle.active ~= true then
-		Chapter2VR.directGunReadReason = "gun_calibration_inactive"
-		return tick
-	end
-	if muzzle.item ~= activeItem then
-		Chapter2VR.directGunReadReason = "gun_uuid_mismatch"
-		return tick
-	end
-	if not validNumber( muzzle.x ) or not validNumber( muzzle.y ) or not validNumber( muzzle.z ) then
-		Chapter2VR.directGunReadReason = "gun_offset_invalid"
+	local muzzleOffset, muzzleSource = resolveGunMuzzleOffset( activeItem, data.gunMuzzle )
+	if not muzzleOffset then
+		Chapter2VR.directGunReadReason = muzzleSource
 		return tick
 	end
 
 	local direction = pose.forward
-	local position = handLocalPosition( pose, { muzzle.x, muzzle.y, muzzle.z } )
+	local position = handLocalPosition( pose, muzzleOffset )
 	Chapter2VR.directGunPose = {
 		position = position,
 		direction = direction,
 		item = activeItem,
+		source = muzzleSource,
 		sequence = data.sequence,
 		tick = tick
 	}
-	Chapter2VR.directGunReadReason = "tracked_barrel"
+	Chapter2VR.directGunMuzzleSource = muzzleSource
+	Chapter2VR.directGunReadReason = "tracked_barrel_" .. muzzleSource
 
 	-- Keep the existing consumers in sync, but do not rely on the player
 	-- callback having run before a tool fires.
@@ -577,37 +606,51 @@ end
 
 local function writeGunFireDiagnostic( firePos, direction, authoritative, reason )
 	local cameraDirection = sm.localPlayer.getDirection()
+	local source = firePos and "vr_barrel" or ( authoritative and "blocked" or "pc_fallback" )
 	local payload = {
 		tick = sm.game.getCurrentTick(),
 		item = tostring( sm.localPlayer.getActiveItem() ),
-		sequence = Chapter2VR.directGunSequence or -1,
-		source = firePos and "vr_barrel" or ( authoritative and "blocked" or "pc_fallback" ),
+		sequence = Chapter2VR.directGunBridgeSequenceObserved or Chapter2VR.directGunSequence or -1,
+		source = source,
 		reason = reason,
+		vrActive = Chapter2VR.directGunBridgeVrActive == true,
+		vrAuthoritative = Chapter2VR.directGunBridgeAuthoritative == true,
+		gunMuzzleActive = Chapter2VR.directGunMuzzleActive == true,
+		muzzleCalibration = Chapter2VR.directGunMuzzleSource,
 		vrDirection = direction and { x = direction.x, y = direction.y, z = direction.z } or nil,
 		cameraDirection = { x = cameraDirection.x, y = cameraDirection.y, z = cameraDirection.z },
 		muzzlePosition = firePos and { x = firePos.x, y = firePos.y, z = firePos.z } or nil
 	}
 	pcall( sm.json.save, payload, VrGunFireDebugPath )
+	local marker = source .. ":" .. tostring( reason )
+	if Chapter2VR.lastGunFireMarker ~= marker then
+		Chapter2VR.lastGunFireMarker = marker
+		sm.log.warning( "SCRAPVR_GUN_FIRE source=" .. source .. " reason=" .. tostring( reason ) )
+	end
 end
 
 function Chapter2VR.gunFirePose( tool, firing )
 	local tick = refreshDirectGunPose()
 	local bridgeTick = Chapter2VR.directGunBridgeTick
-	local authoritative = bridgeTick ~= nil and tick - bridgeTick <= VrDirectBridgeFreshTicks
+	local authorityTick = Chapter2VR.directGunAuthorityTick
+	local authoritative = authorityTick ~= nil and tick - authorityTick <= VrDirectAuthorityFreshTicks
+	local bridgeFresh = bridgeTick ~= nil and tick - bridgeTick <= VrDirectBridgeFreshTicks
 	local cached = Chapter2VR.directGunPose
 	local activeItem = tostring( sm.localPlayer.getActiveItem() )
 	local poseFresh = cached ~= nil and cached.item == activeItem and
 		tick - cached.tick <= VrDirectPoseFreshTicks
 	local reason = Chapter2VR.directGunReadReason or "unknown"
+	local currentPoseReady = reason == "tracked_barrel_native_calibration" or
+		reason == "tracked_barrel_lua_calibration"
 
-	if authoritative and poseFresh then
+	if authoritative and bridgeFresh and poseFresh and currentPoseReady then
 		local direction = cached.direction
 		local owner = tool and tool:getOwner() or nil
 		local character = owner and owner.character or nil
 		if direction:length() >= 0.5 and
 			( not character or ( cached.position - character.worldPosition ):length() <= 3.0 ) then
 			direction = direction:normalize()
-			if firing then writeGunFireDiagnostic( cached.position, direction, true, "tracked_barrel" ) end
+			if firing then writeGunFireDiagnostic( cached.position, direction, true, reason ) end
 			return cached.position, direction, true
 		end
 		reason = "pose_sanity_failed"

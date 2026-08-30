@@ -51,7 +51,12 @@ def replace_constant(text: str, name: str, value: str) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("game_root", type=Path)
-    parser.add_argument("--version", default="1.2.0-chapter2-20260830")
+    parser.add_argument("--version", default="1.2.1-chapter2-20260830")
+    parser.add_argument(
+        "--headset-confirmed",
+        action="store_true",
+        help="record that this exact candidate was verified in a headset",
+    )
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parent.parent
@@ -105,13 +110,14 @@ def main() -> None:
     dump_json(manifest_path, manifest)
 
     snapshot = json.loads(snapshot_path.read_text(encoding="utf-8-sig"))
-    snapshot["snapshot"] = "chapter2-v1.2.0"
+    semver = args.version.split("-", 1)[0]
+    snapshot["snapshot"] = f"chapter2-v{semver}"
     snapshot["localFeatureBranch"] = "main"
-    snapshot["localFeatureStatus"] = "held-item-adapters-locally-built-and-validated"
+    snapshot["localFeatureStatus"] = "release-candidate-built-and-validated"
     artifact = {"path": "payload/Release/smvr_native_vr_v1.addon64", "size": addon.stat().st_size, "sha256": sha256(addon)}
     snapshot["testedArtifact"] = artifact.copy()
     candidate = snapshot.setdefault("localCandidateArtifact", {})
-    candidate.update({"version": args.version, **artifact, "headsetConfirmed": False})
+    candidate.update({"version": args.version, **artifact, "headsetConfirmed": args.headset_confirmed})
     source_meta = candidate.setdefault("source", {})
     source_meta["nativeVrSha256"] = sha256(root / "src" / "native_vr.cpp")
     source_meta["vrToolsSha256"] = sha256(root / "source" / "NativeVR" / "src" / "vr_tools.cpp")
@@ -128,13 +134,12 @@ def main() -> None:
     validation["installerManagedFiles"] = len(manifest["files"])
     validation["luaSyntax"] = "PASS"
     validation["nativeReleaseBuild"] = "PASS"
-    validation["headsetConfirmed"] = False
+    validation["headsetConfirmed"] = args.headset_confirmed
     installer = snapshot.setdefault("installer", {})
     installer.update({"version": args.version, "path": "dist/ScrapMechanicVR-Installer.exe", "selfTest": "PENDING", "published": False})
     dump_json(snapshot_path, snapshot)
 
     program = program_path.read_text(encoding="utf-8-sig")
-    semver = args.version.split("-", 1)[0]
     parts = semver.split(".")
     assembly = ".".join((parts + ["0"] * 4)[:3] + ["0"])
     program, count = re.subn(r'\[assembly: AssemblyVersion\("[^"]+"\)\]', f'[assembly: AssemblyVersion("{assembly}")]', program, count=1)

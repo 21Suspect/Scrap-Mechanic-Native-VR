@@ -1,10 +1,10 @@
 {
-  "snapshot": "chapter2-v1.2.0",
+  "snapshot": "chapter2-v1.2.1",
   "status": "chapter2-stable",
   "legacyBranch": "legacy-pre-1.0",
   "chapter2Branch": "main",
   "localFeatureBranch": "main",
-  "localFeatureStatus": "held-item-adapters-release-validated",
+  "localFeatureStatus": "gun-barrel-authority-hotfix-release-validated",
   "game": {
     "steamAppId": 387990,
     "steamBuildId": 24529696,
@@ -35,17 +35,17 @@
   },
   "testedArtifact": {
     "path": "payload/Release/smvr_native_vr_v1.addon64",
-    "size": 7944192,
-    "sha256": "C750B8DA83FC7ABAB6227B5FAC39ED22F1A7313492BE5CBD92F11E40E93D12CD"
+    "size": 7944704,
+    "sha256": "C52AE1EBBB7308EFADAC050EE14C5A189DAB5CA0AB06DBC01D2AB115C6C1CBE1"
   },
   "localCandidateArtifact": {
-    "version": "1.2.0-chapter2-20260830",
+    "version": "1.2.1-chapter2-20260830",
     "path": "payload/Release/smvr_native_vr_v1.addon64",
-    "size": 7944192,
-    "sha256": "C750B8DA83FC7ABAB6227B5FAC39ED22F1A7313492BE5CBD92F11E40E93D12CD",
-    "headsetConfirmed": false,
+    "size": 7944704,
+    "sha256": "C52AE1EBBB7308EFADAC050EE14C5A189DAB5CA0AB06DBC01D2AB115C6C1CBE1",
+    "headsetConfirmed": true,
     "source": {
-      "nativeVrSha256": "88FECB635AF02B55D84D8AD8C77E619E50C04BD339AEF366F6AEC0F455B88DE9",
+      "nativeVrSha256": "3360A3898414F1CC53E43C1465AB0A18600DC796E4D2FE26354259D02DFE06A9",
       "featureInputSha256": "1843A600C3F3E1D4A001043780B5543F19DD75F00C63B61668E52E9FD07AD82C",
       "featureInputHeaderSha256": "57C3C457E8A7F1115DA8689A803775DFBD0435DFBDC3B825DF98B65C44E7324F",
       "engineInputSha256": "7E42A655339628C71657FA5CE9F1E0328865570D1F0D0516762D66E52DCCFC43",
@@ -59,7 +59,7 @@
       "chapter2ToolAssetSha256": "8DFD5A51BFFEC3F45E3FE57F714354E7CB24AB3C38BF1461BB16BF3E43DB1183",
       "mechanicHandsGeneratorSha256": "2795AD1C628BA0EDF689D86C7D4B13C14BD5022D5AE8086D138AA9B8EBAEE181",
       "chapter2ToolGeneratorSha256": "74BADC890EF7652F85EF9EA54EBEEED7A10B3D098B6B742C76A7122F7BF3793A",
-      "chapter2GameplayBridgeSha256": "DE8918DB540BDB32042A79078A5A78AA5613D0B960F47C9A369E0B5304181452",
+      "chapter2GameplayBridgeSha256": "28BF2D39EEDC75DD19BA9A54EF29DA724E24DA800044D1D522896DB070BC097B",
       "clayCalibrationHelperSourceSha256": "1258A507DCD596E64D3DD101255C5538551AEF3E872313D64BB34A0FD3A40A17",
       "weaponScriptSha256": {
         "PotatoRifle.lua": "1396BD5877CF37C6C72167604D144F6D6E7899416A92BD28362A74B47A2157E1",
@@ -93,7 +93,7 @@
   "validation": {
     "date": "2026-08-30",
     "installerManagedFiles": 43,
-    "headsetConfirmed": false,
+    "headsetConfirmed": true,
     "noHmdDesktopFallbackConfirmed": true,
     "clayCalibrationHeadsetConfirmed": true,
     "weaponAimHeadsetConfirmed": true,
@@ -110,7 +110,7 @@
     "microsoftDefenderInstallerScan": "PASS_NO_THREATS"
   },
   "installer": {
-    "version": "1.2.0-chapter2-20260830",
+    "version": "1.2.1-chapter2-20260830",
     "path": "dist/ScrapMechanicVR-Installer.exe",
     "selfTest": "PASS",
     "published": true
