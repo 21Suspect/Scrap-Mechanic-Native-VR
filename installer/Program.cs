@@ -873,7 +873,7 @@ namespace ScrapMechanicVRPatcher
 
         private void Append(string text)
         {
-            details.AppendText("[" + DateTime.Now.ToString("HH:mm:ss") + "] " + text.TrimEnd() + Environment.NewLine);
+            details.AppendText("[" + DateTime.Now.ToString("HH:mm:ss") + "] " + text.TrimEnd(new char[0]) + Environment.NewLine);
             details.SelectionStart = details.TextLength;
             details.ScrollToCaret();
         }
