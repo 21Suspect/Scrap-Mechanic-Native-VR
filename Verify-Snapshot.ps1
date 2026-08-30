@@ -37,13 +37,36 @@ if ($branch -eq $snapshot.localFeatureBranch -or $branch -eq $snapshot.chapter2B
         @{ Path = 'source\NativeVR\src\vr_hands.cpp'; Expected = $candidate.source.vrHandsSha256 },
         @{ Path = 'source\NativeVR\src\vr_tools.cpp'; Expected = $candidate.source.vrToolsSha256 },
         @{ Path = 'source\NativeVR\src\mechanic_hands_asset.hpp'; Expected = $candidate.source.mechanicHandsAssetSha256 },
-        @{ Path = 'source\NativeVR\src\native_tool_asset.hpp'; Expected = $candidate.source.nativeToolAssetSha256 }
+        @{ Path = 'source\NativeVR\src\native_tool_asset.hpp'; Expected = $candidate.source.nativeToolAssetSha256 },
+        @{ Path = 'source\NativeVR\src\chapter2_tool_asset.hpp'; Expected = $candidate.source.chapter2ToolAssetSha256 },
+        @{ Path = 'source\NativeVR\src\held_item_asset.hpp'; Expected = $candidate.source.heldItemAssetSha256 },
+        @{ Path = 'source\NativeVR\tools\generate_mechanic_hands.py'; Expected = $candidate.source.mechanicHandsGeneratorSha256 },
+        @{ Path = 'source\NativeVR\tools\generate_chapter2_weapons.py'; Expected = $candidate.source.chapter2ToolGeneratorSha256 },
+        @{ Path = 'source\NativeVR\tools\generate_held_item_assets.py'; Expected = $candidate.source.heldItemAssetGeneratorSha256 },
+        @{ Path = 'source\NativeVR\tools\generate_held_item_payload.py'; Expected = $candidate.source.heldItemPayloadGeneratorSha256 },
+        @{ Path = 'payload\Survival\Scripts\game\Chapter2VR.lua'; Expected = $candidate.source.chapter2GameplayBridgeSha256 }
     )
     foreach ($check in $sourceChecks) {
         $sourcePath = Join-Path $PSScriptRoot $check.Path
         $sourceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $sourcePath).Hash
         if ($sourceHash -ne $check.Expected) {
             throw "Feature source hash mismatch for $($check.Path): expected $($check.Expected), got $sourceHash"
+        }
+    }
+
+    foreach ($property in $candidate.source.weaponScriptSha256.PSObject.Properties) {
+        $scriptPath = Join-Path $PSScriptRoot ('payload\Survival\Scripts\game\tools\' + $property.Name)
+        $scriptHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $scriptPath).Hash
+        if ($scriptHash -ne $property.Value) {
+            throw "Weapon script hash mismatch for $($property.Name): expected $($property.Value), got $scriptHash"
+        }
+    }
+
+    foreach ($property in $candidate.source.heldItemScriptSha256.PSObject.Properties) {
+        $scriptPath = Join-Path $PSScriptRoot ('payload\Survival\Scripts\game\tools\' + $property.Name)
+        $scriptHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $scriptPath).Hash
+        if ($scriptHash -ne $property.Value) {
+            throw "Held-item script hash mismatch for $($property.Name): expected $($property.Value), got $scriptHash"
         }
     }
 

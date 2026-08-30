@@ -12,7 +12,15 @@ local VrActionLocalOffsets = {
 	["c60b9627-fc2b-4319-97c5-05921cb976c6"] = { -0.120, -0.040, -0.295 },
 	["fdb8b8be-96e7-4de0-85c7-d2f42e4f33ce"] = { -0.035, -0.035, -0.225 },
 	["8f190ce2-3a59-423e-8483-a7aa67bd5bc0"] = { 0.000, -0.035, -0.120 },
-	["5cc12f03-275e-4c8e-b013-79fc0f913e1b"] = { 0.000, -0.035, -0.120 }
+	["5cc12f03-275e-4c8e-b013-79fc0f913e1b"] = { 0.000, -0.035, -0.120 },
+	["798c2c81-1f8e-481b-8c32-b71b5dc5511a"] = { 0.000, -0.035, -0.170 },
+	["103fc4e6-7e57-465e-a86d-983343415877"] = { 0.000, -0.035, -0.170 },
+	["2e792123-4a10-4cc6-b9ef-c5a518655cb4"] = { 0.000, -0.035, -0.170 },
+	["cc80b6e0-f756-4036-9cd6-77af13a6de36"] = { 0.000, -0.035, -0.170 },
+	["3a3280e4-03b6-4a4d-9e02-e348478213c9"] = { 0.000, -0.030, -0.140 },
+	["e3bdeea5-d349-4d08-9b5a-5695ea05537e"] = { 0.000, -0.035, -0.150 },
+	["6395a2f1-4169-4a7e-be15-a9864cb6ce7e"] = { 0.000, -0.035, -0.160 },
+	["d2fab7ef-21db-4681-a22a-cd4f278fc355"] = { -0.090, -0.035, -0.310 }
 }
 
 local VrWorldStatePath = "$GAME_DATA/NativeVR/world_state.json"
@@ -43,6 +51,8 @@ local function clearTrackedAim()
 	g_vrActionActive = false
 	g_vrActionOrigin = nil
 	g_vrActionDirection = nil
+	g_vrActionUp = nil
+	g_vrActionRight = nil
 	g_vrToolPointerEnabled = false
 	g_vrToolPointerOrigin = nil
 	g_vrToolPointerDirection = nil
@@ -71,7 +81,7 @@ local function publishWorldState( active )
 	end
 end
 
-local function publishPlayerState( active, seated, firstPerson, activeItem )
+local function publishPlayerState( active, seated, firstPerson, activeItem, activeAdapter )
 	Chapter2VR.playerStateSequence = ( Chapter2VR.playerStateSequence or 0 ) + 1
 	local ok, errorMessage = pcall( sm.json.save, {
 		version = 1,
@@ -79,7 +89,8 @@ local function publishPlayerState( active, seated, firstPerson, activeItem )
 		active = active == true,
 		seated = seated == true,
 		firstPerson = firstPerson == true,
-		activeItem = activeItem or "00000000-0000-0000-0000-000000000000"
+		activeItem = activeItem or "00000000-0000-0000-0000-000000000000",
+		activeAdapter = activeAdapter or ""
 	}, VrPlayerStatePath )
 	if not ok then
 		sm.log.error( "SCRAPVR_PLAYER_STATE_WRITE_FAILED " .. tostring( errorMessage ) )
@@ -142,6 +153,7 @@ function Chapter2VR.clientCreate( self )
 	self.cl.vrPlayerStateTimer = 0.0
 	self.cl.vrSeated = nil
 	self.cl.vrFirstPerson = nil
+	self.cl.vrActiveAdapter = ""
 	if self.player == sm.localPlayer.getPlayer() then
 		publishWorldState( true )
 		publishPlayerState( false, false, false, nil )
@@ -167,6 +179,8 @@ local function updateToolAim( self, data )
 	g_vrActionActive = true
 	g_vrActionOrigin = handLocalPosition( pose, actionOffset )
 	g_vrActionDirection = pose.forward
+	g_vrActionUp = pose.up
+	g_vrActionRight = pose.right
 	g_vrPrimaryActionAvailable = true
 	g_vrPrimaryActionDown = hand.interact == true
 
@@ -200,7 +214,12 @@ function Chapter2VR.clientUpdate( self, dt )
 	local locking = character and character:getLockingInteractable() or nil
 	local seated = locking ~= nil and locking:hasSeat()
 	local activeItem = tostring( sm.localPlayer.getActiveItem() )
+	local adapterFresh = Chapter2VR.activeAdapterTick ~= nil and
+		sm.game.getCurrentTick() - Chapter2VR.activeAdapterTick <= 4 and
+		Chapter2VR.activeAdapterItem == activeItem
+	local activeAdapter = adapterFresh and Chapter2VR.activeAdapterName or ""
 	local toolChanged = self.cl.vrNativeToolItem ~= activeItem
+	local adapterChanged = self.cl.vrActiveAdapter ~= activeAdapter
 	local seatedChanged = self.cl.vrSeated ~= seated
 	local firstPerson = sm.localPlayer.isInFirstPersonView()
 	local firstPersonChanged = self.cl.vrFirstPerson ~= firstPerson
@@ -210,6 +229,7 @@ function Chapter2VR.clientUpdate( self, dt )
 		self.cl.vrNativeToolItem = activeItem
 		sm.log.warning( "SCRAPVR_NATIVE_TOOL " .. activeItem )
 	end
+	if adapterChanged then self.cl.vrActiveAdapter = activeAdapter end
 	if seatedChanged then
 		self.cl.vrSeated = seated
 		sm.log.warning( seated and "SCRAPVR_SEATED 1" or "SCRAPVR_SEATED 0" )
@@ -219,9 +239,9 @@ function Chapter2VR.clientUpdate( self, dt )
 		sm.log.warning( firstPerson and "SCRAPVR_FIRST_PERSON 1" or "SCRAPVR_FIRST_PERSON 0" )
 	end
 	self.cl.vrPlayerStateTimer = ( self.cl.vrPlayerStateTimer or 0.0 ) + dt
-	if toolChanged or seatedChanged or firstPersonChanged or self.cl.vrPlayerStateTimer >= 0.25 then
+	if toolChanged or adapterChanged or seatedChanged or firstPersonChanged or self.cl.vrPlayerStateTimer >= 0.25 then
 		self.cl.vrPlayerStateTimer = 0.0
-		publishPlayerState( true, seated, firstPerson, activeItem )
+		publishPlayerState( true, seated, firstPerson, activeItem, activeAdapter )
 	end
 
 	self.cl.vrHandFreshTimer = ( self.cl.vrHandFreshTimer or 1.0 ) + dt
@@ -422,6 +442,43 @@ function Chapter2VR.clientDestroy( self )
 		publishPlayerState( false, false, false, nil )
 		clearClientAim()
 	end
+end
+
+function Chapter2VR.markAdapter( name )
+	Chapter2VR.activeAdapterName = name or ""
+	Chapter2VR.activeAdapterItem = tostring( sm.localPlayer.getActiveItem() )
+	Chapter2VR.activeAdapterTick = sm.game.getCurrentTick()
+end
+
+function Chapter2VR.actionPose()
+	local tick = sm.game.getCurrentTick()
+	local bridgeAge = type( g_vrBridgeLastTick ) == "number" and tick - g_vrBridgeLastTick or nil
+	local fresh = g_vrBridgeActive == true and g_vrActionActive == true and
+		bridgeAge ~= nil and bridgeAge >= 0 and bridgeAge <= VrPrimaryBridgeFreshTicks and
+		g_vrActionOrigin ~= nil and g_vrActionDirection ~= nil
+	if not fresh then return nil, false end
+	return {
+		position = g_vrActionOrigin,
+		direction = g_vrActionDirection,
+		up = g_vrActionUp or sm.vec3.new( 0, 0, 1 ),
+		right = g_vrActionRight or sm.vec3.new( 1, 0, 0 )
+	}, true
+end
+
+-- Use the tracked right hand for an item's world-space action ray while a live
+-- VR bridge is authoritative. Outside VR this deliberately returns the stock
+-- latest raycast unchanged, so the same patched scripts remain desktop-safe.
+function Chapter2VR.actionRaycast( maxRange, ignore, filter )
+	local pose, active = Chapter2VR.actionPose()
+	if active then
+		local direction = pose.direction:normalize()
+		local target = pose.position + direction * ( maxRange or 7.5 )
+		if filter ~= nil then
+			return sm.physics.raycast( pose.position, target, ignore, filter )
+		end
+		return sm.physics.raycast( pose.position, target, ignore )
+	end
+	return sm.localPlayer.getLatestRaycast()
 end
 
 function Chapter2VR.primaryState( toolState, primaryState )

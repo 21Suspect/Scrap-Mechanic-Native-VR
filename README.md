@@ -26,7 +26,9 @@ The installer automatically finds Steam, verifies the supported game build, crea
 - Quest Touch controllers and optional Meta Quest optical hand tracking.
 - Tracked mechanic gloves with animated fingers and no artificial arms.
 - VR locomotion, turning, jump, crouch, sprint, interaction, hotbar controls, seated zoom, pause, and recentering.
-- Tracked hammer, connection tool, paint tool, weld tool, lift, potato weapons, Chapter 2 scrap spudgun, potato launcher, and clay gun.
+- Tracked hammer, connection tool, paint tool, weld tool, lift, handbook, potato weapons, Chapter 2 scrap spudgun, potato launcher, and clay gun.
+- Tracked Chapter 2 held items: buckets and their contents, glowsticks, cornades, loose clay, extinguisher, seed packets, fertilizer, every food and drink, feeder food, soil bags, keycards, power cores, resources, carried objects, and the logbook.
+- VR-hand action origins for throwing, spraying, placing, targeting, inserting, dropping, eating, and using held items.
 - Physical hammer swings and VR-aimed gunfire from each tracked weapon barrel.
 - Calibrated Chapter 2 clay-gun grip and moving parts, with an included live calibration helper.
 - World-locked startup and in-game spatial menus using Scrap Mechanic's live native UI.
