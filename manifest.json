@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "patchId": "scrap-mechanic-native-vr-chapter2",
-  "patchVersion": "1.0.1-chapter2-20260830",
+  "patchVersion": "1.1.0-chapter2-20260830",
   "description": "Scrap Mechanic Chapter 2 native OpenXR VR with tracked Quest hands and tools, VR barrel-aimed gunfire, spatial live game menus, native queued UI input, transparent menu composition, and restrained controller haptics",
   "game": {
     "appId": "387990",
@@ -15,6 +15,13 @@
     "Release\\smvr-empty\\textures"
   ],
   "files": [
+    {
+      "path": "Cache\\Bundle\\core_data.cbo",
+      "patchedSha256": "DE9FA6FFB77C9CD531F958FE7E287C2B41B820220B19D5954407135FDE65C021",
+      "originalMayBeMissing": true,
+      "runtimeMutable": true,
+      "module": "chapter2-prebuilt-game-data-cache"
+    },
     {
       "path": "Release\\dxgi.dll",
       "patchedSha256": "EC9245D05C11751F2AC0D2256E6921AD8FB36BE9172EF6D587856591EB729A25",
@@ -100,7 +107,7 @@
     },
     {
       "path": "Data\\Gui\\Resolutions\\1280x720\\MainMenu\\gui_mainmenu_logo.png",
-      "patchedSha256": "C761339EBD5E30E4D3A05EDDDFD2F5A7CCB93A082A1E7DB39401985AE22646E4",
+      "patchedSha256": "CA111C0A7538F6F20E4B0397626FB7D102812CE65A8268FD774078A5054283F4",
       "originalSha256": [
         "AD40995CAA7498C67B88AAE06BADB402D3746312CCD4995DEF1D81978DD70190"
       ],
@@ -109,7 +116,7 @@
     },
     {
       "path": "Data\\Gui\\Resolutions\\1920x1080\\MainMenu\\gui_mainmenu_logo.png",
-      "patchedSha256": "E15A08A45ECBACEFFE35D8533092F692CC96FCDB7A7B843D7C4AD1764686E604",
+      "patchedSha256": "56792FB46E8BB72064A52D4CDC483E738C5E653DB30D708B0F2ED79113B0010F",
       "originalSha256": [
         "6A37A80C5ECA354E1C87D1CA7AD7D07900549F3358D0BB1BE3434FD75E08DB61"
       ],
@@ -118,7 +125,7 @@
     },
     {
       "path": "Data\\Gui\\Resolutions\\2560x1440\\MainMenu\\gui_mainmenu_logo.png",
-      "patchedSha256": "06A16301BD1D84132608CEE35095B7F32535D62BE7E70A9E8643AAA6B62FC48D",
+      "patchedSha256": "E29E9DB658018A855FE7121D86610A949E5B85A5EE5D90D0C1279492F5D452A4",
       "originalSha256": [
         "B79D70423DFDD6445AC52DDE36555EA75589F2796DEBDAB825031DE3724739C3"
       ],
@@ -127,7 +134,7 @@
     },
     {
       "path": "Data\\Gui\\Resolutions\\3840x2160\\MainMenu\\gui_mainmenu_logo.png",
-      "patchedSha256": "9F2E6CB512182135DB446A016458B289EB15272A37196552CAF69DC634B9F504",
+      "patchedSha256": "625A11FB59752777E77FE2B40C63E845F80EE452AF8886EED4365D8BBBEB2387",
       "originalSha256": [
         "CD02F74FF72E151AF66912B652400D4CFF2F02DA0801145D943AE42EA82EAB24"
       ],

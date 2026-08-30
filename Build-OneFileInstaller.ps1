@@ -26,6 +26,21 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Payload validation failed.'
 }
 
+$iconPath = Join-Path $PSScriptRoot 'installer\ScrapMechanicVR.ico'
+& $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'tools\Build-InstallerIcon.ps1') -OutputPath $iconPath
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $iconPath -PathType Leaf)) {
+    throw 'Installer icon generation failed.'
+}
+
+$musicSource = Join-Path $PSScriptRoot 'assets\audio\BOOMBOX MIX NEW.mp3'
+if (-not (Test-Path -LiteralPath $musicSource -PathType Leaf)) {
+    throw 'The packaged installer music is missing.'
+}
+$logoSource = Join-Path $PSScriptRoot 'assets\ScrapMechanicVR-Logo.png'
+if (-not (Test-Path -LiteralPath $logoSource -PathType Leaf)) {
+    throw 'The packaged installer logo is missing.'
+}
+
 $workingRoot = Join-Path $env:TEMP ( 'ScrapMechanicVR-Chapter2-OneFile-' + [Guid]::NewGuid().ToString('N') )
 $stage = Join-Path $workingRoot 'stage'
 $zip = Join-Path $workingRoot 'installer-payload.zip'
@@ -41,6 +56,10 @@ try {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'third_party\minhook\LICENSE.txt') -Destination (Join-Path $licenseStage 'MinHook-LICENSE.txt')
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'third_party\llvm\LICENSE.TXT') -Destination (Join-Path $licenseStage 'LLVM-LICENSE.txt')
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'payload') -Destination (Join-Path $stage 'payload') -Recurse
+    $mediaStage = Join-Path $stage 'media'
+    New-Item -ItemType Directory -Force -Path $mediaStage | Out-Null
+    Copy-Item -LiteralPath $musicSource -Destination (Join-Path $mediaStage 'BOOMBOX MIX NEW.mp3')
+    Copy-Item -LiteralPath $logoSource -Destination (Join-Path $mediaStage 'ScrapMechanicVR-Logo.png')
     Compress-Archive -LiteralPath (Get-ChildItem -LiteralPath $stage -Force).FullName -DestinationPath $zip -CompressionLevel Optimal
 
     $outputDirectory = Split-Path -Parent $OutputPath
@@ -55,6 +74,7 @@ try {
         '/platform:anycpu',
         '/optimize+',
         "/win32manifest:$applicationManifest",
+        "/win32icon:$iconPath",
         "/resource:$zip,ScrapMechanicVR.Payload.zip",
         '/reference:System.dll',
         '/reference:System.Core.dll',

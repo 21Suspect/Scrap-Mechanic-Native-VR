@@ -1,6 +1,6 @@
 # Chapter 2 release status
 
-Release: `1.0.1-chapter2-20260830`
+Release: `1.1.0-chapter2-20260830`
 
 Branch: `main`
 
@@ -28,6 +28,6 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 
 ## Installer
 
-`dist/ScrapMechanicVR-Installer.exe` embeds and validates all 28 managed payload files, verifies the supported game executable, backs up replaced files, refreshes generated Lua cache when needed, and supports install, start, verify, repair, and uninstall.
+`dist/ScrapMechanicVR-Installer.exe` embeds and validates all 29 managed payload files, the branded installer artwork, its soundtrack, and a verified first-launch game-data cache. It starts music at 50% with a compact volume control, verifies the supported game executable, backs up replaced files, and supports install, start, verify, repair, and uninstall.
 
 Installer and payload hashes are recorded in `SHA256SUMS.txt`.

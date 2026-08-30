@@ -6,6 +6,7 @@ using System.Drawing;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -16,22 +17,24 @@ using Microsoft.Win32;
 [assembly: AssemblyDescription("Installer, verifier, repair manager, and restorer for Scrap Mechanic Chapter 2 VR")]
 [assembly: AssemblyCompany("Scrap Mechanic VR Community Project")]
 [assembly: AssemblyProduct("Scrap Mechanic VR Chapter 2")]
-[assembly: AssemblyVersion("1.0.1.0")]
-[assembly: AssemblyFileVersion("1.0.1.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]
 
 namespace ScrapMechanicVRPatcher
 {
     internal static class BuildInfo
     {
-        internal const string Version = "1.0.1-chapter2-20260830";
+        internal const string Version = "1.1.0-chapter2-20260830";
         internal const string GameBuild = "24529696";
         internal const string GameExeHash = "5D663BA2EC5DC8C7ABEFCC5C9344AE86F0A066C4069A91F54833524AC9A5B4F5";
         internal const string AddonHash = "74295E66FF9A84BAB56E0D10C00B82FD259D359BCA3189DF23118D968297174B";
         internal const string DxgiHash = "EC9245D05C11751F2AC0D2256E6921AD8FB36BE9172EF6D587856591EB729A25";
         internal const string LoaderHash = "018C6519AFBDEADE6DA9E7D59C406068DD58674D87A65AE27353484A05E6674A";
-        internal const string ManifestHash = "FDFF28273D8B4A36488864E513604999A440ACFA360316BBB4451F6B02FA5386";
-        internal const string PatcherHash = "1EFFC0087C231808CDB825918D710C2577B0B664564EE6B5200386AA9A8684C2";
-        internal const int ManagedFileCount = 28;
+        internal const string MusicHash = "02E8E98721A899C2731ED8AFDF6378DB98DC09BB87FA5896FBA911CE5D875660";
+        internal const string LogoHash = "C692A16C8CB01B94618951C09F64A156D7DD6A71D349B91E023B018165504C34";
+        internal const string ManifestHash = "17904F117C13E33BA3A642302389C46CB4100C3BA576331100B66B2E1F548593";
+        internal const string PatcherHash = "C0DB650D7861D60561772EF8C48A686178223B6994B47CE920D3F84AF1FA3A41";
+        internal const int ManagedFileCount = 29;
         internal const string ResourceName = "ScrapMechanicVR.Payload.zip";
     }
 
@@ -81,14 +84,27 @@ namespace ScrapMechanicVRPatcher
             get { return Path.Combine(PackageDirectory, "Patcher.ps1"); }
         }
 
+        internal static string MusicPath
+        {
+            get { return Path.Combine(PackageDirectory, "media", "BOOMBOX MIX NEW.mp3"); }
+        }
+
+        internal static string LogoPath
+        {
+            get { return Path.Combine(PackageDirectory, "media", "ScrapMechanicVR-Logo.png"); }
+        }
+
         private static bool PackageIsValid()
         {
             string manifest = Path.Combine(PackageDirectory, "manifest.json");
             string addon = Path.Combine(PackageDirectory, "payload", "Release", "smvr_native_vr_v1.addon64");
             return File.Exists(PatcherPath) && File.Exists(manifest) && File.Exists(addon) &&
+                   File.Exists(MusicPath) && File.Exists(LogoPath) &&
                    String.Equals(Hashing.Sha256(PatcherPath), BuildInfo.PatcherHash, StringComparison.OrdinalIgnoreCase) &&
                    String.Equals(Hashing.Sha256(manifest), BuildInfo.ManifestHash, StringComparison.OrdinalIgnoreCase) &&
-                   String.Equals(Hashing.Sha256(addon), BuildInfo.AddonHash, StringComparison.OrdinalIgnoreCase);
+                   String.Equals(Hashing.Sha256(addon), BuildInfo.AddonHash, StringComparison.OrdinalIgnoreCase) &&
+                   String.Equals(Hashing.Sha256(MusicPath), BuildInfo.MusicHash, StringComparison.OrdinalIgnoreCase) &&
+                   String.Equals(Hashing.Sha256(LogoPath), BuildInfo.LogoHash, StringComparison.OrdinalIgnoreCase);
         }
 
         internal static void EnsureExtracted()
@@ -117,12 +133,18 @@ namespace ScrapMechanicVRPatcher
                 string stagedManifest = Path.Combine(temporaryDirectory, "manifest.json");
                 string stagedAddon = Path.Combine(temporaryDirectory, "payload", "Release", "smvr_native_vr_v1.addon64");
                 string stagedPatcher = Path.Combine(temporaryDirectory, "Patcher.ps1");
+                string stagedMusic = Path.Combine(temporaryDirectory, "media", "BOOMBOX MIX NEW.mp3");
+                string stagedLogo = Path.Combine(temporaryDirectory, "media", "ScrapMechanicVR-Logo.png");
                 if (!File.Exists(stagedPatcher) ||
                     !File.Exists(stagedManifest) ||
                     !File.Exists(stagedAddon) ||
+                    !File.Exists(stagedMusic) ||
+                    !File.Exists(stagedLogo) ||
                     !String.Equals(Hashing.Sha256(stagedPatcher), BuildInfo.PatcherHash, StringComparison.OrdinalIgnoreCase) ||
                     !String.Equals(Hashing.Sha256(stagedManifest), BuildInfo.ManifestHash, StringComparison.OrdinalIgnoreCase) ||
-                    !String.Equals(Hashing.Sha256(stagedAddon), BuildInfo.AddonHash, StringComparison.OrdinalIgnoreCase))
+                    !String.Equals(Hashing.Sha256(stagedAddon), BuildInfo.AddonHash, StringComparison.OrdinalIgnoreCase) ||
+                    !String.Equals(Hashing.Sha256(stagedMusic), BuildInfo.MusicHash, StringComparison.OrdinalIgnoreCase) ||
+                    !String.Equals(Hashing.Sha256(stagedLogo), BuildInfo.LogoHash, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("The embedded VR payload failed its integrity check.");
 
                 if (Directory.Exists(PackageDirectory))
@@ -303,6 +325,15 @@ namespace ScrapMechanicVRPatcher
 
     internal static class PatcherRunner
     {
+        private static string WindowsPowerShellBootstrap()
+        {
+            // Do not inherit a PowerShell 7-only PSModulePath when the manager
+            // was launched by a developer shell.  Windows PowerShell needs its
+            // own inbox modules for commands such as Get-FileHash.
+            return "$env:PSModulePath=$env:WINDIR+'\\System32\\WindowsPowerShell\\v1.0\\Modules;'+" +
+                   "$env:ProgramFiles+'\\WindowsPowerShell\\Modules'; ";
+        }
+
         private static string Quote(string value)
         {
             return "\"" + value.Replace("\"", "\\\"") + "\"";
@@ -316,7 +347,8 @@ namespace ScrapMechanicVRPatcher
             string logPath = Path.Combine(logDirectory,
                 DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + action.ToLowerInvariant() + ".log");
             string command =
-                "$ErrorActionPreference='Stop'; $log=" + PowerShellLiteral(logPath) + "; try { & " +
+                "$ErrorActionPreference='Stop'; " + WindowsPowerShellBootstrap() +
+                "$log=" + PowerShellLiteral(logPath) + "; try { & " +
                 PowerShellLiteral(PackageManager.PatcherPath) + " -Action " +
                 PowerShellLiteral(action) + " -GamePath " + PowerShellLiteral(gameRoot) +
                 " *>&1 | Tee-Object -FilePath $log; exit 0 } catch { " +
@@ -372,24 +404,36 @@ namespace ScrapMechanicVRPatcher
         internal static CommandResult RunCaptured(string action, string gameRoot)
         {
             PackageManager.EnsureExtracted();
+            string logDirectory = Path.Combine(PackageManager.StateRoot, "logs");
+            Directory.CreateDirectory(logDirectory);
+            string logPath = Path.Combine(logDirectory,
+                DateTime.Now.ToString("yyyyMMdd-HHmmss") + "-" + action.ToLowerInvariant() + "-captured.log");
             ProcessStartInfo info = new ProcessStartInfo();
             info.FileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),
                 @"WindowsPowerShell\v1.0\powershell.exe");
-            info.Arguments = "-NoProfile -ExecutionPolicy Bypass -File " + Quote(PackageManager.PatcherPath) +
-                             " -Action " + action + " -GamePath " + Quote(gameRoot);
+            string command = "$ErrorActionPreference='Stop'; " + WindowsPowerShellBootstrap() +
+                "$log=" + PowerShellLiteral(logPath) + "; try { & " +
+                PowerShellLiteral(PackageManager.PatcherPath) + " -Action " +
+                PowerShellLiteral(action) + " -GamePath " + PowerShellLiteral(gameRoot) +
+                " *>&1 | Out-File -LiteralPath $log -Encoding Unicode; exit 0 } catch { " +
+                "$errorLine=('ERROR: ' + $_.Exception.Message); " +
+                "$detail=($_ | Format-List * -Force | Out-String); " +
+                "$errorLine | Out-File -LiteralPath $log -Append -Encoding Unicode; " +
+                "$detail | Out-File -LiteralPath $log -Append -Encoding Unicode; exit 1 }";
+            string encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(command));
+            info.Arguments = "-NoProfile -ExecutionPolicy Bypass -EncodedCommand " + encoded;
             info.WorkingDirectory = PackageManager.PackageDirectory;
             info.UseShellExecute = false;
             info.CreateNoWindow = true;
-            info.RedirectStandardOutput = true;
-            info.RedirectStandardError = true;
             using (Process process = Process.Start(info))
             {
-                string output = process.StandardOutput.ReadToEnd();
-                string error = process.StandardError.ReadToEnd();
                 process.WaitForExit();
+                string output = File.Exists(logPath) ? File.ReadAllText(logPath) :
+                    "No captured action log was produced.";
                 return new CommandResult {
                     ExitCode = process.ExitCode,
-                    Output = output + (String.IsNullOrWhiteSpace(error) ? String.Empty : Environment.NewLine + error)
+                    Output = output,
+                    LogPath = logPath
                 };
             }
         }
@@ -403,7 +447,8 @@ namespace ScrapMechanicVRPatcher
         {
             PackageManager.EnsureExtracted();
             string command =
-                "$ErrorActionPreference='Stop'; try { & " + PowerShellLiteral(PackageManager.PatcherPath) +
+                "$ErrorActionPreference='Stop'; " + WindowsPowerShellBootstrap() +
+                "try { & " + PowerShellLiteral(PackageManager.PatcherPath) +
                 " -Action Start -GamePath " + PowerShellLiteral(gameRoot) +
                 "; exit 0 } catch { Write-Host ''; Write-Host $_ -ForegroundColor Red; " +
                 "[void](Read-Host 'VR launch failed. Press Enter to close'); exit 1 }";
@@ -472,6 +517,50 @@ namespace ScrapMechanicVRPatcher
         }
     }
 
+    internal static class InstallerMusic
+    {
+        private const string Alias = "ScrapMechanicVRInstallerMusic";
+
+        [DllImport("winmm.dll", CharSet = CharSet.Unicode)]
+        private static extern int mciSendString(
+            string command, StringBuilder returnValue, int returnLength, IntPtr callback);
+
+        internal static bool Start(string path, int volumePercent)
+        {
+            Close();
+            if (!File.Exists(path))
+                return false;
+
+            string safePath = path.Replace("\"", String.Empty);
+            int result = mciSendString(
+                "open \"" + safePath + "\" type mpegvideo alias " + Alias,
+                null, 0, IntPtr.Zero);
+            if (result != 0)
+                return false;
+
+            SetVolume(volumePercent);
+            result = mciSendString("play " + Alias + " repeat", null, 0, IntPtr.Zero);
+            if (result == 0)
+                return true;
+
+            Close();
+            return false;
+        }
+
+        internal static void SetVolume(int volumePercent)
+        {
+            int safePercent = Math.Max(0, Math.Min(100, volumePercent));
+            mciSendString(
+                "setaudio " + Alias + " volume to " + (safePercent * 10),
+                null, 0, IntPtr.Zero);
+        }
+
+        internal static void Close()
+        {
+            mciSendString("close " + Alias, null, 0, IntPtr.Zero);
+        }
+    }
+
     internal sealed class MainForm : Form
     {
         private static readonly Color AppBackground = Color.FromArgb(24, 26, 29);
@@ -498,6 +587,8 @@ namespace ScrapMechanicVRPatcher
         private readonly Button uninstallButton;
         private readonly Button logsButton;
         private readonly RichTextBox details;
+        private readonly TrackBar musicVolume;
+        private readonly Label musicVolumeLabel;
 
         internal MainForm()
         {
@@ -509,6 +600,7 @@ namespace ScrapMechanicVRPatcher
             BackColor = AppBackground;
             ForeColor = PrimaryText;
             DoubleBuffered = true;
+            ShowIcon = false;
 
             Panel accentBar = new Panel();
             accentBar.BackColor = Accent;
@@ -516,14 +608,14 @@ namespace ScrapMechanicVRPatcher
             accentBar.Height = 5;
             Controls.Add(accentBar);
 
-            Label brand = new Label();
-            brand.Text = "SM" + Environment.NewLine + "VR";
-            brand.TextAlign = ContentAlignment.MiddleCenter;
-            brand.Font = new Font("Segoe UI Black", 12F, FontStyle.Bold);
-            brand.ForeColor = Color.FromArgb(22, 24, 27);
-            brand.BackColor = Accent;
-            brand.Location = new Point(24, 23);
-            brand.Size = new Size(58, 58);
+            PictureBox brand = new PictureBox();
+            brand.BackColor = Color.Transparent;
+            brand.Location = new Point(18, 11);
+            brand.Size = new Size(122, 82);
+            brand.SizeMode = PictureBoxSizeMode.Zoom;
+            using (FileStream logoStream = new FileStream(PackageManager.LogoPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (Image logoSource = Image.FromStream(logoStream))
+                brand.Image = new Bitmap(logoSource);
             Controls.Add(brand);
 
             Label title = new Label();
@@ -531,7 +623,7 @@ namespace ScrapMechanicVRPatcher
             title.Font = new Font("Segoe UI Semibold", 21F, FontStyle.Bold);
             title.ForeColor = PrimaryText;
             title.AutoSize = true;
-            title.Location = new Point(98, 19);
+            title.Location = new Point(148, 19);
             Controls.Add(title);
 
             Label subtitle = new Label();
@@ -539,7 +631,7 @@ namespace ScrapMechanicVRPatcher
             subtitle.AutoSize = true;
             subtitle.Font = new Font("Segoe UI Semibold", 8.5F, FontStyle.Bold);
             subtitle.ForeColor = MutedText;
-            subtitle.Location = new Point(101, 61);
+            subtitle.Location = new Point(151, 61);
             Controls.Add(subtitle);
 
             Label version = new Label();
@@ -552,6 +644,34 @@ namespace ScrapMechanicVRPatcher
             version.Size = new Size(166, 32);
             version.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             Controls.Add(version);
+
+            musicVolumeLabel = new Label();
+            musicVolumeLabel.Text = "MUSIC 50%";
+            musicVolumeLabel.TextAlign = ContentAlignment.MiddleRight;
+            musicVolumeLabel.Font = new Font("Segoe UI Semibold", 8F, FontStyle.Bold);
+            musicVolumeLabel.ForeColor = MutedText;
+            musicVolumeLabel.Location = new Point(620, 68);
+            musicVolumeLabel.Size = new Size(84, 24);
+            musicVolumeLabel.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            Controls.Add(musicVolumeLabel);
+
+            musicVolume = new TrackBar();
+            musicVolume.Minimum = 0;
+            musicVolume.Maximum = 100;
+            musicVolume.Value = 50;
+            musicVolume.SmallChange = 5;
+            musicVolume.LargeChange = 10;
+            musicVolume.TickStyle = TickStyle.None;
+            musicVolume.BackColor = AppBackground;
+            musicVolume.Location = new Point(710, 66);
+            musicVolume.Size = new Size(166, 32);
+            musicVolume.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            musicVolume.Scroll += delegate
+            {
+                musicVolumeLabel.Text = "MUSIC " + musicVolume.Value + "%";
+                InstallerMusic.SetVolume(musicVolume.Value);
+            };
+            Controls.Add(musicVolume);
 
             Panel setupCard = CreateCard(24, 105, 852, 184);
             setupCard.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
@@ -642,12 +762,13 @@ namespace ScrapMechanicVRPatcher
             Controls.Add(details);
 
             gamePath.Text = GameLocator.Find();
-            if (GameLocator.IsGameRoot(gamePath.Text))
-            {
-                try { Icon = Icon.ExtractAssociatedIcon(Path.Combine(gamePath.Text, "Release", "ScrapMechanic.exe")); }
-                catch { }
-            }
             gamePath.TextChanged += delegate { RefreshState(); };
+            InstallerMusic.Start(PackageManager.MusicPath, musicVolume.Value);
+            FormClosed += delegate
+            {
+                InstallerMusic.Close();
+                if (brand.Image != null) brand.Image.Dispose();
+            };
             Shown += delegate
             {
                 RefreshState();
@@ -1070,17 +1191,63 @@ namespace ScrapMechanicVRPatcher
                 new UTF8Encoding(false));
         }
 
+        private static void RunHeadlessAction(string action)
+        {
+            PackageManager.EnsureExtracted();
+            string root = GameLocator.Find();
+            if (!GameLocator.IsGameRoot(root))
+                throw new InvalidOperationException("Scrap Mechanic was not discovered in any registered Steam library.");
+
+            CommandResult result = PatcherRunner.RunCaptured(action, root);
+            Directory.CreateDirectory(PackageManager.StateRoot);
+            string logPath = Path.Combine(PackageManager.StateRoot,
+                "installer-" + action.ToLowerInvariant() + "-test.log");
+            File.WriteAllText(logPath,
+                "Action=" + action + "\r\nGame=" + root + "\r\nExitCode=" + result.ExitCode +
+                "\r\n\r\n" + result.Output,
+                new UTF8Encoding(false));
+            if (result.ExitCode != 0)
+                throw new InvalidOperationException(PatcherRunner.FailureMessage(action, result));
+
+            if (String.Equals(action, "Install", StringComparison.OrdinalIgnoreCase))
+            {
+                GameLocator.Save(root);
+                Shortcuts.Install(root);
+            }
+            else if (String.Equals(action, "Uninstall", StringComparison.OrdinalIgnoreCase))
+            {
+                Shortcuts.Remove();
+            }
+        }
+
         [STAThread]
         private static void Main(string[] args)
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             bool selfTest = args.Length > 0 && String.Equals(args[0], "--self-test", StringComparison.OrdinalIgnoreCase);
+            string headlessAction = null;
+            if (args.Length > 0)
+            {
+                if (String.Equals(args[0], "--install", StringComparison.OrdinalIgnoreCase))
+                    headlessAction = "Install";
+                else if (String.Equals(args[0], "--uninstall", StringComparison.OrdinalIgnoreCase))
+                    headlessAction = "Uninstall";
+                else if (String.Equals(args[0], "--verify", StringComparison.OrdinalIgnoreCase))
+                    headlessAction = "Verify";
+            }
+            bool testCommand = selfTest || headlessAction != null;
             try
             {
                 if (selfTest)
                 {
                     RunSelfTest();
+                    Environment.ExitCode = 0;
+                    return;
+                }
+                if (headlessAction != null)
+                {
+                    RunHeadlessAction(headlessAction);
                     Environment.ExitCode = 0;
                     return;
                 }
@@ -1097,12 +1264,14 @@ namespace ScrapMechanicVRPatcher
             }
             catch (Exception ex)
             {
-                if (selfTest)
+                if (testCommand)
                 {
                     try
                     {
                         Directory.CreateDirectory(PackageManager.StateRoot);
-                        File.WriteAllText(Path.Combine(PackageManager.StateRoot, "self-test.log"),
+                        string failureLog = selfTest ? "self-test.log" :
+                            "installer-" + headlessAction.ToLowerInvariant() + "-test.log";
+                        File.WriteAllText(Path.Combine(PackageManager.StateRoot, failureLog),
                             "FAIL\r\n" + ex + "\r\n", new UTF8Encoding(false));
                     }
                     catch { }

@@ -36,13 +36,13 @@ Only use the payload with the exact executable hash documented in `README.md`. D
 .\Build-OneFileInstaller.ps1
 ```
 
-The public artifact is `dist/ScrapMechanicVR-Installer.exe`. It validates its embedded patcher, manifest, native add-on, and all 28 managed payload files before installation. It discovers Steam and the active 64-bit OpenXR runtime, rejects unsupported game builds, backs up original files, and supports verify, repair/restore, and uninstall.
+The public artifact is `dist/ScrapMechanicVR-Installer.exe`. It validates its embedded patcher, manifest, native add-on, branded UI assets, soundtrack, and all 29 managed payload files before installation. It discovers Steam and the active 64-bit OpenXR runtime, rejects unsupported game builds, backs up original files, and supports verify, repair/restore, and uninstall.
 
-Current version: `1.0.1-chapter2-20260830`
+Current version: `1.1.0-chapter2-20260830`
 
 The installer SHA-256 is recorded in `SHA256SUMS.txt`.
 
-The backend invalidates Scrap Mechanic's generated `Cache/Bundle/core_data.cbo` after relevant install, repair, and uninstall operations so the game recompiles current player callbacks rather than running a stale Lua bundle.
+The payload includes a verified `Cache/Bundle/core_data.cbo` seed for the supported game build. This avoids Scrap Mechanic's unstable cold-cache compiler path on the first VR launch; the cache remains runtime-mutable and is backed up/restored like every other managed file.
 
 ## Release checks
 

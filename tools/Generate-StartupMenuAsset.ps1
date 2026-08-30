@@ -1,14 +1,18 @@
 [CmdletBinding()]
 param(
     [string]$GamePath = 'C:\Program Files (x86)\Steam\steamapps\common\Scrap Mechanic',
-    [string]$LogoPath = (Join-Path $PSScriptRoot '..\assets\ScrapMechanicVR-Logo.png'),
-    [string]$OutputPath = (Join-Path $PSScriptRoot '..\assets\ScrapMechanicVR-StartupMenu.png'),
-    [string]$PayloadRoot = (Join-Path $PSScriptRoot '..\payload')
+    [string]$LogoPath,
+    [string]$OutputPath,
+    [string]$PayloadRoot
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
+
+if (-not $LogoPath) { $LogoPath = Join-Path $PSScriptRoot '..\assets\ScrapMechanicVR-Logo.png' }
+if (-not $OutputPath) { $OutputPath = Join-Path $PSScriptRoot '..\assets\ScrapMechanicVR-StartupMenu.png' }
+if (-not $PayloadRoot) { $PayloadRoot = Join-Path $PSScriptRoot '..\payload' }
 
 function New-TransparentBitmap {
     param([int]$Width, [int]$Height)
@@ -184,10 +188,13 @@ $bitmap.Save($OutputPath, [System.Drawing.Imaging.ImageFormat]::Png)
 $bitmap.Dispose()
 
 foreach ($specification in @(
-    @('1280x720', 364, 240),
-    @('1920x1080', 546, 360),
-    @('2560x1440', 728, 480),
-    @('3840x2160', 1092, 720)
+    # These dimensions must exactly match the Logo panel in each
+    # MainMenu_Logo.layout.  Smaller arbitrary PNGs can crash Scrap Mechanic's
+    # GUI compiler while rebuilding a cold core_data.cbo cache.
+    @('1280x720', 400, 320),
+    @('1920x1080', 600, 480),
+    @('2560x1440', 800, 640),
+    @('3840x2160', 1200, 960)
 )) {
     Export-DesktopLogo $logo $specification[0] $specification[1] $specification[2]
 }

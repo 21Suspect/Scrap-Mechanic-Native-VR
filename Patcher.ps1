@@ -165,6 +165,15 @@ function Clear-CompiledDataCache([string]$Root) {
     }
 }
 
+function Test-ManifestIncludesCompiledDataCache($Manifest) {
+    foreach ($entry in @($Manifest.files)) {
+        if ([string]$entry.path -ieq 'Cache\Bundle\core_data.cbo') {
+            return $true
+        }
+    }
+    return $false
+}
+
 function Get-NormalizedRoot([string]$Path) {
     if ([string]::IsNullOrWhiteSpace($Path)) { return $null }
     try {
@@ -312,7 +321,12 @@ function Install-Patch([string]$Root, $Manifest) {
             Write-Host "Installed $($entry.path)"
         }
 
-        Clear-CompiledDataCache $Root
+        if (Test-ManifestIncludesCompiledDataCache $Manifest) {
+            Write-Host 'Installed verified Cache\Bundle\core_data.cbo seed; the game may update this runtime cache normally.' -ForegroundColor Green
+        }
+        else {
+            Clear-CompiledDataCache $Root
+        }
 
         $state = [ordered]@{
             patchId = [string]$Manifest.patchId
@@ -654,7 +668,14 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
             Write-Host "Removed $($record.path)"
         }
     }
-    Clear-CompiledDataCache $Root
+    $stateManagedCompiledCache = @($recognizedRecords | Where-Object {
+        [string]$_.path -ieq 'Cache\Bundle\core_data.cbo'
+    }).Count -gt 0
+    if (-not $stateManagedCompiledCache) {
+        # Older managed states predate the cache seed. Remove their stale
+        # compiled bundle during migration before the new seed is installed.
+        Clear-CompiledDataCache $Root
+    }
     Remove-Item -LiteralPath $statePath -Force
     foreach ($relativeDirectory in @($Manifest.directories) | Sort-Object Length -Descending) {
         $directory = Join-Path $Root $relativeDirectory
