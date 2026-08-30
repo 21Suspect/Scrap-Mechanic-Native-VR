@@ -22,6 +22,7 @@ local VrGunFireDebugPath = "$GAME_DATA/NativeVR/gun_fire_debug.json"
 local VrDirectBridgeFreshTicks = 10
 local VrDirectPoseFreshTicks = 6
 local VrPrimaryBridgeFreshTicks = 8
+local VrInactiveBridgePollSeconds = 0.25
 
 local VrToolLaserItems = {
 	["8c7efc37-cd7c-4262-976e-39585f8527bf"] = true,
@@ -233,12 +234,14 @@ function Chapter2VR.clientUpdate( self, dt )
 	if self.cl.vrGunFreshTimer > 0.12 then clearGunAim() end
 	if self.cl.vrHandFreshTimer > 0.8 then clearClientAim() end
 	self.cl.vrHandTimer = ( self.cl.vrHandTimer or 0.0 ) + dt
-	if self.cl.vrHandTimer < 0.02 then return end
+	local bridgePollSeconds = self.cl.vrHandBridgeActive == true and 0.02 or VrInactiveBridgePollSeconds
+	if self.cl.vrHandTimer < bridgePollSeconds then return end
 	self.cl.vrHandTimer = 0.0
 	-- fileExists is backed by the game's resource catalog and can remain false
 	-- for this native add-on's runtime-created file. Open it directly and let
 	-- pcall handle the short periods where the bridge is genuinely absent.
 	local ok, data = pcall( sm.json.open, VrHandBridgePath )
+	self.cl.vrHandBridgeActive = ok and type( data ) == "table" and data.vrActive == true
 	if not ok or type( data ) ~= "table" or type( data.sequence ) ~= "number" or
 		data.sequence == self.cl.vrHandSequence then return end
 	-- A previous VR run may have ended without deleting its last bridge file.

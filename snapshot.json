@@ -1,5 +1,5 @@
 {
-  "snapshot": "chapter2-v1.1.0",
+  "snapshot": "chapter2-v1.1.1",
   "status": "chapter2-stable",
   "legacyBranch": "legacy-pre-1.0",
   "chapter2Branch": "main",
@@ -26,7 +26,7 @@
   },
   "source": {
     "path": "src/native_vr.cpp",
-    "sha256": "102BBF447750A7F8DB668A39543A3709D90F9D0B62C3438949809209D3A97E2D",
+    "sha256": "80A5E788D2B43F62DED43C71EB2C719A1C8120551F13B1779BF81473173AC072",
     "reshadeApi": 18,
     "reshadeCommit": "4a50d1eddace85734871d91792ff214f13f66c01",
     "minhookCommit": "c3fcafdc10146beb5919319d0683e44e3c30d537",
@@ -35,17 +35,17 @@
   },
   "testedArtifact": {
     "path": "payload/Release/smvr_native_vr_v1.addon64",
-    "size": 4025856,
-    "sha256": "74295E66FF9A84BAB56E0D10C00B82FD259D359BCA3189DF23118D968297174B"
+    "size": 4027392,
+    "sha256": "288A89BF2CB7183252CFF6D5056605EB822AB26A79D67D2083CC5C8635743B69"
   },
   "localCandidateArtifact": {
-    "version": "1.1.0-chapter2-20260830",
+    "version": "1.1.1-chapter2-20260830",
     "path": "payload/Release/smvr_native_vr_v1.addon64",
-    "size": 4025856,
-    "sha256": "74295E66FF9A84BAB56E0D10C00B82FD259D359BCA3189DF23118D968297174B",
-    "headsetConfirmed": true,
+    "size": 4027392,
+    "sha256": "288A89BF2CB7183252CFF6D5056605EB822AB26A79D67D2083CC5C8635743B69",
+    "headsetConfirmed": false,
     "source": {
-      "nativeVrSha256": "102BBF447750A7F8DB668A39543A3709D90F9D0B62C3438949809209D3A97E2D",
+      "nativeVrSha256": "80A5E788D2B43F62DED43C71EB2C719A1C8120551F13B1779BF81473173AC072",
       "featureInputSha256": "1843A600C3F3E1D4A001043780B5543F19DD75F00C63B61668E52E9FD07AD82C",
       "featureInputHeaderSha256": "57C3C457E8A7F1115DA8689A803775DFBD0435DFBDC3B825DF98B65C44E7324F",
       "engineInputSha256": "7E42A655339628C71657FA5CE9F1E0328865570D1F0D0516762D66E52DCCFC43",
@@ -59,7 +59,7 @@
       "chapter2ToolAssetSha256": "8DFD5A51BFFEC3F45E3FE57F714354E7CB24AB3C38BF1461BB16BF3E43DB1183",
       "mechanicHandsGeneratorSha256": "2795AD1C628BA0EDF689D86C7D4B13C14BD5022D5AE8086D138AA9B8EBAEE181",
       "chapter2ToolGeneratorSha256": "74BADC890EF7652F85EF9EA54EBEEED7A10B3D098B6B742C76A7122F7BF3793A",
-      "chapter2GameplayBridgeSha256": "C39115B5E83D8D4E04DDB9FC4F8D933A3935DEA148BE8F93F8517DDF7A0D968D",
+      "chapter2GameplayBridgeSha256": "3D8E9B61BFB36D7602046ED81C4528DFE2BFB9B4FEEE3297E9F576D23A1326E3",
       "clayCalibrationHelperSourceSha256": "1258A507DCD596E64D3DD101255C5538551AEF3E872313D64BB34A0FD3A40A17",
       "weaponScriptSha256": {
         "PotatoRifle.lua": "1396BD5877CF37C6C72167604D144F6D6E7899416A92BD28362A74B47A2157E1",
@@ -74,13 +74,14 @@
   "validation": {
     "date": "2026-08-30",
     "installerManagedFiles": 29,
-    "headsetConfirmed": true,
+    "headsetConfirmed": false,
+    "noHmdDesktopFallbackConfirmed": true,
     "clayCalibrationHeadsetConfirmed": true,
     "weaponAimHeadsetConfirmed": true,
     "seatTransitionRecoveryHeadsetConfirmed": true
   },
   "installer": {
-    "version": "1.1.0-chapter2-20260830",
+    "version": "1.1.1-chapter2-20260830",
     "path": "dist/ScrapMechanicVR-Installer.exe",
     "selfTest": "PASS",
     "published": true

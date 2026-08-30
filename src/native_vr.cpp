@@ -91,6 +91,11 @@ std::atomic<bool> g_enabled{false};
 std::atomic<bool> g_hook_reached{false};
 std::atomic<bool> g_target_found{false};
 std::atomic<bool> g_failed{false};
+constexpr uint64_t kOpenXrRetryDelayMs = 5000;
+std::atomic<uint64_t> g_openxr_retry_after_ms{0};
+std::atomic<bool> g_desktop_fallback_logged{false};
+std::atomic<bool> g_openxr_runtime_logged{false};
+std::atomic<bool> g_openxr_unavailable_logged{false};
 std::atomic<uint64_t> g_engine_frames{0};
 std::atomic<uint64_t> g_stereo_frames{0};
 std::atomic<uint64_t> g_openxr_success_frames{0};
@@ -113,9 +118,17 @@ bool g_feature_optical_hands_enabled = true;
 bool g_feature_hands_enabled = true;
 bool g_feature_startup_menu_enabled = true;
 std::atomic<bool> g_hands_render_failure_logged{false};
+
+void mark_openxr_failed(bool retry = true)
+{
+    g_openxr_retry_after_ms.store(retry ? GetTickCount64() + kOpenXrRetryDelayMs : 0,
+        std::memory_order_release);
+    g_failed.store(true, std::memory_order_release);
+}
 uint64_t g_hand_bridge_sequence = 0;
 uint64_t g_last_hand_bridge_publish_ms = 0;
 std::atomic<bool> g_hand_bridge_logged{false};
+std::atomic<bool> g_hand_bridge_inactive_published{false};
 bool g_previous_right_interaction = false;
 bool g_previous_gun_muzzle_active = false;
 std::string g_previous_gun_muzzle_item;
@@ -359,13 +372,15 @@ bool write_atomic_file(const wchar_t *path, const wchar_t *temporary, const char
     return true;
 }
 
-void remove_hand_bridge(bool reset_session = false)
+void reset_hand_bridge(bool reset_session = false)
 {
     wchar_t path[MAX_PATH]{}, temporary[MAX_PATH]{};
     if (hand_bridge_paths(path, temporary, false))
     {
+        // Preserve the last valid JSON until its atomic replacement is ready.
+        // Deleting it here creates a short startup window in which sm.json.open
+        // asks Scrap Mechanic to rebuild a missing data-cache entry.
         DeleteFileW(temporary);
-        DeleteFileW(path);
     }
     if (reset_session)
     {
@@ -376,6 +391,7 @@ void remove_hand_bridge(bool reset_session = false)
     g_previous_gun_muzzle_item.clear();
     g_last_hand_bridge_publish_ms = 0;
     g_hand_bridge_logged.store(false, std::memory_order_release);
+    g_hand_bridge_inactive_published.store(false, std::memory_order_release);
     g_right_hand_world_active = false;
     g_right_hand_world_ms = 0;
 }
@@ -390,6 +406,11 @@ void deactivate_hand_bridge()
     g_right_hand_world_active = false;
     g_right_hand_world_ms = 0;
 
+    // A static inactive file is sufficient until tracking becomes active. Do not
+    // rewrite it on every OpenXR cleanup/retry: Scrap Mechanic treats each change
+    // as data-cache invalidation and can stall its logic task while recompiling it.
+    if (g_hand_bridge_inactive_published.load(std::memory_order_acquire)) return;
+
     wchar_t path[MAX_PATH]{}, temporary[MAX_PATH]{};
     if (!hand_bridge_paths(path, temporary, true)) return;
     const uint64_t hand_sequence = ++g_hand_bridge_sequence;
@@ -402,8 +423,9 @@ void deactivate_hand_bridge()
         "\"right\":{\"active\":false,\"interact\":false,\"optical\":false}}",
         static_cast<unsigned long long>(hand_sequence),
         static_cast<unsigned long long>(g_optical_hammer_swing_sequence));
-    if (length > 0 && static_cast<size_t>(length) < sizeof(json))
-        write_atomic_file(path, temporary, json, static_cast<size_t>(length));
+    if (length > 0 && static_cast<size_t>(length) < sizeof(json) &&
+        write_atomic_file(path, temporary, json, static_cast<size_t>(length)))
+        g_hand_bridge_inactive_published.store(true, std::memory_order_release);
 }
 
 void remove_world_state_bridge()
@@ -549,6 +571,7 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
     g_previous_right_interaction = interaction[1];
     if (!write_atomic_file(path, temporary, json, static_cast<size_t>(length))) return;
 
+    g_hand_bridge_inactive_published.store(false, std::memory_order_release);
     g_last_hand_bridge_publish_ms = now;
     g_previous_gun_muzzle_active = gun_muzzle_active;
     g_previous_gun_muzzle_item = gun_item;
@@ -1052,7 +1075,7 @@ struct OpenXrState
         if (!fields_readable)
         {
             log_line("FAIL stage=restore_vr_render_size reason=renderer_unreadable");
-            g_failed.store(true, std::memory_order_release);
+            mark_openxr_failed();
         }
         else
         {
@@ -1504,7 +1527,9 @@ struct OpenXrState
     void destroy()
     {
         abandon_pending_frame();
-        remove_hand_bridge(false);
+        // Keep a valid inactive bridge on disk. Deleting it makes the Lua side
+        // call sm.json.open on a missing file every update while no HMD exists.
+        deactivate_hand_bridge();
         restore_render_size_override();
         restore_viewmodel_pass_patch();
         release_mirror();
@@ -1536,7 +1561,7 @@ struct OpenXrState
     bool fail(const char *stage, XrResult result)
     {
         log_line("FAIL stage=%s xr=%d", stage, static_cast<int>(result));
-        g_failed.store(true, std::memory_order_release);
+        mark_openxr_failed();
         return false;
     }
 
@@ -1571,12 +1596,20 @@ struct OpenXrState
         XrInstanceProperties properties{XR_TYPE_INSTANCE_PROPERTIES};
         result = xrGetInstanceProperties(instance, &properties);
         if (XR_FAILED(result)) return fail("xrGetInstanceProperties", result);
-        log_line("XR_RUNTIME name=%s version=%u.%u.%u", properties.runtimeName,
-            XR_VERSION_MAJOR(properties.runtimeVersion), XR_VERSION_MINOR(properties.runtimeVersion), XR_VERSION_PATCH(properties.runtimeVersion));
+        if (!g_openxr_runtime_logged.exchange(true, std::memory_order_acq_rel))
+            log_line("XR_RUNTIME name=%s version=%u.%u.%u", properties.runtimeName,
+                XR_VERSION_MAJOR(properties.runtimeVersion), XR_VERSION_MINOR(properties.runtimeVersion), XR_VERSION_PATCH(properties.runtimeVersion));
 
         XrSystemGetInfo system_info{XR_TYPE_SYSTEM_GET_INFO};
         system_info.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
         result = xrGetSystem(instance, &system_info, &system);
+        if (result == XR_ERROR_FORM_FACTOR_UNAVAILABLE)
+        {
+            if (!g_openxr_unavailable_logged.exchange(true, std::memory_order_acq_rel))
+                log_line("XR_UNAVAILABLE reason=no_hmd desktop_fallback=1 auto_retry=0 restart_after_connect=1");
+            mark_openxr_failed(false);
+            return false;
+        }
         if (XR_FAILED(result)) return fail("xrGetSystem", result);
         result = xrGetInstanceProcAddr(instance, "xrGetD3D11GraphicsRequirementsKHR", reinterpret_cast<PFN_xrVoidFunction *>(&get_requirements));
         if (XR_FAILED(result) || !get_requirements) return fail("xrGetD3D11GraphicsRequirementsKHR.address", result);
@@ -1595,7 +1628,7 @@ struct OpenXrState
         if (FAILED(hr) || std::memcmp(&adapter_desc.AdapterLuid, &requirements.adapterLuid, sizeof(LUID)) != 0)
         {
             log_line("FAIL stage=adapter_luid_match hr=%08x", static_cast<unsigned>(hr));
-            g_failed.store(true); return false;
+            mark_openxr_failed(); return false;
         }
 
         XrGraphicsBindingD3D11KHR binding{XR_TYPE_GRAPHICS_BINDING_D3D11_KHR};
@@ -1653,13 +1686,13 @@ struct OpenXrState
         if (source.Format != DXGI_FORMAT_R8G8B8A8_UNORM)
         {
             log_line("FAIL stage=unexpected_source_color_format format=%u", static_cast<unsigned>(source.Format));
-            g_failed.store(true, std::memory_order_release);
+            mark_openxr_failed();
             return false;
         }
         const int64_t required_format = static_cast<int64_t>(DXGI_FORMAT_R8G8B8A8_UNORM_SRGB);
         bool format_supported = false;
         for (int64_t f : formats) if (f == required_format) format_supported = true;
-        if (!format_supported) { log_line("FAIL stage=srgb_swapchain_format_not_supported format=%lld", static_cast<long long>(required_format)); g_failed.store(true); return false; }
+        if (!format_supported) { log_line("FAIL stage=srgb_swapchain_format_not_supported format=%lld", static_cast<long long>(required_format)); mark_openxr_failed(); return false; }
 
         for (uint32_t i = 0; i != 2; ++i)
         {
@@ -1723,11 +1756,14 @@ struct OpenXrState
         if (!initialize_mirror(device))
         {
             log_line("FAIL stage=desktop_mirror_initialize");
-            g_failed.store(true, std::memory_order_release);
+            mark_openxr_failed();
             return false;
         }
         desktop_width = source.Width; desktop_height = source.Height; source_format = source.Format;
         initialized = true;
+        g_openxr_retry_after_ms.store(0, std::memory_order_release);
+        g_desktop_fallback_logged.store(false, std::memory_order_release);
+        g_openxr_unavailable_logged.store(false, std::memory_order_release);
         log_line("XR_INITIALIZED desktop_source=%ux%u source_format=%u swapchain_format=%lld color_encoding=sRGB runtime_views=%ux%u,%ux%u", source.Width, source.Height,
             static_cast<unsigned>(source.Format), static_cast<long long>(required_format), view_info[0].recommendedImageRectWidth, view_info[0].recommendedImageRectHeight,
             view_info[1].recommendedImageRectWidth, view_info[1].recommendedImageRectHeight);
@@ -1784,7 +1820,7 @@ struct OpenXrState
                     g_startup_menu.reset_state();
                     restore_render_size_override();
                     restore_viewmodel_pass_patch();
-                    g_failed.store(true); log_line("FAIL stage=session_exit_or_loss state=%d", static_cast<int>(state));
+                    mark_openxr_failed(false); log_line("FAIL stage=session_exit_or_loss state=%d", static_cast<int>(state));
                 }
             }
         }
@@ -1803,7 +1839,7 @@ struct OpenXrState
         if (desc.Format != source_format || desc.SampleDesc.Count != 1 || desc.ArraySize != 1 || desc.MipLevels != 1)
         {
             log_line("FAIL stage=target_changed actual=%ux%u/%u", desc.Width, desc.Height, static_cast<unsigned>(desc.Format));
-            g_failed.store(true); return false;
+            mark_openxr_failed(); return false;
         }
 
         XrFrameWaitInfo wait_info{XR_TYPE_FRAME_WAIT_INFO};
@@ -2395,11 +2431,39 @@ void __fastcall hk_render_setup(void *renderer, float scalar, const float *world
         original(renderer, scalar, world_to_view, projection, settings);
         return;
     }
-    if (g_failed.load(std::memory_order_acquire)) return;
+    if (g_failed.load(std::memory_order_acquire))
+    {
+        const uint64_t now = GetTickCount64();
+        const uint64_t retry_after = g_openxr_retry_after_ms.load(std::memory_order_acquire);
+        if (retry_after != 0 && now >= retry_after)
+        {
+            // Retry transient renderer/runtime failures at a low rate while every
+            // intervening frame continues through the original desktop renderer.
+            // A genuinely absent HMD uses retry_after=0 and stays in quiet desktop
+            // mode until the next launch, avoiding periodic runtime stalls.
+            std::lock_guard retry_lock(g_xr_mutex);
+            g_failed.store(false, std::memory_order_release);
+            g_openxr_retry_after_ms.store(0, std::memory_order_release);
+            g_xr.destroy();
+        }
+        if (g_failed.load(std::memory_order_acquire))
+        {
+            g_xr.restore_render_size_override();
+            restore_viewmodel_pass_patch();
+            if (!g_desktop_fallback_logged.exchange(true, std::memory_order_acq_rel))
+                log_line("XR_DESKTOP_FALLBACK active=1 original_renderer=1 auto_retry=%u retry_delay_ms=%llu",
+                    retry_after != 0 ? 1u : 0u,
+                    static_cast<unsigned long long>(retry_after != 0 ? kOpenXrRetryDelayMs : 0));
+            original(renderer, scalar, world_to_view, projection, settings);
+            return;
+        }
+    }
     if (!view_valid || !projection_valid)
     {
         log_line("FAIL stage=live_camera_abi view_valid=%u projection_valid=%u", view_valid ? 1u : 0u, projection_valid ? 1u : 0u);
-        g_failed.store(true, std::memory_order_release);
+        mark_openxr_failed();
+        restore_viewmodel_pass_patch();
+        original(renderer, scalar, world_to_view, projection, settings);
         return;
     }
 
@@ -2411,7 +2475,10 @@ void __fastcall hk_render_setup(void *renderer, float scalar, const float *world
         if (g_xr.initialized || g_xr.running)
         {
             log_line("FAIL stage=native_renderer_resource_lost device=%p context=%p target=%p", device, context, target);
-            g_failed.store(true, std::memory_order_release);
+            mark_openxr_failed();
+            g_xr.restore_render_size_override();
+            restore_viewmodel_pass_patch();
+            original(renderer, scalar, world_to_view, projection, settings);
             return;
         }
         restore_viewmodel_pass_patch();
@@ -2429,13 +2496,24 @@ void __fastcall hk_render_setup(void *renderer, float scalar, const float *world
             // input action spaces. Release the partial transaction before leaving
             // the hook so a later process/session can never hit XR_LIMIT_REACHED.
             g_xr.destroy();
+            restore_viewmodel_pass_patch();
+            original(renderer, scalar, world_to_view, projection, settings);
             return;
         }
     }
     // Close any prior frame before processing a possible STOPPING transition.
     if (g_xr.frame_pending)
     {
-        if (!g_xr.finish_pending_frame(context)) return;
+        if (!g_xr.finish_pending_frame(context))
+        {
+            if (g_failed.load(std::memory_order_acquire))
+            {
+                g_xr.restore_render_size_override();
+                restore_viewmodel_pass_patch();
+                original(renderer, scalar, world_to_view, projection, settings);
+            }
+            return;
+        }
     }
     g_xr.poll_events();
     if (!g_xr.running)
@@ -2447,7 +2525,13 @@ void __fastcall hk_render_setup(void *renderer, float scalar, const float *world
     }
     if (!g_xr.render_stereo(original, renderer, scalar, world_to_view, projection, settings, context, target))
     {
-        if (!g_failed.load()) log_line("XR_FRAME_NOT_RENDERED");
+        if (g_failed.load(std::memory_order_acquire))
+        {
+            g_xr.restore_render_size_override();
+            restore_viewmodel_pass_patch();
+            original(renderer, scalar, world_to_view, projection, settings);
+        }
+        else log_line("XR_FRAME_NOT_RENDERED");
         return;
     }
     g_stereo_frames.fetch_add(1);
@@ -2606,7 +2690,7 @@ void on_init_swapchain(reshade::api::swapchain *swapchain, bool resize)
     {
         log_line("FAIL stage=desktop_swapchain_desc resize=%u hr=%08x",
             resize ? 1u : 0u, static_cast<unsigned>(hr));
-        g_failed.store(true, std::memory_order_release);
+        mark_openxr_failed();
     }
 }
 
@@ -2710,7 +2794,8 @@ extern "C" __declspec(dllexport) BOOL AddonInit(HMODULE addon_module, HMODULE re
 {
     smvr::g_module = addon_module;
     smvr::initialize_paths();
-    smvr::remove_hand_bridge(true);
+    smvr::reset_hand_bridge(true);
+    smvr::deactivate_hand_bridge();
     smvr::remove_world_state_bridge();
     smvr::log_line("SMVR_V1_START enabled=%u game_build=24529696 exe_sha256=5D663BA2...A5B4F5", smvr::g_enabled.load() ? 1u : 0u);
     if (!smvr::validate_build()) { smvr::log_line("FAIL stage=validate_build"); return FALSE; }

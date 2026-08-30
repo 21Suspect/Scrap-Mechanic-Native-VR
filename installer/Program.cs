@@ -17,22 +17,22 @@ using Microsoft.Win32;
 [assembly: AssemblyDescription("Installer, verifier, repair manager, and restorer for Scrap Mechanic Chapter 2 VR")]
 [assembly: AssemblyCompany("Scrap Mechanic VR Community Project")]
 [assembly: AssemblyProduct("Scrap Mechanic VR Chapter 2")]
-[assembly: AssemblyVersion("1.1.0.0")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+[assembly: AssemblyVersion("1.1.1.0")]
+[assembly: AssemblyFileVersion("1.1.1.0")]
 
 namespace ScrapMechanicVRPatcher
 {
     internal static class BuildInfo
     {
-        internal const string Version = "1.1.0-chapter2-20260830";
+        internal const string Version = "1.1.1-chapter2-20260830";
         internal const string GameBuild = "24529696";
         internal const string GameExeHash = "5D663BA2EC5DC8C7ABEFCC5C9344AE86F0A066C4069A91F54833524AC9A5B4F5";
-        internal const string AddonHash = "74295E66FF9A84BAB56E0D10C00B82FD259D359BCA3189DF23118D968297174B";
+        internal const string AddonHash = "288A89BF2CB7183252CFF6D5056605EB822AB26A79D67D2083CC5C8635743B69";
         internal const string DxgiHash = "EC9245D05C11751F2AC0D2256E6921AD8FB36BE9172EF6D587856591EB729A25";
         internal const string LoaderHash = "018C6519AFBDEADE6DA9E7D59C406068DD58674D87A65AE27353484A05E6674A";
         internal const string MusicHash = "02E8E98721A899C2731ED8AFDF6378DB98DC09BB87FA5896FBA911CE5D875660";
         internal const string LogoHash = "C692A16C8CB01B94618951C09F64A156D7DD6A71D349B91E023B018165504C34";
-        internal const string ManifestHash = "17904F117C13E33BA3A642302389C46CB4100C3BA576331100B66B2E1F548593";
+        internal const string ManifestHash = "161954C3DFC5828BC6B8152BD8CC417FCDB4BD57F1BF73DAF0C10DFAFEBA38E7";
         internal const string PatcherHash = "C0DB650D7861D60561772EF8C48A686178223B6994B47CE920D3F84AF1FA3A41";
         internal const int ManagedFileCount = 29;
         internal const string ResourceName = "ScrapMechanicVR.Payload.zip";
