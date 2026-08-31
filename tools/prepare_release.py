@@ -71,14 +71,16 @@ def main() -> None:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
     manifest["patchVersion"] = args.version
     manifest["description"] = (
-        "Scrap Mechanic Chapter 2 native OpenXR VR with tracked Quest hands, "
-        "complete held-item and tool adapters, barrel-aimed weapons, spatial live "
+        "Scrap Mechanic Chapter 2 native OpenXR VR with tracked Quest Touch and Valve Index "
+        "controllers, optional Quest optical hands, Custom Game content bridging, complete "
+        "held-item geometry, grouped live pose calibration, barrel-aimed weapons, spatial live "
         "game menus, native queued UI input, transparent composition, and restrained haptics"
     )
 
     adapter_paths = {
         f"Survival\\Scripts\\game\\tools\\{name}": name for name in ADAPTER_FILES
     }
+    existing_entries = {entry["path"]: entry for entry in manifest["files"]}
     files = [entry for entry in manifest["files"] if entry["path"] not in adapter_paths]
     insert_at = next(
         (index for index, entry in enumerate(files) if entry["path"].endswith("Sledgehammer.lua")),
@@ -86,18 +88,22 @@ def main() -> None:
     ) + 1
     additions = []
     for game_path, name in adapter_paths.items():
-        source = args.game_root / Path(game_path.replace("\\", "/"))
         patched = payload / Path(game_path.replace("\\", "/"))
-        if not source.is_file() or not patched.is_file():
-            raise FileNotFoundError(source if not source.is_file() else patched)
-        additions.append(
-            {
-                "path": game_path,
-                "patchedSha256": sha256(patched),
-                "originalSha256": [sha256(source)],
-                "module": "chapter2-vr-held-items",
-            }
-        )
+        if not patched.is_file():
+            raise FileNotFoundError(patched)
+        previous = existing_entries.get(game_path, {})
+        original_hashes = previous.get("originalSha256")
+        if not original_hashes:
+            source = args.game_root / Path(game_path.replace("\\", "/"))
+            if not source.is_file():
+                raise FileNotFoundError(source)
+            original_hashes = [sha256(source)]
+        additions.append({
+            "path": game_path,
+            "patchedSha256": sha256(patched),
+            "originalSha256": original_hashes,
+            "module": "chapter2-vr-held-items",
+        })
     files[insert_at:insert_at] = additions
     manifest["files"] = files
 
@@ -119,24 +125,62 @@ def main() -> None:
     candidate = snapshot.setdefault("localCandidateArtifact", {})
     candidate.update({"version": args.version, **artifact, "headsetConfirmed": args.headset_confirmed})
     source_meta = candidate.setdefault("source", {})
-    source_meta["nativeVrSha256"] = sha256(root / "src" / "native_vr.cpp")
-    source_meta["vrToolsSha256"] = sha256(root / "source" / "NativeVR" / "src" / "vr_tools.cpp")
-    source_meta["heldItemAssetSha256"] = sha256(root / "source" / "NativeVR" / "src" / "held_item_asset.hpp")
-    source_meta["heldItemAssetGeneratorSha256"] = sha256(root / "source" / "NativeVR" / "tools" / "generate_held_item_assets.py")
-    source_meta["heldItemPayloadGeneratorSha256"] = sha256(root / "source" / "NativeVR" / "tools" / "generate_held_item_payload.py")
-    source_meta["chapter2GameplayBridgeSha256"] = sha256(payload / "Survival" / "Scripts" / "game" / "Chapter2VR.lua")
+    source_paths = {
+        "nativeVrSha256": "src/native_vr.cpp",
+        "featureInputSha256": "src/feature_input.cpp",
+        "featureInputHeaderSha256": "src/feature_input.hpp",
+        "engineInputSha256": "src/feature_engine_input.cpp",
+        "engineInputHeaderSha256": "src/feature_engine_input.hpp",
+        "startupMenuSha256": "src/feature_startup_menu.cpp",
+        "startupMenuHeaderSha256": "src/feature_startup_menu.hpp",
+        "vrHandsSha256": "source/NativeVR/src/vr_hands.cpp",
+        "vrToolsSha256": "source/NativeVR/src/vr_tools.cpp",
+        "vrToolsHeaderSha256": "source/NativeVR/src/vr_tools.hpp",
+        "mechanicHandsAssetSha256": "source/NativeVR/src/mechanic_hands_asset.hpp",
+        "nativeToolAssetSha256": "source/NativeVR/src/native_tool_asset.hpp",
+        "chapter2ToolAssetSha256": "source/NativeVR/src/chapter2_tool_asset.hpp",
+        "mechanicHandsGeneratorSha256": "source/NativeVR/tools/generate_mechanic_hands.py",
+        "chapter2ToolGeneratorSha256": "source/NativeVR/tools/generate_chapter2_weapons.py",
+        "customContentBridgeSha256": "source/NativeVR/src/custom_content_bridge.cpp",
+        "customContentBridgeHeaderSha256": "source/NativeVR/src/custom_content_bridge.hpp",
+        "clayCalibrationHelperSourceSha256": "tools/ClayCalibration/Program.cs",
+        "heldItemAssetSha256": "source/NativeVR/src/held_item_asset.hpp",
+        "heldItemAssetGeneratorSha256": "source/NativeVR/tools/generate_held_item_assets.py",
+        "heldItemPayloadGeneratorSha256": "source/NativeVR/tools/generate_held_item_payload.py",
+        "heldItemCatalogSha256": "source/NativeVR/src/held_item_catalog.hpp",
+        "fullHeldItemCatalogGeneratorSha256": "source/NativeVR/tools/generate_full_held_item_catalog.py",
+        "blenderHeldCatalogExtractorSha256": "source/NativeVR/tools/blender_extract_held_catalog.py",
+        "heldCalibrationHelperSourceSha256": "tools/HeldCalibration/Program.cs",
+        "heldCalibrationBuildScriptSha256": "Build-HeldCalibration.ps1",
+    }
+    for key, relative in source_paths.items():
+        source_meta[key] = sha256(root / relative)
+    source_meta["chapter2GameplayBridgeSha256"] = sha256(
+        payload / "Survival" / "Scripts" / "game" / "Chapter2VR.lua"
+    )
+    source_meta["heldItemCatalogBinarySha256"] = sha256(
+        payload / "Release" / "ScrapMechanicVR-HeldItems.bin"
+    )
+    source_meta["heldItemCatalogIndexSha256"] = sha256(
+        payload / "Release" / "ScrapMechanicVR-HeldItems.tsv"
+    )
     source_meta["heldItemScriptSha256"] = {
         name: sha256(payload / "Survival" / "Scripts" / "game" / "tools" / name)
         for name in ADAPTER_FILES
     }
     validation = snapshot.setdefault("validation", {})
-    validation["date"] = "2026-08-30"
+    validation["date"] = "2026-08-31"
     validation["installerManagedFiles"] = len(manifest["files"])
     validation["luaSyntax"] = "PASS"
     validation["nativeReleaseBuild"] = "PASS"
     validation["headsetConfirmed"] = args.headset_confirmed
     installer = snapshot.setdefault("installer", {})
-    installer.update({"version": args.version, "path": "dist/ScrapMechanicVR-Installer.exe", "selfTest": "PENDING", "published": False})
+    installer.update({
+        "version": args.version,
+        "path": "dist/ScrapMechanicVR-Installer.exe",
+        "selfTest": "SKIPPED_USER_CONFIRMED_RUNTIME",
+        "published": False,
+    })
     dump_json(snapshot_path, snapshot)
 
     program = program_path.read_text(encoding="utf-8-sig")

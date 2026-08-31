@@ -78,6 +78,7 @@ namespace scrapvr::tools
 			ID3D11Buffer *vertices = nullptr;
 			ID3D11ShaderResourceView *texture = nullptr;
 			uint32_t count = 0;
+			held_item_catalog::Material material = held_item_catalog::Material::opaque;
 		};
 		struct ToolCalibration
 		{
@@ -112,11 +113,14 @@ namespace scrapvr::tools
 		ID3D11Buffer *g_laser_buffer = nullptr;
 		ID3D11VertexShader *g_vertex_shader = nullptr;
 		ID3D11PixelShader *g_pixel_shader = nullptr;
+		ID3D11PixelShader *g_cutout_pixel_shader = nullptr;
 		ID3D11PixelShader *g_laser_pixel_shader = nullptr;
 		ID3D11InputLayout *g_input_layout = nullptr;
 		ID3D11SamplerState *g_sampler = nullptr;
 		ID3D11RasterizerState *g_rasterizer = nullptr;
 		ID3D11DepthStencilState *g_depth_state = nullptr;
+		ID3D11DepthStencilState *g_glass_depth_state = nullptr;
+		ID3D11BlendState *g_alpha_blend_state = nullptr;
 		std::wstring g_game_root;
 		Tool g_active_tool = Tool::none;
 		ItemVariant g_active_variant = ItemVariant::none;
@@ -581,10 +585,47 @@ namespace scrapvr::tools
 			return pixel == width * height;
 		}
 
-		bool create_texture(const wchar_t *relative, ID3D11ShaderResourceView **output)
+		bool create_texture(const wchar_t *relative, ID3D11ShaderResourceView **output,
+			uint32_t paint_rgba = 0xffffffffu, bool apply_paint = false,
+			const wchar_t *mask_relative = nullptr,
+			held_item_catalog::Material material = held_item_catalog::Material::opaque)
 		{
 			std::vector<uint8_t> pixels; uint32_t width = 0, height = 0;
 			if (!load_tga(relative, pixels, width, height)) return false;
+			std::vector<uint8_t> mask_pixels; uint32_t mask_width = 0, mask_height = 0;
+			const bool has_cutout_mask = material == held_item_catalog::Material::cutout &&
+				mask_relative && load_tga(mask_relative, mask_pixels, mask_width, mask_height) &&
+				mask_width == width && mask_height == height;
+			if (apply_paint)
+			{
+				// Scrap Mechanic's paintable diffuse maps do not store ordinary RGBA.
+				// RGB contains the unpainted contribution and inverse alpha is the
+				// paint mask. Sampling those files directly makes common blocks (whose
+				// RGB is intentionally black) appear as featureless black geometry.
+				const uint8_t paint[] = {
+					static_cast<uint8_t>(paint_rgba & 0xffu),
+					static_cast<uint8_t>((paint_rgba >> 8) & 0xffu),
+					static_cast<uint8_t>((paint_rgba >> 16) & 0xffu)
+				};
+				for (size_t offset = 0; offset + 3 < pixels.size(); offset += 4)
+				{
+					const unsigned int inverse_mask = 255u - pixels[offset + 3];
+					for (size_t channel = 0; channel < 3; ++channel)
+					{
+						const unsigned int painted = pixels[offset + channel] +
+							(static_cast<unsigned int>(paint[channel]) * inverse_mask + 127u) / 255u;
+						pixels[offset + channel] = static_cast<uint8_t>(std::min(painted, 255u));
+					}
+					// Diffuse alpha is the paint mask, not surface transparency. Alpha
+					// materials store their actual coverage in the red ASG channel.
+					if (material == held_item_catalog::Material::glass)
+						pixels[offset + 3] = 112;
+					else if (has_cutout_mask)
+						pixels[offset + 3] = mask_pixels[offset];
+					else
+						pixels[offset + 3] = 255;
+				}
+			}
 			D3D11_TEXTURE2D_DESC desc = {}; desc.Width = width; desc.Height = height; desc.MipLevels = 1; desc.ArraySize = 1;
 			desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; desc.SampleDesc.Count = 1; desc.Usage = D3D11_USAGE_IMMUTABLE; desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
 			D3D11_SUBRESOURCE_DATA data = {}; data.pSysMem = pixels.data(); data.SysMemPitch = width * 4;
@@ -608,20 +649,23 @@ namespace scrapvr::tools
 		}
 
 		bool create_resource(DrawResource &draw, const Vertex *vertices, uint32_t count,
-			const wchar_t *texture, uint32_t rgba = 0xffffffffu)
+			const wchar_t *texture, uint32_t rgba = 0xffffffffu, bool apply_paint = false,
+			const wchar_t *mask = nullptr,
+			held_item_catalog::Material material = held_item_catalog::Material::opaque)
 		{
 			release(draw.vertices);
 			release(draw.texture);
-			draw.count = count;
+			draw.count = count; draw.material = material;
 			D3D11_BUFFER_DESC desc = {}; desc.ByteWidth = count * sizeof(Vertex); desc.Usage = D3D11_USAGE_IMMUTABLE; desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 			D3D11_SUBRESOURCE_DATA data = {}; data.pSysMem = vertices;
 			if (FAILED(g_device->CreateBuffer(&desc, &data, &draw.vertices))) return false;
-			if (texture && create_texture(texture, &draw.texture)) return true;
+			if (texture && create_texture(texture, &draw.texture, rgba, apply_paint, mask, material)) return true;
 			const bool ok = create_solid_texture(
 				static_cast<uint8_t>(rgba & 0xffu),
 				static_cast<uint8_t>((rgba >> 8) & 0xffu),
 				static_cast<uint8_t>((rgba >> 16) & 0xffu),
-				static_cast<uint8_t>((rgba >> 24) & 0xffu), &draw.texture);
+				material == held_item_catalog::Material::glass ? 112u :
+				apply_paint ? 255u : static_cast<uint8_t>((rgba >> 24) & 0xffu), &draw.texture);
 			if (!ok) { release(draw.vertices); draw.count = 0; }
 			return ok;
 		}
@@ -745,7 +789,8 @@ namespace scrapvr::tools
 				}
 				g_catalog_draws.emplace_back();
 				if (!create_resource(g_catalog_draws.back(), vertices.data(), submesh.vertex_count,
-					submesh.texture, submesh.rgba ? submesh.rgba : item.tint))
+					submesh.texture, submesh.rgba ? submesh.rgba : item.tint, true,
+					submesh.mask, submesh.material))
 				{
 					release_catalog_draws();
 					return false;
@@ -757,14 +802,31 @@ namespace scrapvr::tools
 
 		void draw_catalog_item(ID3D11DeviceContext *context)
 		{
+			const float blend_factor[4] = { 0, 0, 0, 0 };
 			for (auto &draw : g_catalog_draws)
 			{
 				if (!draw.vertices || !draw.texture) continue;
+				if (draw.material == held_item_catalog::Material::glass)
+				{
+					context->PSSetShader(g_pixel_shader, nullptr, 0);
+					context->OMSetBlendState(g_alpha_blend_state, blend_factor, 0xffffffffu);
+					context->OMSetDepthStencilState(g_glass_depth_state, 0);
+				}
+				else
+				{
+					context->PSSetShader(draw.material == held_item_catalog::Material::cutout ?
+						g_cutout_pixel_shader : g_pixel_shader, nullptr, 0);
+					context->OMSetBlendState(nullptr, blend_factor, 0xffffffffu);
+					context->OMSetDepthStencilState(g_depth_state, 0);
+				}
 				UINT stride = sizeof(Vertex), offset = 0;
 				context->IASetVertexBuffers(0, 1, &draw.vertices, &stride, &offset);
 				context->PSSetShaderResources(0, 1, &draw.texture);
 				context->Draw(draw.count, 0);
 			}
+			context->PSSetShader(g_pixel_shader, nullptr, 0);
+			context->OMSetBlendState(nullptr, blend_factor, 0xffffffffu);
+			context->OMSetDepthStencilState(g_depth_state, 0);
 		}
 
 		HeldProfile catalog_profile(held_item_catalog::Profile profile)
@@ -1000,6 +1062,12 @@ namespace scrapvr::tools
 			default:
 				return false;
 			}
+		}
+
+		bool has_projectile_aim(Tool tool)
+		{
+			return is_gun(tool) || tool == Tool::glowstick || tool == Tool::cornade ||
+				tool == Tool::extinguisher;
 		}
 
 		void update_spinner_animation(bool firing, bool clay)
@@ -1317,7 +1385,7 @@ namespace scrapvr::tools
 				o.position = mul(mvp, local); o.uv = input.uv; o.world_position = world.xyz;
 				o.world_normal = normalize(mul((float3x3)model, input.normal)); return o; }
 			Texture2D tex : register(t0); SamplerState samp : register(s0);
-			float4 ps_main(VSOut input) : SV_TARGET { float4 c = tex.Sample(samp, input.uv); float3 n = normalize(input.world_normal);
+			float4 shade(VSOut input, float4 c) { float3 n = normalize(input.world_normal);
 				float3 key_direction = normalize(float3(-0.35, 0.78, -0.52)); float sky = 0.5 + 0.5 * n.y;
 				float ambient = lerp(0.32, 0.48, sky); float key = 0.38 * saturate(dot(n, key_direction));
 				float fill = 0.06 * saturate(dot(n, normalize(float3(0.65, 0.25, 0.72))));
@@ -1325,20 +1393,25 @@ namespace scrapvr::tools
 				float specular = 0.035 * pow(saturate(dot(n, normalize(key_direction + view_direction))), 30.0);
 				float3 linear_lit = c.rgb * (ambient + key + fill) + specular;
 				return float4(saturate((linear_lit - 0.18) * 1.08 + 0.16), c.a); }
+			float4 ps_main(VSOut input) : SV_TARGET { return shade(input, tex.Sample(samp, input.uv)); }
+			float4 ps_cutout(VSOut input) : SV_TARGET { float4 c = tex.Sample(samp, input.uv);
+				clip(c.a - 0.08); return shade(input, c); }
 			float4 ps_laser(VSOut input) : SV_TARGET { return float4(1, 1, 1, 1); }
 		)";
 		HMODULE compiler = LoadLibraryW(L"d3dcompiler_47.dll");
 		using Compile = HRESULT (WINAPI *)(LPCVOID, SIZE_T, LPCSTR, const void *, void *, LPCSTR, LPCSTR, UINT, UINT, ID3DBlob **, ID3DBlob **);
 		auto compile = compiler ? reinterpret_cast<Compile>(GetProcAddress(compiler, "D3DCompile")) : nullptr;
-		ID3DBlob *vs = nullptr, *ps = nullptr, *laser_ps = nullptr, *errors = nullptr;
+		ID3DBlob *vs = nullptr, *ps = nullptr, *cutout_ps = nullptr, *laser_ps = nullptr, *errors = nullptr;
 		if (!compile || FAILED(compile(shader, std::strlen(shader), "vr_tools", nullptr, nullptr, "vs_main", "vs_5_0", 0, 0, &vs, &errors))) { release(errors); if (compiler) FreeLibrary(compiler); return false; }
 		release(errors);
 		if (FAILED(compile(shader, std::strlen(shader), "vr_tools", nullptr, nullptr, "ps_main", "ps_5_0", 0, 0, &ps, &errors)) ||
+			FAILED(compile(shader, std::strlen(shader), "vr_tools", nullptr, nullptr, "ps_cutout", "ps_5_0", 0, 0, &cutout_ps, &errors)) ||
 			FAILED(compile(shader, std::strlen(shader), "vr_tools", nullptr, nullptr, "ps_laser", "ps_5_0", 0, 0, &laser_ps, &errors)))
-		{ release(errors); release(vs); release(ps); release(laser_ps); if (compiler) FreeLibrary(compiler); return false; }
+		{ release(errors); release(vs); release(ps); release(cutout_ps); release(laser_ps); if (compiler) FreeLibrary(compiler); return false; }
 		if (compiler) FreeLibrary(compiler);
 		if (FAILED(g_device->CreateVertexShader(vs->GetBufferPointer(), vs->GetBufferSize(), nullptr, &g_vertex_shader)) ||
 			FAILED(g_device->CreatePixelShader(ps->GetBufferPointer(), ps->GetBufferSize(), nullptr, &g_pixel_shader)) ||
+			FAILED(g_device->CreatePixelShader(cutout_ps->GetBufferPointer(), cutout_ps->GetBufferSize(), nullptr, &g_cutout_pixel_shader)) ||
 			FAILED(g_device->CreatePixelShader(laser_ps->GetBufferPointer(), laser_ps->GetBufferSize(), nullptr, &g_laser_pixel_shader))) return false;
 		D3D11_INPUT_ELEMENT_DESC elements[] = {
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -1346,7 +1419,7 @@ namespace scrapvr::tools
 			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 		};
 		if (FAILED(g_device->CreateInputLayout(elements, 3, vs->GetBufferPointer(), vs->GetBufferSize(), &g_input_layout))) return false;
-		release(vs); release(ps); release(laser_ps); release(errors);
+		release(vs); release(ps); release(cutout_ps); release(laser_ps); release(errors);
 		D3D11_BUFFER_DESC cb = {}; cb.ByteWidth = sizeof(Constants); cb.Usage = D3D11_USAGE_DEFAULT; cb.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 		if (FAILED(g_device->CreateBuffer(&cb, nullptr, &g_constant_buffer))) return false;
 		D3D11_BUFFER_DESC lb = {}; lb.ByteWidth = 2 * sizeof(Vertex); lb.Usage = D3D11_USAGE_DYNAMIC; lb.BindFlags = D3D11_BIND_VERTEX_BUFFER; lb.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -1357,6 +1430,18 @@ namespace scrapvr::tools
 		if (FAILED(g_device->CreateRasterizerState(&raster, &g_rasterizer))) return false;
 		D3D11_DEPTH_STENCIL_DESC depth = {}; depth.DepthEnable = TRUE; depth.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL; depth.DepthFunc = D3D11_COMPARISON_LESS;
 		if (FAILED(g_device->CreateDepthStencilState(&depth, &g_depth_state))) return false;
+		D3D11_DEPTH_STENCIL_DESC glass_depth = depth; glass_depth.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+		if (FAILED(g_device->CreateDepthStencilState(&glass_depth, &g_glass_depth_state))) return false;
+		D3D11_BLEND_DESC blend = {};
+		blend.RenderTarget[0].BlendEnable = TRUE;
+		blend.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+		blend.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+		blend.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+		blend.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+		blend.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
+		blend.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+		blend.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+		if (FAILED(g_device->CreateBlendState(&blend, &g_alpha_blend_state))) return false;
 
 		using namespace native_tool_asset;
 		using namespace chapter2_tool_asset;
@@ -1563,7 +1648,7 @@ namespace scrapvr::tools
 	{
 		poll_active_tool();
 		poll_held_calibration();
-		if (!is_gun(g_active_tool))
+		if (!has_projectile_aim(g_active_tool))
 		{
 			item_uuid = nullptr;
 			return false;
@@ -1580,6 +1665,9 @@ namespace scrapvr::tools
 		case Tool::scrap: item_uuid = "d51ec758-057b-4263-bd16-7a731e149480"; break;
 		case Tool::launcher: item_uuid = "a2a2bb33-a841-4b23-88da-b758063d9206"; break;
 		case Tool::clay: item_uuid = "6993e5df-6852-4e84-88ae-df49f765e784"; break;
+		case Tool::glowstick: item_uuid = "3a3280e4-03b6-4a4d-9e02-e348478213c9"; break;
+		case Tool::cornade: item_uuid = "e3bdeea5-d349-4d08-9b5a-5695ea05537e"; break;
+		case Tool::extinguisher: item_uuid = "d2fab7ef-21db-4681-a22a-cd4f278fc355"; break;
 		default: item_uuid = nullptr; return false;
 		}
 		return true;
@@ -1597,6 +1685,15 @@ namespace scrapvr::tools
 		if (is_gun(g_active_tool)) return HapticProfile::gun;
 		if (g_active_tool != Tool::none) return HapticProfile::tool;
 		return HapticProfile::none;
+	}
+
+	ContextAction active_context_action()
+	{
+		poll_active_tool();
+		if (g_player_seated) return ContextAction::none;
+		if (g_active_tool == Tool::paint) return ContextAction::paint_palette;
+		if (g_active_tool == Tool::catalog) return ContextAction::rotate_placement;
+		return ContextAction::none;
 	}
 
 	bool is_player_seated()
@@ -1621,8 +1718,10 @@ namespace scrapvr::tools
 		for (auto &draw : g_draws) { release(draw.vertices); release(draw.texture); draw.count = 0; }
 		for (auto &draw : g_held_draws) { release(draw.vertices); release(draw.texture); draw.count = 0; }
 		release_catalog_draws();
-		release(g_depth_state); release(g_rasterizer); release(g_sampler); release(g_input_layout);
-		release(g_laser_pixel_shader); release(g_pixel_shader); release(g_vertex_shader); release(g_laser_buffer); release(g_constant_buffer);
+		release(g_alpha_blend_state); release(g_glass_depth_state); release(g_depth_state);
+		release(g_rasterizer); release(g_sampler); release(g_input_layout);
+		release(g_laser_pixel_shader); release(g_cutout_pixel_shader); release(g_pixel_shader);
+		release(g_vertex_shader); release(g_laser_buffer); release(g_constant_buffer);
 		g_device = nullptr; g_log = nullptr; g_game_root.clear(); g_active_tool = Tool::none;
 		g_active_variant = ItemVariant::none; g_active_catalog_item = -1; g_active_item_uuid.clear();
 		g_clay_calibration = ClayCalibration{}; g_clay_calibration_path.clear();

@@ -15,14 +15,15 @@ Native OpenXR VR for the current Scrap Mechanic Chapter 2 / 1.0 release, made by
 1. Close Scrap Mechanic.
 2. Download and run **[ScrapMechanicVR-Installer.exe](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/raw/refs/heads/main/dist/ScrapMechanicVR-Installer.exe)**.
 3. Click **Install VR Mod** and approve the administrator prompt.
-4. Start your OpenXR runtime, connect the headset, then use the new **Start Scrap Mechanic VR - Chapter 2** shortcut.
+4. Start your OpenXR runtime, connect and wake the headset, then click **Start VR** or use the new desktop shortcut.
 
-The installer automatically finds Steam, verifies the supported game build, creates backups, and includes Verify, Repair, Start, and Uninstall actions. It is currently unsigned, so Windows SmartScreen may ask for confirmation.
+The installer has four clear actions: **Install VR Mod**, **Uninstall VR Mod**, **Start VR**, and **Open Logs**. Install automatically removes a detected older/current managed build before upgrading, and both install and uninstall verify their result automatically. Start VR checks that the active OpenXR runtime reports a connected headset. The installer is currently unsigned, so Windows SmartScreen may ask for confirmation.
 
 ## Features
 
 - Native stereo OpenXR rendering at the headset-recommended `2064 × 2272` resolution per eye.
 - Six-degree-of-freedom head tracking, correct stereo depth and perspective, exact runtime FOV, and the VR seam fix.
+- A level standing horizon with mouse/controller pitch-height movement removed, while seats retain Scrap Mechanic's original camera orbit.
 - Quest Touch and Valve Index controllers, plus optional Meta Quest optical hand tracking.
 - Tracked mechanic gloves with animated fingers and no artificial arms.
 - VR locomotion, turning, jump, crouch, sprint, interaction, hotbar controls, seated zoom, pause, and recentering.
@@ -37,7 +38,7 @@ The installer automatically finds Steam, verifies the supported game build, crea
 - Normal PC mode keeps the standard first-person viewmodel; VR mode removes it.
 - Survival, Creative, and Custom Games share the same tracked-hand, held-item, and spatial-menu integration.
 - Chapter 2 VR Mod branding on both the desktop and VR main menus.
-- Guarded one-file installation with hash verification, repair, backups, and complete restore.
+- Guarded one-file installation with automatic hash verification, backups, version migration, and complete restore.
 
 ## Controls
 

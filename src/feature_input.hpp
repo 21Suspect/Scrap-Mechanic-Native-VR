@@ -126,6 +126,7 @@ private:
     bool key_crouch_ = false;
     bool key_jump_ = false;
     bool key_use_ = false;
+    bool key_context_ = false;
     bool key_camera_ = false;
     bool key_zoom_in_ = false;
     bool key_zoom_out_ = false;

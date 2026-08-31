@@ -4,7 +4,8 @@ param(
     [string]$Action = 'Verify',
     [string]$GamePath,
     [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'ScrapMechanicVR-Chapter2'),
-    [switch]$Force
+    [switch]$Force,
+    [string[]]$AdditionalSteamRoot = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -62,6 +63,61 @@ function Assert-Payload($Manifest) {
             $failures += "payload hash mismatch: $($entry.path) expected=$($entry.patchedSha256) actual=$actual"
         }
     }
+
+    # This is a release-blocking gameplay contract, not just a collection of
+    # payload hashes. A hash refresh must never be able to bless weapon scripts
+    # which have accidentally reverted to Scrap Mechanic's desktop crosshair.
+    $chapter2BridgePath = Join-Path $payloadRoot 'Survival\Scripts\game\Chapter2VR.lua'
+    if (Test-Path -LiteralPath $chapter2BridgePath -PathType Leaf) {
+        $chapter2Bridge = [IO.File]::ReadAllText($chapter2BridgePath)
+        foreach ($requiredMarker in @(
+            'ScrapVRProjectilePoseNative',
+            'tracked_barrel_native_logic_task',
+            'source = firePos and "vr_barrel"',
+            'authoritative and "blocked" or "pc_fallback"'
+        )) {
+            if (-not $chapter2Bridge.Contains($requiredMarker)) {
+                $failures += "VR barrel regression: Chapter2VR.lua is missing '$requiredMarker'"
+            }
+        }
+    }
+
+    $gunScripts = @(
+        'ClayRifle.lua',
+        'PotatoRifle.lua',
+        'PotatoShotgun.lua',
+        'PotatoGatling.lua',
+        'PotatoLauncher.lua',
+        'ScrapPotatoRifle.lua'
+    )
+    foreach ($gunScript in $gunScripts) {
+        $relativePath = "Survival\Scripts\game\tools\$gunScript"
+        $gunPath = Join-Path $payloadRoot $relativePath
+        if (-not (Test-Path -LiteralPath $gunPath -PathType Leaf)) {
+            $failures += "VR barrel regression: missing gun script $relativePath"
+            continue
+        }
+        $gunText = [IO.File]::ReadAllText($gunPath)
+        foreach ($requiredMarker in @(
+            'Chapter2VR.gunFirePose( self.tool, true )',
+            'if vrAuthoritative and not vrFirePos then return end',
+            'vrGunAim and vrDirection or sm.localPlayer.getDirection()',
+            'vrGunAim and vrFirePos'
+        )) {
+            if (-not $gunText.Contains($requiredMarker)) {
+                $failures += "VR barrel regression: $gunScript is missing '$requiredMarker'"
+            }
+        }
+    }
+
+    $nativeAddonPath = Join-Path $payloadRoot 'Release\smvr_native_vr_v1.addon64'
+    if (Test-Path -LiteralPath $nativeAddonPath -PathType Leaf) {
+        $nativeAddonStrings = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($nativeAddonPath))
+        if (-not $nativeAddonStrings.Contains('ScrapVRProjectilePoseNative')) {
+            $failures += 'VR barrel regression: native addon does not export the direct Logic Task projectile-pose bridge'
+        }
+    }
+
     if ($failures.Count -gt 0) {
         throw ($failures -join [Environment]::NewLine)
     }
@@ -71,12 +127,36 @@ function Assert-Payload($Manifest) {
 function Add-GameCandidate([Collections.Generic.List[string]]$List, [string]$Candidate) {
     if ([string]::IsNullOrWhiteSpace($Candidate)) { return }
     try { $full = [IO.Path]::GetFullPath($Candidate) } catch { return }
+    $pathRoot = [IO.Path]::GetPathRoot($full)
+    if ([string]::IsNullOrWhiteSpace($pathRoot) -or -not [IO.Directory]::Exists($pathRoot)) { return }
     if (-not $List.Contains($full)) { $List.Add($full) }
 }
 
-function Find-GameRoot([string]$ExplicitPath, $Manifest) {
+function Join-FileSystemPath([string]$BasePath, [string]$ChildPath) {
+    if ([string]::IsNullOrWhiteSpace($BasePath) -or [string]::IsNullOrWhiteSpace($ChildPath)) {
+        return $null
+    }
+    try {
+        return [IO.Path]::Combine($BasePath, $ChildPath)
+    }
+    catch {
+        return $null
+    }
+}
+
+function Find-GameRoot([string]$ExplicitPath, $Manifest, [string[]]$ExtraSteamRoots = @()) {
     $candidates = New-Object 'Collections.Generic.List[string]'
     Add-GameCandidate $candidates $ExplicitPath
+
+    # The installer already supplies its validated game directory. Prefer it
+    # immediately so unrelated stale Steam library records cannot break an
+    # install, repair, or uninstall operation.
+    if ($candidates.Count -gt 0) {
+        $explicitExe = Join-FileSystemPath $candidates[0] ([string]$Manifest.game.executable)
+        if ($explicitExe -and [IO.File]::Exists($explicitExe)) {
+            return $candidates[0]
+        }
+    }
 
     $cursor = $projectRoot
     for ($i = 0; $i -lt 4; $i++) {
@@ -98,23 +178,24 @@ function Find-GameRoot([string]$ExplicitPath, $Manifest) {
         }
         catch {}
     }
-    foreach ($steamRoot in $steamRoots | Select-Object -Unique) {
-        Add-GameCandidate $candidates (Join-Path $steamRoot 'steamapps\common\Scrap Mechanic')
-        $libraries = Join-Path $steamRoot 'steamapps\libraryfolders.vdf'
-        if (Test-Path -LiteralPath $libraries) {
+    $steamRoots += @($ExtraSteamRoots)
+    foreach ($steamRoot in $steamRoots | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique) {
+        Add-GameCandidate $candidates (Join-FileSystemPath $steamRoot 'steamapps\common\Scrap Mechanic')
+        $libraries = Join-FileSystemPath $steamRoot 'steamapps\libraryfolders.vdf'
+        if ($libraries -and [IO.File]::Exists($libraries)) {
             foreach ($line in Get-Content -LiteralPath $libraries) {
                 if ($line -match '"path"\s+"([^"]+)"') {
                     $library = $matches[1].Replace('\\', '\')
-                    Add-GameCandidate $candidates (Join-Path $library 'steamapps\common\Scrap Mechanic')
+                    Add-GameCandidate $candidates (Join-FileSystemPath $library 'steamapps\common\Scrap Mechanic')
                 }
             }
         }
     }
 
     foreach ($candidate in $candidates) {
-        $exe = Join-Path $candidate $Manifest.game.executable
-        if (Test-Path -LiteralPath $exe -PathType Leaf) {
-            return (Resolve-Path -LiteralPath $candidate).Path
+        $exe = Join-FileSystemPath $candidate ([string]$Manifest.game.executable)
+        if ($exe -and [IO.File]::Exists($exe)) {
+            return [IO.Path]::GetFullPath($candidate)
         }
     }
     throw 'Could not find the Scrap Mechanic game data directory. Pass -GamePath with the folder containing Data, Survival, and Release.'
@@ -191,6 +272,53 @@ function Get-StatePath([string]$Root) {
     return Join-Path $StateRoot "install-state-$key.json"
 }
 
+function Get-ContainedPath([string]$BasePath, [string]$RelativePath) {
+    if ([string]::IsNullOrWhiteSpace($BasePath) -or
+        [string]::IsNullOrWhiteSpace($RelativePath) -or
+        [IO.Path]::IsPathRooted($RelativePath)) {
+        return $null
+    }
+    try {
+        $base = [IO.Path]::GetFullPath($BasePath).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+        $full = [IO.Path]::GetFullPath([IO.Path]::Combine($base, $RelativePath))
+        if (-not $full.StartsWith($base, [StringComparison]::OrdinalIgnoreCase)) {
+            return $null
+        }
+        return $full
+    }
+    catch {
+        return $null
+    }
+}
+
+function Get-CompatiblePackageManifest($State, $CurrentManifest) {
+    $version = [string]$State.patchVersion
+    if ([string]::IsNullOrWhiteSpace($version)) { return $null }
+
+    $packagesRoot = Join-Path $StateRoot 'packages'
+    $packageRoot = Get-ContainedPath $packagesRoot $version
+    if (-not $packageRoot) { return $null }
+    $candidatePath = Join-Path $packageRoot 'manifest.json'
+    if (-not (Test-Path -LiteralPath $candidatePath -PathType Leaf)) { return $null }
+
+    try {
+        $candidate = Get-Content -Raw -LiteralPath $candidatePath | ConvertFrom-Json
+    }
+    catch {
+        Write-Warning "Could not read previous package metadata: $candidatePath"
+        return $null
+    }
+    if ($candidate.formatVersion -ne 1 -or
+        [string]$candidate.patchId -ne [string]$CurrentManifest.patchId -or
+        [string]$candidate.game.executableSha256 -ne [string]$CurrentManifest.game.executableSha256 -or
+        -not $candidate.files) {
+        Write-Warning "Previous package metadata is incompatible and will not be trusted: $candidatePath"
+        return $null
+    }
+    Write-Host "Loaded verified removal metadata for installed version $version." -ForegroundColor Green
+    return $candidate
+}
+
 function Write-JsonAtomic([string]$Path, $Value) {
     $directory = Split-Path -Parent $Path
     New-Item -ItemType Directory -Force -Path $directory | Out-Null
@@ -223,18 +351,51 @@ function Assert-NoLegacyVrFiles([string]$Root, $Manifest) {
         }
     }
     if ($blocked.Count -gt 0) {
-        throw "Legacy or conflicting VR files were found. This Chapter 2 installer will not mix renderer generations. Use Repair / Clean Old VR Files, let Steam Verify finish if requested, then install again:`n$($blocked -join "`n")"
+        throw "Legacy or conflicting VR files were found. This Chapter 2 installer will not mix renderer generations. Click Uninstall VR Mod to preserve and remove recognized VR files, let Steam verification finish if it opens, then click Install VR Mod again:`n$($blocked -join "`n")"
     }
+}
+
+function Remove-ExactLegacyVrFiles([string]$Root, $Manifest) {
+    $matches = @()
+    foreach ($entry in @($Manifest.legacyFiles)) {
+        $status = Get-TargetStatus $Root $entry
+        if ($status.Status -eq 'patched') {
+            $matches += [pscustomobject]@{ Entry = $entry; Status = $status }
+        }
+    }
+    if ($matches.Count -eq 0) { return }
+
+    $stamp = Get-Date -Format 'yyyyMMddTHHmmss'
+    $key = (Get-StringSha256 $Root.ToLowerInvariant()).Substring(0, 16)
+    $quarantineRoot = Join-Path $StateRoot "legacy-removals\$($Manifest.patchId)-$stamp-$key"
+    Write-Host "Detected $($matches.Count) exact file(s) from the legacy VR build. Preserving and removing them before installation." -ForegroundColor Yellow
+    foreach ($match in $matches) {
+        $backup = Join-Path $quarantineRoot $match.Entry.path
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $backup) | Out-Null
+        Copy-Item -LiteralPath $match.Status.Target -Destination $backup -Force
+        if ((Get-Sha256 $backup) -ne $match.Status.Hash) {
+            throw "Legacy-file preservation failed for $($match.Entry.path)"
+        }
+        Remove-Item -LiteralPath $match.Status.Target -Force
+        if (Test-Path -LiteralPath $match.Status.Target) {
+            throw "Could not remove legacy VR file $($match.Entry.path)"
+        }
+        Write-Host "Removed legacy VR file $($match.Entry.path)"
+    }
+    Write-Host "Legacy files were preserved at $quarantineRoot" -ForegroundColor Green
 }
 
 function Install-Patch([string]$Root, $Manifest) {
     Assert-GameClosed
-    Assert-NoLegacyVrFiles $Root $Manifest
     $statePath = Get-StatePath $Root
     if (Test-Path -LiteralPath $statePath) {
-        Write-Host 'An existing managed installation was found. Restoring it safely before reinstalling.' -ForegroundColor Yellow
+        $existingState = Get-Content -Raw -LiteralPath $statePath | ConvertFrom-Json
+        Write-Host "Existing managed VR version '$($existingState.patchVersion)' detected." -ForegroundColor Yellow
+        Write-Host 'The previous version will now be restored and removed using its verified backup metadata before this version is installed.' -ForegroundColor Yellow
         Uninstall-Patch $Root $Manifest
     }
+    Remove-ExactLegacyVrFiles $Root $Manifest
+    Assert-NoLegacyVrFiles $Root $Manifest
 
     $plan = @()
     $conflicts = @()
@@ -341,6 +502,8 @@ function Install-Patch([string]$Root, $Manifest) {
         Write-Host "Installed and verified $($changed.Count) files." -ForegroundColor Green
         Write-Host "Restore state: $statePath" -ForegroundColor Green
         Write-Host "Backups: $backupRoot" -ForegroundColor Green
+        Write-Host 'Running automatic post-install verification...' -ForegroundColor Cyan
+        Verify-Patch $Root $Manifest
     }
     catch {
         Write-Warning "Install failed; rolling back $($changed.Count) touched files."
@@ -472,8 +635,25 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
     }
 
     $entryByPath = @{}
+    $previousEntryByPath = @{}
+    $previousManifest = Get-CompatiblePackageManifest $state $Manifest
+    if ($previousManifest) {
+        foreach ($entry in @($previousManifest.files) + @($previousManifest.legacyFiles)) {
+            $entryPath = [string]$entry.path
+            if ([string]::IsNullOrWhiteSpace($entryPath)) { continue }
+            $contained = Get-ContainedPath $Root $entryPath
+            if (-not $contained) {
+                throw "Previous package metadata contains an unsafe managed path: $entryPath"
+            }
+            $entryByPath[$entryPath] = $entry
+            $previousEntryByPath[$entryPath] = $entry
+        }
+    }
     foreach ($entry in @($Manifest.files) + @($Manifest.legacyFiles)) {
-        $entryByPath[[string]$entry.path] = $entry
+        $entryPath = [string]$entry.path
+        if (-not $entryByPath.ContainsKey($entryPath)) {
+            $entryByPath[$entryPath] = $entry
+        }
     }
 
     # Do not trust stale metadata blindly, but do not reject an otherwise verifiable
@@ -483,6 +663,18 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
     $stateIssues = New-Object Collections.ArrayList
     $recognizedRecords = New-Object Collections.ArrayList
     $unknownRecords = New-Object Collections.ArrayList
+    if ($state.backupRoot) {
+        try {
+            $allowedBackupRoot = [IO.Path]::GetFullPath((Join-Path $StateRoot 'backups')).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+            $storedBackupRoot = [IO.Path]::GetFullPath([string]$state.backupRoot).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+            if (-not $storedBackupRoot.StartsWith($allowedBackupRoot, [StringComparison]::OrdinalIgnoreCase)) {
+                [void]$stateIssues.Add("backup root is outside the installer backup directory: $($state.backupRoot)")
+            }
+        }
+        catch {
+            [void]$stateIssues.Add("backup root is invalid: $($state.backupRoot)")
+        }
+    }
     if ($state.gameExecutableSha256 -and
         $state.gameExecutableSha256.ToUpperInvariant() -ne $Manifest.game.executableSha256.ToUpperInvariant()) {
         [void]$stateIssues.Add("state executable hash $($state.gameExecutableSha256) does not match supported build $($Manifest.game.executableSha256)")
@@ -497,7 +689,16 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
             }
             continue
         }
+        if (-not (Get-ContainedPath $Root $recordPath)) {
+            [void]$stateIssues.Add("unsafe managed path in state: $recordPath")
+            continue
+        }
         [void]$recognizedRecords.Add($record)
+        $previousEntry = $previousEntryByPath[$recordPath]
+        if ($previousEntry -and $record.installedSha256 -and
+            [string]$previousEntry.patchedSha256 -ne [string]$record.installedSha256) {
+            [void]$stateIssues.Add("installed hash for $recordPath does not match verified package $($state.patchVersion)")
+        }
         if ($record.existed) {
             if (-not $record.originalSha256 -or
                 (-not $entry.runtimeMutable -and
@@ -710,6 +911,44 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
     }
 }
 
+function Verify-UninstalledPatch([string]$Root, $Manifest) {
+    $failures = @()
+    foreach ($entry in @($Manifest.files) + @($Manifest.legacyFiles)) {
+        $status = Get-TargetStatus $Root $entry
+        if ($entry.originalMayBeMissing) {
+            if ($status.Status -eq 'patched') {
+                $failures += "$($entry.path) still matches a VR-mod payload"
+            }
+            continue
+        }
+        if ($status.Status -ne 'original') {
+            $failures += "$($entry.path) is $($status.Status) instead of the supported game original"
+        }
+    }
+    if ($failures.Count -gt 0) {
+        Write-Host 'STEAM_REPAIR_REQUIRED: automatic post-uninstall verification found game originals that Steam must restore.' -ForegroundColor Yellow
+        foreach ($failure in $failures) { Write-Host "  $failure" -ForegroundColor Yellow }
+        throw 'The VR mod was removed, but Steam must verify Scrap Mechanic before the game is complete.'
+    }
+    Write-Host 'Automatic post-uninstall verification passed: no recognized VR payload remains and all required game originals are restored.' -ForegroundColor Green
+}
+
+function Uninstall-AnyPatch([string]$Root, $Manifest) {
+    Assert-GameClosed
+    $statePath = Get-StatePath $Root
+    if (Test-Path -LiteralPath $statePath) {
+        $state = Get-Content -Raw -LiteralPath $statePath | ConvertFrom-Json
+        Write-Host "Managed VR version '$($state.patchVersion)' detected. Its verified state and backups will be used for removal." -ForegroundColor Yellow
+        Uninstall-Patch $Root $Manifest
+        Verify-UninstalledPatch $Root $Manifest
+        return
+    }
+
+    Write-Host 'No managed install state exists. Scanning current and recognized legacy VR paths before guarded cleanup.' -ForegroundColor Yellow
+    Repair-PatchTargets $Root $Manifest
+    Verify-UninstalledPatch $Root $Manifest
+}
+
 function Force-InstallPatch([string]$Root, $Manifest) {
     Assert-GameClosed
     $statePath = Get-StatePath $Root
@@ -737,7 +976,7 @@ $manifest = Get-Manifest
 Assert-Payload $manifest
 if ($Action -eq 'ValidatePayload') { return }
 
-$root = Find-GameRoot $GamePath $manifest
+$root = Find-GameRoot $GamePath $manifest $AdditionalSteamRoot
 Write-Host "Game directory: $root"
 Assert-GameBuild $root $manifest
 
@@ -746,7 +985,7 @@ switch ($Action) {
     'ForceInstall' { Force-InstallPatch $root $manifest }
     'Verify' { Verify-Patch $root $manifest }
     'Repair' { Repair-PatchTargets $root $manifest }
-    'Uninstall' { Uninstall-Patch $root $manifest }
+    'Uninstall' { Uninstall-AnyPatch $root $manifest }
     'Start' {
         Start-Process 'steam://rungameid/387990'
     }

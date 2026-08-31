@@ -1,6 +1,6 @@
 # Chapter 2 release status
 
-Release: `1.3.0-chapter2-20260831`
+Release candidate: `1.3.1-chapter2-20260831`
 
 Branch: `main`
 
@@ -10,6 +10,7 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 
 - Native stereo OpenXR rendering at `2064 × 2272` per eye with six-degree-of-freedom head tracking.
 - Exact runtime FOV, correct depth and perspective, VR seam correction, and normal Scrap Mechanic color and contrast.
+- Standing VR keeps the world upright and cancels desktop pitch-orbit height movement; seated VR uses the original game camera behavior.
 - Quest Touch and Valve Index OpenXR controllers, plus optional Meta optical hand tracking with tracked mechanic gloves.
 - Tracked tools and Chapter 2 weapons, including physical hammer swings and gunfire from the VR barrel pose.
 - Complete grouped held-item geometry with a live position/rotation calibration helper, including blocks, parts, buckets, glowsticks, cornades, loose clay, extinguisher, planting, fertilizer, food and drink, feeder food, soil, keys and power cores, resources, arbitrary carried objects, and the logbook.
@@ -20,6 +21,7 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 - Normal PC mode retains its standard viewmodel; VR mode removes it.
 - Seat, headset-focus, tool-switching, primary-action, and lift-placement state recover automatically after transitions.
 - Survival, Creative, and Custom Game content contexts use the same tracked-hand and spatial-UI bridge.
+- Steam discovery ignores stale or offline library drives and prioritizes the game directory already validated by the installer.
 
 ## Rendering architecture
 
@@ -31,6 +33,6 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 
 ## Installer
 
-`dist/ScrapMechanicVR-Installer.exe` embeds and validates all 47 managed payload files, the branded installer artwork, its soundtrack, and a verified first-launch game-data cache. It starts music at 50% with a compact volume control, verifies the supported game executable, backs up replaced files, and supports install, start, verify, repair, and uninstall.
+`dist/ScrapMechanicVR-Installer.exe` embeds and validates all 47 managed payload files, the branded installer artwork, its soundtrack, and a verified first-launch game-data cache. It starts music at 50% with a compact volume control and presents only Install VR Mod, Uninstall VR Mod, Start VR, and Open Logs. Install and uninstall detect current/older managed versions, explain the exact operation before asking for approval, migrate or restore safely, and verify automatically. Start VR requires a connected headset reported by the active OpenXR runtime.
 
 Installer and payload hashes are recorded in `SHA256SUMS.txt`.

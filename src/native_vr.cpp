@@ -76,12 +76,60 @@ using RenderSetupFn = void (__fastcall *)(void *, float, const float *, const fl
 using CameraBuildFn = void (__fastcall *)(void *, const float *, const float *, float, float, float);
 using RaycastFn = uint8_t (__fastcall *)(void *, void *, const float *, const float *, void *, void *);
 
+// Scrap Mechanic executes equipped tools on independent Lua Logic Tasks. The
+// engine's sm.json.open data cache is therefore not a safe transport for the
+// frame-current projectile pose: a task can retain the first inactive packet
+// even while the native bridge file advances on disk. Register a tiny read-only
+// native Lua function in every task instead. This keeps projectile origin and
+// direction tied to the exact tracked pose available when the tool fires.
+struct lua_State;
+using LuaCFunction = int (__cdecl *)(lua_State *);
+using LuaPCallFn = int (__cdecl *)(lua_State *, int, int, int);
+using LuaCallFn = void (__cdecl *)(lua_State *, int, int);
+using LuaGetFieldFn = void (__cdecl *)(lua_State *, int, const char *);
+using LuaLNewStateFn = lua_State * (__cdecl *)();
+using LuaLLoadBufferXFn = int (__cdecl *)(lua_State *, const char *, size_t, const char *, const char *);
+using LuaGetTopFn = int (__cdecl *)(lua_State *);
+using LuaSetTopFn = void (__cdecl *)(lua_State *, int);
+using LuaGetFenvFn = void (__cdecl *)(lua_State *, int);
+using LuaTypeFn = int (__cdecl *)(lua_State *, int);
+using LuaToPointerFn = const void * (__cdecl *)(lua_State *, int);
+using LuaPushCClosureFn = void (__cdecl *)(lua_State *, LuaCFunction, int);
+using LuaPushNumberFn = void (__cdecl *)(lua_State *, double);
+using LuaPushBooleanFn = void (__cdecl *)(lua_State *, int);
+using LuaPushStringFn = void (__cdecl *)(lua_State *, const char *);
+using LuaSetFieldFn = void (__cdecl *)(lua_State *, int, const char *);
+
+constexpr int kLuaGlobalsIndex = -10002;
+constexpr int kLuaTypeTable = 5;
+constexpr char kLuaProjectilePoseFunction[] = "ScrapVRProjectilePoseNative";
+
 HMODULE g_module = nullptr;
 HMODULE g_game = nullptr;
 uintptr_t g_game_base = 0;
 std::atomic<void *> g_render_original{nullptr};
 std::atomic<void *> g_camera_build_original{nullptr};
 std::atomic<void *> g_raycast_original{nullptr};
+std::atomic<void *> g_lua_pcall_original{nullptr};
+std::atomic<void *> g_lua_call_original{nullptr};
+std::atomic<void *> g_lua_getfield_original{nullptr};
+std::atomic<void *> g_lua_newstate_original{nullptr};
+std::atomic<void *> g_lua_loadbufferx_original{nullptr};
+void *g_lua_pcall_target = nullptr;
+void *g_lua_call_target = nullptr;
+void *g_lua_getfield_target = nullptr;
+void *g_lua_newstate_target = nullptr;
+void *g_lua_loadbufferx_target = nullptr;
+LuaGetTopFn g_lua_gettop = nullptr;
+LuaSetTopFn g_lua_settop = nullptr;
+LuaGetFenvFn g_lua_getfenv = nullptr;
+LuaTypeFn g_lua_type = nullptr;
+LuaToPointerFn g_lua_topointer = nullptr;
+LuaPushCClosureFn g_lua_pushcclosure = nullptr;
+LuaPushNumberFn g_lua_pushnumber = nullptr;
+LuaPushBooleanFn g_lua_pushboolean = nullptr;
+LuaPushStringFn g_lua_pushstring = nullptr;
+LuaSetFieldFn g_lua_setfield = nullptr;
 std::atomic<ID3D11Device *> g_device{nullptr};
 std::atomic<ID3D11DeviceContext *> g_context{nullptr};
 std::atomic<ID3D11Texture2D *> g_final_target{nullptr};
@@ -104,6 +152,7 @@ std::atomic<uint64_t> g_engine_frames{0};
 std::atomic<uint64_t> g_stereo_frames{0};
 std::atomic<uint64_t> g_openxr_success_frames{0};
 std::atomic<bool> g_camera_abi_logged{false};
+std::atomic<bool> g_vr_upright_camera_logged{false};
 std::atomic<uint64_t> g_camera_build_calls{0};
 std::atomic<uint64_t> g_vr_camera_diagnostic_calls{0};
 std::atomic<uint64_t> g_viewmodel_camera_hides{0};
@@ -150,6 +199,22 @@ XrVector3f g_right_hand_world{};
 XrVector3f g_right_hand_forward{};
 XrVector3f g_right_hand_up{};
 uint64_t g_right_hand_world_ms = 0;
+struct NativeProjectilePose
+{
+    bool authoritative = false;
+    bool active = false;
+    XrVector3f position{};
+    XrVector3f direction{0.0f, 0.0f, -1.0f};
+    std::string item;
+    uint64_t sequence = 0;
+};
+std::mutex g_native_projectile_mutex;
+NativeProjectilePose g_native_projectile_pose;
+std::mutex g_lua_state_mutex;
+std::vector<lua_State *> g_lua_registered_states;
+std::vector<const void *> g_lua_registered_environments;
+std::atomic<bool> g_lua_projectile_registration_logged{false};
+std::atomic<bool> g_lua_projectile_call_logged{false};
 std::atomic<bool> g_tool_raycast_logged{false};
 thread_local int g_active_eye = -1;
 thread_local uint32_t g_eye_camera_build_index = 0;
@@ -392,6 +457,225 @@ bool normalize_vector(XrVector3f &vector)
     return true;
 }
 
+XrVector3f cross_vector(const XrVector3f &a, const XrVector3f &b)
+{
+    return {
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x
+    };
+}
+
+void set_native_projectile_pose(bool authoritative, bool active,
+    const XrVector3f &position = {}, const XrVector3f &direction = {0.0f, 0.0f, -1.0f},
+    const char *item = nullptr)
+{
+    std::lock_guard lock(g_native_projectile_mutex);
+    g_native_projectile_pose.authoritative = authoritative;
+    g_native_projectile_pose.active = active;
+    g_native_projectile_pose.position = position;
+    g_native_projectile_pose.direction = direction;
+    g_native_projectile_pose.item = item ? item : "";
+    ++g_native_projectile_pose.sequence;
+}
+
+void update_native_projectile_pose(bool right_active, bool projectile_tool_active,
+    const XrVector3f &hand_position, XrVector3f forward, XrVector3f up,
+    const XrVector3f &local_offset, const XrVector3f &local_direction, const char *item)
+{
+    // Rebuild the same orthonormal hand basis used by Chapter2VR.lua. Forward
+    // is the controller/hand aim vector; local -Z therefore maps to forward.
+    if (!right_active || !projectile_tool_active || !item || !normalize_vector(forward))
+    {
+        set_native_projectile_pose(true, false, {}, {}, item);
+        return;
+    }
+    const float up_projection = up.x * forward.x + up.y * forward.y + up.z * forward.z;
+    up.x -= forward.x * up_projection;
+    up.y -= forward.y * up_projection;
+    up.z -= forward.z * up_projection;
+    if (!normalize_vector(up))
+    {
+        up = {0.0f, 0.0f, 1.0f};
+        const float fallback_projection = up.x * forward.x + up.y * forward.y + up.z * forward.z;
+        up.x -= forward.x * fallback_projection;
+        up.y -= forward.y * fallback_projection;
+        up.z -= forward.z * fallback_projection;
+    }
+    if (!normalize_vector(up))
+    {
+        set_native_projectile_pose(true, false, {}, {}, item);
+        return;
+    }
+    XrVector3f right = cross_vector(forward, up);
+    if (!normalize_vector(right))
+    {
+        set_native_projectile_pose(true, false, {}, {}, item);
+        return;
+    }
+    const XrVector3f position{
+        hand_position.x + right.x * local_offset.x + up.x * local_offset.y - forward.x * local_offset.z,
+        hand_position.y + right.y * local_offset.x + up.y * local_offset.y - forward.y * local_offset.z,
+        hand_position.z + right.z * local_offset.x + up.z * local_offset.y - forward.z * local_offset.z
+    };
+    XrVector3f direction{
+        right.x * local_direction.x + up.x * local_direction.y - forward.x * local_direction.z,
+        right.y * local_direction.x + up.y * local_direction.y - forward.y * local_direction.z,
+        right.z * local_direction.x + up.z * local_direction.y - forward.z * local_direction.z
+    };
+    if (!normalize_vector(direction))
+    {
+        set_native_projectile_pose(true, false, {}, {}, item);
+        return;
+    }
+    set_native_projectile_pose(true, true, position, direction, item);
+}
+
+int __cdecl lua_native_projectile_pose(lua_State *state)
+{
+    NativeProjectilePose pose;
+    {
+        std::lock_guard lock(g_native_projectile_mutex);
+        pose = g_native_projectile_pose;
+    }
+    g_lua_pushboolean(state, pose.authoritative ? 1 : 0);
+    g_lua_pushboolean(state, pose.active ? 1 : 0);
+    g_lua_pushnumber(state, pose.position.x);
+    g_lua_pushnumber(state, pose.position.y);
+    g_lua_pushnumber(state, pose.position.z);
+    g_lua_pushnumber(state, pose.direction.x);
+    g_lua_pushnumber(state, pose.direction.y);
+    g_lua_pushnumber(state, pose.direction.z);
+    g_lua_pushstring(state, pose.item.c_str());
+    g_lua_pushnumber(state, static_cast<double>(pose.sequence));
+    if (!g_lua_projectile_call_logged.exchange(true))
+        log_line("VR_LUA_PROJECTILE_BRIDGE_CALLED authoritative=%u active=%u item=%s",
+            pose.authoritative ? 1u : 0u, pose.active ? 1u : 0u,
+            pose.item.empty() ? "none" : pose.item.c_str());
+    return 10;
+}
+
+bool resolve_lua_projectile_api()
+{
+    HMODULE lua = GetModuleHandleW(L"lua51.dll");
+    if (!lua) return false;
+    g_lua_pcall_target = reinterpret_cast<void *>(GetProcAddress(lua, "lua_pcall"));
+    g_lua_call_target = reinterpret_cast<void *>(GetProcAddress(lua, "lua_call"));
+    g_lua_getfield_target = reinterpret_cast<void *>(GetProcAddress(lua, "lua_getfield"));
+    g_lua_newstate_target = reinterpret_cast<void *>(GetProcAddress(lua, "luaL_newstate"));
+    g_lua_loadbufferx_target = reinterpret_cast<void *>(GetProcAddress(lua, "luaL_loadbufferx"));
+    g_lua_gettop = reinterpret_cast<LuaGetTopFn>(GetProcAddress(lua, "lua_gettop"));
+    g_lua_settop = reinterpret_cast<LuaSetTopFn>(GetProcAddress(lua, "lua_settop"));
+    g_lua_getfenv = reinterpret_cast<LuaGetFenvFn>(GetProcAddress(lua, "lua_getfenv"));
+    g_lua_type = reinterpret_cast<LuaTypeFn>(GetProcAddress(lua, "lua_type"));
+    g_lua_topointer = reinterpret_cast<LuaToPointerFn>(GetProcAddress(lua, "lua_topointer"));
+    g_lua_pushcclosure = reinterpret_cast<LuaPushCClosureFn>(GetProcAddress(lua, "lua_pushcclosure"));
+    g_lua_pushnumber = reinterpret_cast<LuaPushNumberFn>(GetProcAddress(lua, "lua_pushnumber"));
+    g_lua_pushboolean = reinterpret_cast<LuaPushBooleanFn>(GetProcAddress(lua, "lua_pushboolean"));
+    g_lua_pushstring = reinterpret_cast<LuaPushStringFn>(GetProcAddress(lua, "lua_pushstring"));
+    g_lua_setfield = reinterpret_cast<LuaSetFieldFn>(GetProcAddress(lua, "lua_setfield"));
+    return g_lua_pcall_target && g_lua_call_target && g_lua_getfield_target && g_lua_newstate_target &&
+        g_lua_loadbufferx_target && g_lua_gettop && g_lua_settop &&
+        g_lua_getfenv && g_lua_type && g_lua_topointer &&
+        g_lua_pushcclosure && g_lua_pushnumber && g_lua_pushboolean && g_lua_pushstring && g_lua_setfield;
+}
+
+void ensure_lua_projectile_api(lua_State *state, int argument_count)
+{
+    if (!state) return;
+    bool register_global = false;
+    {
+        std::lock_guard lock(g_lua_state_mutex);
+        if (std::find(g_lua_registered_states.begin(), g_lua_registered_states.end(), state) ==
+            g_lua_registered_states.end())
+        {
+            g_lua_registered_states.push_back(state);
+            register_global = true;
+        }
+    }
+
+    const int top = g_lua_gettop(state);
+    if (register_global)
+    {
+        g_lua_pushcclosure(state, lua_native_projectile_pose, 0);
+        g_lua_setfield(state, kLuaGlobalsIndex, kLuaProjectilePoseFunction);
+    }
+
+    // Scrap Mechanic normally shares one global environment per Logic Task,
+    // but also install into the current callback's sandbox environment when it
+    // differs. This is balanced back to the exact original Lua stack height.
+    if (argument_count >= 0 && top >= argument_count + 1)
+    {
+        const int function_index = top - argument_count;
+        g_lua_getfenv(state, function_index);
+        if (g_lua_type(state, -1) == kLuaTypeTable)
+        {
+            const void *environment = g_lua_topointer(state, -1);
+            bool register_environment = environment != nullptr;
+            if (register_environment)
+            {
+                std::lock_guard lock(g_lua_state_mutex);
+                if (std::find(g_lua_registered_environments.begin(), g_lua_registered_environments.end(),
+                        environment) != g_lua_registered_environments.end())
+                    register_environment = false;
+                else
+                    g_lua_registered_environments.push_back(environment);
+            }
+            if (register_environment)
+            {
+                g_lua_pushcclosure(state, lua_native_projectile_pose, 0);
+                g_lua_setfield(state, -2, kLuaProjectilePoseFunction);
+            }
+        }
+        g_lua_settop(state, top);
+    }
+    if ((register_global || argument_count >= 0) && !g_lua_projectile_registration_logged.exchange(true))
+        log_line("VR_LUA_PROJECTILE_API_REGISTERED transport=native_logic_task");
+}
+
+int __cdecl hk_lua_pcall(lua_State *state, int argument_count, int result_count, int error_function)
+{
+    auto original = reinterpret_cast<LuaPCallFn>(g_lua_pcall_original.load(std::memory_order_acquire));
+    if (!original) __fastfail(FAST_FAIL_INVALID_ARG);
+    ensure_lua_projectile_api(state, argument_count);
+    return original(state, argument_count, result_count, error_function);
+}
+
+void __cdecl hk_lua_call(lua_State *state, int argument_count, int result_count)
+{
+    auto original = reinterpret_cast<LuaCallFn>(g_lua_call_original.load(std::memory_order_acquire));
+    if (!original) __fastfail(FAST_FAIL_INVALID_ARG);
+    ensure_lua_projectile_api(state, argument_count);
+    original(state, argument_count, result_count);
+}
+
+void __cdecl hk_lua_getfield(lua_State *state, int index, const char *key)
+{
+    auto original = reinterpret_cast<LuaGetFieldFn>(g_lua_getfield_original.load(std::memory_order_acquire));
+    if (!original) __fastfail(FAST_FAIL_INVALID_ARG);
+    ensure_lua_projectile_api(state, -1);
+    original(state, index, key);
+}
+
+lua_State * __cdecl hk_lua_newstate()
+{
+    auto original = reinterpret_cast<LuaLNewStateFn>(g_lua_newstate_original.load(std::memory_order_acquire));
+    if (!original) __fastfail(FAST_FAIL_INVALID_ARG);
+    lua_State *state = original();
+    ensure_lua_projectile_api(state, -1);
+    return state;
+}
+
+int __cdecl hk_lua_loadbufferx(lua_State *state, const char *buffer, size_t length,
+    const char *name, const char *mode)
+{
+    auto original = reinterpret_cast<LuaLLoadBufferXFn>(
+        g_lua_loadbufferx_original.load(std::memory_order_acquire));
+    if (!original) __fastfail(FAST_FAIL_INVALID_ARG);
+    ensure_lua_projectile_api(state, -1);
+    return original(state, buffer, length, name, mode);
+}
+
 bool hand_bridge_paths(wchar_t (&path)[MAX_PATH], wchar_t (&temporary)[MAX_PATH], bool create_directory)
 {
     wchar_t module_path[MAX_PATH]{};
@@ -460,6 +744,7 @@ void reset_hand_bridge(bool reset_session = false)
     g_hand_bridge_inactive_authoritative.store(false, std::memory_order_release);
     g_right_hand_world_active = false;
     g_right_hand_world_ms = 0;
+    set_native_projectile_pose(false, false);
 }
 
 void deactivate_hand_bridge(bool vr_authoritative = false)
@@ -471,6 +756,7 @@ void deactivate_hand_bridge(bool vr_authoritative = false)
     g_hand_bridge_logged.store(false, std::memory_order_release);
     g_right_hand_world_active = false;
     g_right_hand_world_ms = 0;
+    set_native_projectile_pose(vr_authoritative, false);
 
     // A static inactive file is sufficient until tracking becomes active. Do not
     // rewrite it on every OpenXR cleanup/retry: Scrap Mechanic treats each change
@@ -566,6 +852,8 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
     const bool gun_tool_active = scrapvr::tools::get_gun_muzzle_offset(
         gun_muzzle_offset, gun_muzzle_direction, gun_muzzle_item);
     const bool gun_muzzle_active = active[1] && gun_tool_active && gun_muzzle_item;
+    update_native_projectile_pose(active[1], gun_tool_active, world[1], forward[1], up[1],
+        gun_muzzle_offset, gun_muzzle_direction, gun_muzzle_item);
     const bool hammer_active = scrapvr::tools::is_hammer_active();
     if (active[1] && optical[1] && hammer_active)
     {
@@ -758,6 +1046,171 @@ bool world_to_view_matrix(const float *matrix)
     return finite_matrix(matrix) && std::fabs(matrix[3]) < 0.01f &&
         std::fabs(matrix[7]) < 0.01f && std::fabs(matrix[11]) < 0.01f &&
         std::fabs(matrix[15] - 1.0f) < 0.01f;
+}
+
+struct StandingCameraState
+{
+    bool sample_valid = false;
+    XrVector3f previous_camera_position{};
+    XrVector3f previous_forward{};
+    float previous_output_height = 0.0f;
+    bool orbit_distance_valid = false;
+    float orbit_distance = 0.0f;
+    float height_bias = 0.0f;
+    bool orbit_logged = false;
+
+    void reset()
+    {
+        sample_valid = false;
+        previous_camera_position = {};
+        previous_forward = {};
+        previous_output_height = 0.0f;
+        orbit_distance_valid = false;
+        orbit_distance = 0.0f;
+        height_bias = 0.0f;
+        orbit_logged = false;
+    }
+};
+
+// Scrap Mechanic's desktop camera owns player/world translation and horizontal
+// turning, but its mouse/controller pitch must not become a second VR head
+// rotation. The desktop camera also moves along a small orbit while pitching.
+// Removing only its rotation would preserve that orbit's vertical component and
+// make looking up/down raise or lower the VR viewpoint. Learn the orbit radius
+// from consecutive rigid camera samples and remove its Z component as well.
+// Real player/world vertical motion remains in camera_height and still passes
+// through. This path is standing-only; seats use the untouched game matrix.
+bool build_upright_world_to_view(const float *source, StandingCameraState &state,
+                                 float upright[16])
+{
+    if (!world_to_view_matrix(source) || !upright) return false;
+
+    const XrVector3f camera_position = view_point_to_world(source, {0.0f, 0.0f, 0.0f});
+    XrVector3f source_forward = view_vector_to_world(source, {0.0f, 0.0f, -1.0f});
+    if (!normalize_vector(source_forward)) return false;
+
+    float camera_height = camera_position.z;
+    if (state.sample_valid)
+    {
+        const XrVector3f forward_delta{
+            source_forward.x - state.previous_forward.x,
+            source_forward.y - state.previous_forward.y,
+            source_forward.z - state.previous_forward.z
+        };
+        const XrVector3f camera_delta{
+            camera_position.x - state.previous_camera_position.x,
+            camera_position.y - state.previous_camera_position.y,
+            camera_position.z - state.previous_camera_position.z
+        };
+        const float forward_delta_squared = forward_delta.x * forward_delta.x +
+            forward_delta.y * forward_delta.y + forward_delta.z * forward_delta.z;
+
+        // Estimate only while pitch actually changes. Requiring the residual to
+        // be tiny rejects ordinary walking, jumping and vehicle translation.
+        if (std::fabs(forward_delta.z) >= 0.0005f && forward_delta_squared >= 0.00000025f)
+        {
+            const float candidate = -(camera_delta.x * forward_delta.x +
+                camera_delta.y * forward_delta.y + camera_delta.z * forward_delta.z) /
+                forward_delta_squared;
+            const XrVector3f residual{
+                camera_delta.x + candidate * forward_delta.x,
+                camera_delta.y + candidate * forward_delta.y,
+                camera_delta.z + candidate * forward_delta.z
+            };
+            const float residual_length = std::sqrt(residual.x * residual.x +
+                residual.y * residual.y + residual.z * residual.z);
+            const float orbit_motion = std::fabs(candidate) * std::sqrt(forward_delta_squared);
+            const float residual_limit = std::max(0.008f, orbit_motion * 0.25f);
+            if (std::isfinite(candidate) && candidate >= -0.05f && candidate <= 12.0f &&
+                std::isfinite(residual_length) && residual_length <= residual_limit)
+            {
+                const float clamped_candidate = std::max(0.0f, candidate);
+                if (!state.orbit_distance_valid)
+                {
+                    state.orbit_distance = clamped_candidate;
+                    state.orbit_distance_valid = true;
+                    // Preserve the exact height visible before learning the
+                    // radius, so enabling the correction cannot cause a jump.
+                    state.height_bias = state.previous_output_height -
+                        (state.previous_camera_position.z +
+                            state.orbit_distance * state.previous_forward.z);
+                }
+                else
+                {
+                    const float output_before_update = camera_position.z +
+                        state.orbit_distance * source_forward.z + state.height_bias;
+                    state.orbit_distance = state.orbit_distance * 0.85f +
+                        clamped_candidate * 0.15f;
+                    // Radius refinement must also be visually continuous.
+                    state.height_bias = output_before_update -
+                        (camera_position.z + state.orbit_distance * source_forward.z);
+                }
+                if (!state.orbit_logged)
+                {
+                    state.orbit_logged = true;
+                    log_line("VR_CAMERA_STANDING_HEIGHT_LOCK orbit_radius=%.5f "
+                        "mouse_controller_pitch_height=discarded player_vertical_motion=preserved",
+                        state.orbit_distance);
+                }
+            }
+        }
+    }
+    if (state.orbit_distance_valid)
+        camera_height = camera_position.z + state.orbit_distance * source_forward.z +
+            state.height_bias;
+
+    state.sample_valid = true;
+    state.previous_camera_position = camera_position;
+    state.previous_forward = source_forward;
+    state.previous_output_height = camera_height;
+
+    // Projecting camera-forward onto the game's XY ground plane keeps heading
+    // while removing both pitch and roll. Only a mathematically vertical camera
+    // needs the projected-right fallback to retain its last meaningful yaw.
+    XrVector3f forward{-source[2], -source[6], 0.0f};
+    const float forward_length = std::sqrt(forward.x * forward.x + forward.y * forward.y);
+    XrVector3f right{};
+    if (std::isfinite(forward_length) && forward_length > 0.0001f)
+    {
+        forward.x /= forward_length;
+        forward.y /= forward_length;
+        right = {forward.y, -forward.x, 0.0f};
+    }
+    else
+    {
+        right = {source[0], source[4], 0.0f};
+        const float right_length = std::sqrt(right.x * right.x + right.y * right.y);
+        if (!std::isfinite(right_length) || right_length <= 0.0001f) return false;
+        right.x /= right_length;
+        right.y /= right_length;
+        forward = {-right.y, right.x, 0.0f};
+    }
+    std::memset(upright, 0, sizeof(float) * 16);
+
+    // Column-major rigid world-to-view matrix. Rows are camera right, camera
+    // up (+game Z), and camera back (-forward), respectively.
+    upright[0] = right.x;
+    upright[4] = right.y;
+    upright[1] = 0.0f;
+    upright[5] = 0.0f;
+    upright[9] = 1.0f;
+    upright[2] = -forward.x;
+    upright[6] = -forward.y;
+    upright[10] = 0.0f;
+    upright[12] = -(right.x * camera_position.x + right.y * camera_position.y);
+    upright[13] = -camera_height;
+    upright[14] = forward.x * camera_position.x + forward.y * camera_position.y;
+    upright[15] = 1.0f;
+
+    if (!world_to_view_matrix(upright)) return false;
+    if (!g_vr_upright_camera_logged.exchange(true, std::memory_order_acq_rel))
+    {
+        const XrVector3f source_up = view_vector_to_world(source, {0.0f, 1.0f, 0.0f});
+        log_line("VR_CAMERA_UPRIGHT_LOCK active=1 game_world_up=+Z mouse_pitch=discarded "
+            "mouse_yaw=preserved controller_turn=preserved source_up=%.5f,%.5f,%.5f",
+            source_up.x, source_up.y, source_up.z);
+    }
+    return true;
 }
 
 bool perspective_matrix(const float *matrix)
@@ -1103,6 +1556,9 @@ struct OpenXrState
     IDXGISwapChain *game_swapchain = nullptr;
     bool anchor_valid = false;
     bool eye_math_logged = false;
+    bool camera_mode_known = false;
+    bool camera_mode_seated = false;
+    StandingCameraState standing_camera{};
     XrPosef anchor_head{{0,0,0,1},{0,0,0}};
     Mat4 anchor_game{};
     EyeSwapchain eyes[2];
@@ -1714,6 +2170,7 @@ struct OpenXrState
         foreign_context_logged = false;
         instance = XR_NULL_HANDLE; system = XR_NULL_SYSTEM_ID; session = XR_NULL_HANDLE; space = XR_NULL_HANDLE;
         initialized = false; anchor_valid = false; eye_math_logged = false; state = XR_SESSION_STATE_UNKNOWN;
+        camera_mode_known = false; camera_mode_seated = false; standing_camera.reset();
         last_focused_ms = 0;
         source_width = source_height = desktop_width = desktop_height = 0;
         pending_desktop_width = pending_desktop_height = 0;
@@ -1964,6 +2421,7 @@ struct OpenXrState
                     if (XR_SUCCEEDED(result))
                     {
                         running = true; anchor_valid = false;
+                        camera_mode_known = false; standing_camera.reset();
                         g_startup_menu.reset_world_anchor();
                         g_startup_menu.reset_state();
                         log_line("XR_SESSION_RUNNING");
@@ -1977,6 +2435,7 @@ struct OpenXrState
                     abandon_pending_frame();
                     result = xrEndSession(session);
                     running = false; anchor_valid = false;
+                    camera_mode_known = false; standing_camera.reset();
                     g_startup_menu.reset_world_anchor();
                     g_startup_menu.reset_state();
                     restore_render_size_override();
@@ -2017,6 +2476,31 @@ struct OpenXrState
         }
         context = bound_context(context, "render_stereo");
         if (!context) return fail("bound_d3d11_context_missing", XR_ERROR_GRAPHICS_DEVICE_INVALID);
+
+        const bool player_seated = scrapvr::tools::is_player_seated();
+        if (!camera_mode_known || camera_mode_seated != player_seated)
+        {
+            camera_mode_known = true;
+            camera_mode_seated = player_seated;
+            standing_camera.reset();
+            log_line("VR_CAMERA_PATH seated=%u base_transform=%s",
+                player_seated ? 1u : 0u,
+                player_seated ? "original_game_camera" : "upright_pitch_neutral");
+        }
+        float upright_world_to_view[16]{};
+        const float *vr_world_to_view = game_world_to_view;
+        if (player_seated)
+        {
+            if (!world_to_view_matrix(game_world_to_view))
+                return fail("seated_world_to_view", XR_ERROR_VALIDATION_FAILURE);
+        }
+        else
+        {
+            if (!build_upright_world_to_view(
+                    game_world_to_view, standing_camera, upright_world_to_view))
+                return fail("upright_world_to_view", XR_ERROR_VALIDATION_FAILURE);
+            vr_world_to_view = upright_world_to_view;
+        }
         D3D11_TEXTURE2D_DESC desc{}; source->GetDesc(&desc);
         if (desc.Format != source_format || desc.SampleDesc.Count != 1 || desc.ArraySize != 1 || desc.MipLevels != 1)
         {
@@ -2131,7 +2615,7 @@ struct OpenXrState
 
         if (!anchor_valid)
         {
-            std::memcpy(anchor_game.m, game_world_to_view, sizeof(anchor_game.m));
+            std::memcpy(anchor_game.m, vr_world_to_view, sizeof(anchor_game.m));
             anchor_head.orientation = yaw_only(views[0].pose.orientation);
             anchor_head.position = {
                 (views[0].pose.position.x + views[1].pose.position.x) * 0.5f,
@@ -2145,7 +2629,7 @@ struct OpenXrState
                 anchor_head.orientation.y, anchor_head.orientation.z, anchor_head.orientation.w);
         }
         if (state == XR_SESSION_STATE_FOCUSED)
-            publish_hand_bridge(anchor_head, game_world_to_view);
+            publish_hand_bridge(anchor_head, vr_world_to_view);
         if (g_feature_startup_menu_enabled)
         {
             g_startup_menu.update_pointer(
@@ -2214,7 +2698,7 @@ struct OpenXrState
                     mapping.width, mapping.height, eyes[i].width, eyes[i].height);
                 return abort_frame("eye_extent_changed", XR_ERROR_VALIDATION_FAILURE);
             }
-            multiply_column_major(tracking_view, game_world_to_view, eye_world_to_view);
+            multiply_column_major(tracking_view, vr_world_to_view, eye_world_to_view);
             g_active_eye = static_cast<int>(i);
             g_eye_camera_build_index = 0;
             // Advance renderer-owned temporal state once per OpenXR frame. The
@@ -2944,6 +3428,11 @@ bool install_hook()
     void *render_original = nullptr;
     void *camera_original = nullptr;
     void *raycast_original = nullptr;
+    void *lua_pcall_original = nullptr;
+    void *lua_call_original = nullptr;
+    void *lua_getfield_original = nullptr;
+    void *lua_newstate_original = nullptr;
+    void *lua_loadbufferx_original = nullptr;
     if (MH_CreateHook(render_target, reinterpret_cast<void *>(hk_render_setup), &render_original) != MH_OK || !render_original)
     {
         MH_Uninitialize();
@@ -2963,14 +3452,65 @@ bool install_hook()
         MH_Uninitialize();
         return false;
     }
+    if (resolve_lua_projectile_api())
+    {
+        const bool pcall_ready = MH_CreateHook(g_lua_pcall_target, reinterpret_cast<void *>(hk_lua_pcall),
+                &lua_pcall_original) == MH_OK && lua_pcall_original;
+        if (pcall_ready)
+        {
+            g_lua_pcall_original.store(lua_pcall_original, std::memory_order_release);
+        }
+        const bool call_ready = MH_CreateHook(g_lua_call_target, reinterpret_cast<void *>(hk_lua_call),
+                &lua_call_original) == MH_OK && lua_call_original;
+        if (call_ready)
+        {
+            g_lua_call_original.store(lua_call_original, std::memory_order_release);
+        }
+        const bool getfield_ready = MH_CreateHook(g_lua_getfield_target,
+                reinterpret_cast<void *>(hk_lua_getfield), &lua_getfield_original) == MH_OK &&
+            lua_getfield_original;
+        if (getfield_ready)
+        {
+            g_lua_getfield_original.store(lua_getfield_original, std::memory_order_release);
+        }
+        const bool newstate_ready = MH_CreateHook(g_lua_newstate_target,
+                reinterpret_cast<void *>(hk_lua_newstate), &lua_newstate_original) == MH_OK &&
+            lua_newstate_original;
+        if (newstate_ready)
+        {
+            g_lua_newstate_original.store(lua_newstate_original, std::memory_order_release);
+        }
+        const bool loadbufferx_ready = MH_CreateHook(g_lua_loadbufferx_target,
+                reinterpret_cast<void *>(hk_lua_loadbufferx), &lua_loadbufferx_original) == MH_OK &&
+            lua_loadbufferx_original;
+        if (loadbufferx_ready)
+        {
+            g_lua_loadbufferx_original.store(lua_loadbufferx_original, std::memory_order_release);
+        }
+        if (pcall_ready && call_ready && getfield_ready && newstate_ready && loadbufferx_ready)
+        {
+            log_line("VR_LUA_PROJECTILE_HOOK_READY targets=lua51!lua_pcall,lua_call,lua_getfield,luaL_newstate,luaL_loadbufferx");
+        }
+        else
+        {
+            log_line("FAIL stage=lua_projectile_hook_create fallback=json_cache");
+        }
+    }
+    else
+    {
+        log_line("FAIL stage=lua_projectile_api_resolve fallback=json_cache");
+    }
     g_render_original.store(render_original, std::memory_order_release);
     g_camera_build_original.store(camera_original, std::memory_order_release);
     g_raycast_original.store(raycast_original, std::memory_order_release);
     if (MH_EnableHook(MH_ALL_HOOKS) != MH_OK)
     {
-        MH_RemoveHook(raycast_target);
-        MH_RemoveHook(camera_target);
-        MH_RemoveHook(render_target);
+        MH_RemoveHook(MH_ALL_HOOKS);
+        g_lua_pcall_original.store(nullptr, std::memory_order_release);
+        g_lua_call_original.store(nullptr, std::memory_order_release);
+        g_lua_getfield_original.store(nullptr, std::memory_order_release);
+        g_lua_newstate_original.store(nullptr, std::memory_order_release);
+        g_lua_loadbufferx_original.store(nullptr, std::memory_order_release);
         g_camera_build_original.store(nullptr, std::memory_order_release);
         g_raycast_original.store(nullptr, std::memory_order_release);
         g_render_original.store(nullptr, std::memory_order_release);
@@ -3060,6 +3600,11 @@ extern "C" __declspec(dllexport) void AddonUninit(HMODULE addon_module, HMODULE 
     reshade::unregister_event<reshade::addon_event::init_device>(smvr::on_init_device);
     MH_DisableHook(MH_ALL_HOOKS);
     MH_RemoveHook(MH_ALL_HOOKS);
+    smvr::g_lua_pcall_original.store(nullptr, std::memory_order_release);
+    smvr::g_lua_call_original.store(nullptr, std::memory_order_release);
+    smvr::g_lua_getfield_original.store(nullptr, std::memory_order_release);
+    smvr::g_lua_newstate_original.store(nullptr, std::memory_order_release);
+    smvr::g_lua_loadbufferx_original.store(nullptr, std::memory_order_release);
     smvr::g_camera_build_original.store(nullptr, std::memory_order_release);
     smvr::g_raycast_original.store(nullptr, std::memory_order_release);
     smvr::g_render_original.store(nullptr, std::memory_order_release);

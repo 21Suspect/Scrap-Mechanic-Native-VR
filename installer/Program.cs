@@ -17,23 +17,23 @@ using Microsoft.Win32;
 [assembly: AssemblyDescription("Installer, verifier, repair manager, and restorer for Scrap Mechanic Chapter 2 VR")]
 [assembly: AssemblyCompany("Scrap Mechanic VR Community Project")]
 [assembly: AssemblyProduct("Scrap Mechanic VR Chapter 2")]
-[assembly: AssemblyVersion("1.3.0.0")]
-[assembly: AssemblyFileVersion("1.3.0.0")]
+[assembly: AssemblyVersion("1.3.1.0")]
+[assembly: AssemblyFileVersion("1.3.1.0")]
 
 namespace ScrapMechanicVRPatcher
 {
     internal static class BuildInfo
     {
-        internal const string Version = "1.3.0-chapter2-20260831";
+        internal const string Version = "1.3.1-chapter2-20260831";
         internal const string GameBuild = "24529696";
         internal const string GameExeHash = "5D663BA2EC5DC8C7ABEFCC5C9344AE86F0A066C4069A91F54833524AC9A5B4F5";
-        internal const string AddonHash = "542B8E9AC3F5C544A979D6DB499BE47B994D9A0358E9C022EE166E1D3E8C42A1";
+        internal const string AddonHash = "1292B0C0FF8845C2AC297C7435D6CD189D0A6B952131E0E5136B1A80CC28197C";
         internal const string DxgiHash = "EC9245D05C11751F2AC0D2256E6921AD8FB36BE9172EF6D587856591EB729A25";
         internal const string LoaderHash = "018C6519AFBDEADE6DA9E7D59C406068DD58674D87A65AE27353484A05E6674A";
         internal const string MusicHash = "02E8E98721A899C2731ED8AFDF6378DB98DC09BB87FA5896FBA911CE5D875660";
         internal const string LogoHash = "C692A16C8CB01B94618951C09F64A156D7DD6A71D349B91E023B018165504C34";
-        internal const string ManifestHash = "66126A77F55154B199D814FB96DB7542823B28C2CB4A848430257A7FFE553129";
-        internal const string PatcherHash = "C0DB650D7861D60561772EF8C48A686178223B6994B47CE920D3F84AF1FA3A41";
+        internal const string ManifestHash = "E86A960C97A26EBF427C2DCA105F4267578B1C98F338C52032D8C1BFA9B853C4";
+        internal const string PatcherHash = "BD79FB930BEDE4B20B9797B5B20ED6507297D8B5DE389847FD37481180471BFC";
         internal const int ManagedFileCount = 47;
         internal const string ResourceName = "ScrapMechanicVR.Payload.zip";
     }
@@ -92,6 +92,11 @@ namespace ScrapMechanicVRPatcher
         internal static string LogoPath
         {
             get { return Path.Combine(PackageDirectory, "media", "ScrapMechanicVR-Logo.png"); }
+        }
+
+        internal static string OpenXrLoaderPath
+        {
+            get { return Path.Combine(PackageDirectory, "payload", "Release", "libopenxr_loader.dll"); }
         }
 
         private static bool PackageIsValid()
@@ -299,20 +304,258 @@ namespace ScrapMechanicVRPatcher
 
         internal static bool HasManagedInstall(string root)
         {
+            return File.Exists(ManagedStatePath(root));
+        }
+
+        internal static string ManagedStatePath(string root)
+        {
             try
             {
                 string normalized = Path.GetFullPath(root).TrimEnd(
                     Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).ToLowerInvariant();
                 string key = Hashing.Sha256Text(normalized).Substring(0, 16);
-                return File.Exists(Path.Combine(PackageManager.StateRoot, "install-state-" + key + ".json"));
+                return Path.Combine(PackageManager.StateRoot, "install-state-" + key + ".json");
             }
-            catch { return false; }
+            catch { return String.Empty; }
+        }
+
+        internal static string ManagedVersion(string root)
+        {
+            try
+            {
+                string statePath = ManagedStatePath(root);
+                if (String.IsNullOrWhiteSpace(statePath) || !File.Exists(statePath))
+                    return String.Empty;
+                Match match = Regex.Match(File.ReadAllText(statePath),
+                    "\\\"patchVersion\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"", RegexOptions.IgnoreCase);
+                return match.Success ? match.Groups[1].Value : "unknown managed version";
+            }
+            catch { return "unknown managed version"; }
+        }
+
+        internal static bool HasVrTraces(string root)
+        {
+            if (!IsGameRoot(root))
+                return false;
+            string[] paths = new string[] {
+                @"Release\smvr_native_vr_v1.addon64",
+                @"Release\ScrapMechanicVR.ini",
+                @"Release\ScrapMechanicVR-StartupMenu.png",
+                @"Release\ScrapMechanicVR-HeldItems.bin",
+                @"Release\scrap_native_vr.addon64",
+                @"Release\openxr_loader.dll",
+                @"NativeVR\Start-NativeVR.ps1"
+            };
+            foreach (string relative in paths)
+                if (File.Exists(Path.Combine(root, relative)))
+                    return true;
+            return HasManagedInstall(root);
         }
 
         internal static void Save(string root)
         {
             Directory.CreateDirectory(PackageManager.StateRoot);
             File.WriteAllText(SavedGamePath, root, new UTF8Encoding(false));
+        }
+    }
+
+    internal static class OpenXrProbe
+    {
+        private const int XrTypeInstanceCreateInfo = 3;
+        private const int XrTypeSystemGetInfo = 4;
+        private const int XrFormFactorHeadMountedDisplay = 1;
+        private const int XrErrorFormFactorUnavailable = -35;
+        private const ulong XrApiVersion10 = 0x0001000000000000UL;
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        private struct XrApplicationInfo
+        {
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+            internal string applicationName;
+            internal uint applicationVersion;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+            internal string engineName;
+            internal uint engineVersion;
+            internal ulong apiVersion;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct XrInstanceCreateInfo
+        {
+            internal int type;
+            internal IntPtr next;
+            internal ulong createFlags;
+            internal XrApplicationInfo applicationInfo;
+            internal uint enabledApiLayerCount;
+            internal IntPtr enabledApiLayerNames;
+            internal uint enabledExtensionCount;
+            internal IntPtr enabledExtensionNames;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct XrSystemGetInfo
+        {
+            internal int type;
+            internal IntPtr next;
+            internal int formFactor;
+        }
+
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate int XrCreateInstanceDelegate(ref XrInstanceCreateInfo createInfo, out IntPtr instance);
+
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate int XrGetSystemDelegate(IntPtr instance, ref XrSystemGetInfo getInfo, out ulong systemId);
+
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+        private delegate int XrDestroyInstanceDelegate(IntPtr instance);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr LoadLibrary(string path);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Ansi, SetLastError = true)]
+        private static extern IntPtr GetProcAddress(IntPtr module, string name);
+
+        [DllImport("kernel32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool FreeLibrary(IntPtr module);
+
+        private static T LoadFunction<T>(IntPtr module, string name) where T : class
+        {
+            IntPtr address = GetProcAddress(module, name);
+            if (address == IntPtr.Zero)
+                throw new InvalidOperationException("The OpenXR loader does not export " + name + ".");
+            return (T)(object)Marshal.GetDelegateForFunctionPointer(address, typeof(T));
+        }
+
+        internal static bool HeadsetAvailable(string loaderPath, out string detail)
+        {
+            detail = String.Empty;
+            if (String.IsNullOrWhiteSpace(loaderPath) || !File.Exists(loaderPath))
+            {
+                detail = "OpenXR loader is missing";
+                return false;
+            }
+
+            IntPtr module = LoadLibrary(loaderPath);
+            if (module == IntPtr.Zero)
+            {
+                detail = "OpenXR loader could not be opened (Windows error " + Marshal.GetLastWin32Error() + ")";
+                return false;
+            }
+
+            IntPtr instance = IntPtr.Zero;
+            try
+            {
+                XrCreateInstanceDelegate createInstance = LoadFunction<XrCreateInstanceDelegate>(module, "xrCreateInstance");
+                XrGetSystemDelegate getSystem = LoadFunction<XrGetSystemDelegate>(module, "xrGetSystem");
+                XrInstanceCreateInfo createInfo = new XrInstanceCreateInfo();
+                createInfo.type = XrTypeInstanceCreateInfo;
+                createInfo.applicationInfo = new XrApplicationInfo {
+                    applicationName = "Scrap Mechanic VR Installer",
+                    applicationVersion = 1,
+                    engineName = "Scrap Mechanic VR",
+                    engineVersion = 1,
+                    apiVersion = XrApiVersion10
+                };
+                int createResult = createInstance(ref createInfo, out instance);
+                if (createResult < 0 || instance == IntPtr.Zero)
+                {
+                    detail = "OpenXR runtime is not ready (result " + createResult + ")";
+                    return false;
+                }
+
+                XrSystemGetInfo systemInfo = new XrSystemGetInfo();
+                systemInfo.type = XrTypeSystemGetInfo;
+                systemInfo.formFactor = XrFormFactorHeadMountedDisplay;
+                ulong systemId;
+                int systemResult = getSystem(instance, ref systemInfo, out systemId);
+                if (systemResult >= 0 && systemId != 0)
+                {
+                    detail = "headset connected";
+                    return true;
+                }
+                detail = systemResult == XrErrorFormFactorUnavailable
+                    ? "runtime ready, but no headset is connected"
+                    : "headset check failed (OpenXR result " + systemResult + ")";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                detail = ex.Message;
+                return false;
+            }
+            finally
+            {
+                if (instance != IntPtr.Zero)
+                {
+                    try
+                    {
+                        XrDestroyInstanceDelegate destroyInstance = LoadFunction<XrDestroyInstanceDelegate>(module, "xrDestroyInstance");
+                        destroyInstance(instance);
+                    }
+                    catch { }
+                }
+                FreeLibrary(module);
+            }
+        }
+
+        internal static bool HeadsetAvailableWithTimeout(out string detail)
+        {
+            string diagnosticRoot = Path.Combine(PackageManager.StateRoot, "diagnostics");
+            Directory.CreateDirectory(diagnosticRoot);
+            string resultPath = Path.Combine(diagnosticRoot, "headset-probe-" + Guid.NewGuid().ToString("N") + ".txt");
+            try
+            {
+                ProcessStartInfo info = new ProcessStartInfo();
+                info.FileName = Assembly.GetExecutingAssembly().Location;
+                info.Arguments = "--headset-probe-worker \"" + resultPath.Replace("\"", String.Empty) + "\"";
+                info.UseShellExecute = false;
+                info.CreateNoWindow = true;
+                using (Process worker = Process.Start(info))
+                {
+                    if (!worker.WaitForExit(5000))
+                    {
+                        try { worker.Kill(); } catch { }
+                        try { worker.WaitForExit(1000); } catch { }
+                        detail = "OpenXR did not answer within five seconds; connect and wake the headset";
+                        return false;
+                    }
+                }
+
+                if (!File.Exists(resultPath))
+                {
+                    detail = "OpenXR headset probe returned no result";
+                    return false;
+                }
+                string[] lines = File.ReadAllLines(resultPath);
+                detail = lines.Length > 1 ? lines[1] : "OpenXR headset probe returned an incomplete result";
+                return lines.Length > 0 && lines[0] == "CONNECTED";
+            }
+            catch (Exception ex)
+            {
+                detail = "OpenXR headset probe failed: " + ex.Message;
+                return false;
+            }
+            finally
+            {
+                try { if (File.Exists(resultPath)) File.Delete(resultPath); } catch { }
+            }
+        }
+
+        internal static bool RunWorker(string resultPath)
+        {
+            string diagnosticRoot = Path.GetFullPath(Path.Combine(PackageManager.StateRoot, "diagnostics"))
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            string fullResultPath = Path.GetFullPath(resultPath);
+            if (!fullResultPath.StartsWith(diagnosticRoot, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Unsafe OpenXR probe result path.");
+            Directory.CreateDirectory(diagnosticRoot);
+            string detail;
+            bool available = HeadsetAvailable(PackageManager.OpenXrLoaderPath, out detail);
+            File.WriteAllText(fullResultPath,
+                (available ? "CONNECTED" : "UNAVAILABLE") + Environment.NewLine + detail,
+                new UTF8Encoding(false));
+            return available;
         }
     }
 
@@ -507,7 +750,7 @@ namespace ScrapMechanicVRPatcher
             string gameIcon = Path.Combine(gameRoot, "Release", "ScrapMechanic.exe");
             CreateShortcut(DesktopShortcut, ManagerExecutable, "--start", "Start Scrap Mechanic Chapter 2 in native OpenXR VR", gameIcon);
             CreateShortcut(Path.Combine(StartMenuDirectory, "Start Scrap Mechanic VR - Chapter 2.lnk"), ManagerExecutable, "--start", "Start Scrap Mechanic Chapter 2 in native OpenXR VR", gameIcon);
-            CreateShortcut(Path.Combine(StartMenuDirectory, "Manage or Uninstall Scrap Mechanic VR - Chapter 2.lnk"), ManagerExecutable, "", "Manage, verify, or uninstall the Chapter 2 VR snapshot", gameIcon);
+            CreateShortcut(Path.Combine(StartMenuDirectory, "Manage or Uninstall Scrap Mechanic VR - Chapter 2.lnk"), ManagerExecutable, "", "Install, start, or uninstall Scrap Mechanic VR Chapter 2", gameIcon);
         }
 
         internal static void Remove()
@@ -582,13 +825,16 @@ namespace ScrapMechanicVRPatcher
         private readonly Label modStatus;
         private readonly Button installButton;
         private readonly Button startButton;
-        private readonly Button verifyButton;
-        private readonly Button repairButton;
         private readonly Button uninstallButton;
         private readonly Button logsButton;
         private readonly RichTextBox details;
         private readonly TrackBar musicVolume;
         private readonly Label musicVolumeLabel;
+        private bool automaticVerificationRunning;
+        private bool? lastVerificationPassed;
+        private string lastVerificationRoot = String.Empty;
+        private bool? lastHeadsetReady;
+        private string lastHeadsetDetail = String.Empty;
 
         internal MainForm()
         {
@@ -627,7 +873,7 @@ namespace ScrapMechanicVRPatcher
             Controls.Add(title);
 
             Label subtitle = new Label();
-            subtitle.Text = "CHAPTER 2  /  SCRAP MECHANIC 1.0  /  META QUEST 3";
+            subtitle.Text = "CHAPTER 2  /  OPENXR  /  QUEST + VALVE INDEX";
             subtitle.AutoSize = true;
             subtitle.Font = new Font("Segoe UI Semibold", 8.5F, FontStyle.Bold);
             subtitle.ForeColor = MutedText;
@@ -712,32 +958,26 @@ namespace ScrapMechanicVRPatcher
             actionsCard.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             Controls.Add(actionsCard);
 
-            installButton = CreateActionButton(actionsCard, "INSTALL VR MOD", 18, 17, 170, ButtonKind.Primary);
+            installButton = CreateActionButton(actionsCard, "INSTALL VR MOD", 18, 17, 190, ButtonKind.Primary);
             installButton.Click += InstallClicked;
 
-            startButton = CreateActionButton(actionsCard, "START VR", 198, 17, 120, ButtonKind.Success);
-            startButton.Click += StartClicked;
-
-            verifyButton = CreateActionButton(actionsCard, "VERIFY", 328, 17, 110, ButtonKind.Neutral);
-            verifyButton.Click += VerifyClicked;
-
-            uninstallButton = CreateActionButton(actionsCard, "UNINSTALL / RESTORE", 448, 17, 170, ButtonKind.Danger);
+            uninstallButton = CreateActionButton(actionsCard, "UNINSTALL VR MOD", 218, 17, 190, ButtonKind.Danger);
             uninstallButton.Click += UninstallClicked;
 
-            logsButton = CreateActionButton(actionsCard, "OPEN LOGS", 628, 17, 204, ButtonKind.Neutral);
+            startButton = CreateActionButton(actionsCard, "START VR", 418, 17, 170, ButtonKind.Success);
+            startButton.Click += StartClicked;
+
+            logsButton = CreateActionButton(actionsCard, "OPEN LOGS", 598, 17, 234, ButtonKind.Neutral);
             logsButton.Click += LogsClicked;
 
-            repairButton = CreateActionButton(actionsCard, "REPAIR / CLEAN OLD VR FILES", 18, 67, 250, ButtonKind.Warning);
-            repairButton.Click += RepairClicked;
-
             Label safety = new Label();
-            safety.Text = "GUARDED INSTALL  •  BACKUPS VERIFIED  •  GAME EXE & SAVES UNTOUCHED";
+            safety.Text = "GUARDED INSTALL  •  AUTOMATIC VERIFICATION  •  GAME EXE & SAVES UNTOUCHED";
             safety.AutoSize = false;
             safety.TextAlign = ContentAlignment.MiddleRight;
             safety.Font = new Font("Segoe UI Semibold", 8F, FontStyle.Bold);
             safety.ForeColor = MutedText;
-            safety.Location = new Point(280, 69);
-            safety.Size = new Size(552, 32);
+            safety.Location = new Point(18, 69);
+            safety.Size = new Size(814, 32);
             safety.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             actionsCard.Controls.Add(safety);
 
@@ -758,7 +998,7 @@ namespace ScrapMechanicVRPatcher
             details.BackColor = Color.FromArgb(18, 20, 22);
             details.ForeColor = Color.FromArgb(202, 207, 213);
             details.Font = new Font("Consolas", 9F);
-            details.Text = "[READY] Installation status loaded. Choose an action above.\n";
+            details.Text = "[READY] Inspecting the game, installed VR version, and OpenXR runtime.\n";
             Controls.Add(details);
 
             gamePath.Text = GameLocator.Find();
@@ -774,6 +1014,7 @@ namespace ScrapMechanicVRPatcher
                 RefreshState();
                 if (startButton.Enabled) startButton.Focus();
                 else if (installButton.Enabled) installButton.Focus();
+                BeginInvoke((MethodInvoker)delegate { AutomaticStartupVerification(); });
             };
         }
 
@@ -865,9 +1106,8 @@ namespace ScrapMechanicVRPatcher
             UseWaitCursor = busy;
             installButton.Enabled = !busy && installButton.Enabled;
             startButton.Enabled = !busy && startButton.Enabled;
-            verifyButton.Enabled = !busy && verifyButton.Enabled;
-            repairButton.Enabled = !busy && repairButton.Enabled;
             uninstallButton.Enabled = !busy && uninstallButton.Enabled;
+            logsButton.Enabled = !busy && logsButton.Enabled;
             Application.DoEvents();
         }
 
@@ -903,30 +1143,91 @@ namespace ScrapMechanicVRPatcher
 
             string runtime = GameLocator.ActiveOpenXrRuntime();
             bool runtimeReady = !String.IsNullOrWhiteSpace(runtime) && File.Exists(runtime);
-            openXrStatus.Text = runtimeReady
-                ? "●  OPENXR   " + runtime
-                : "●  OPENXR   No active 64-bit runtime — select Meta Quest Link in Meta Horizon settings";
-            openXrStatus.ForeColor = runtimeReady ? Success : Warning;
+            openXrStatus.Text = !runtimeReady
+                ? "●  OPENXR   No active 64-bit runtime"
+                : lastHeadsetReady == true
+                    ? "●  OPENXR   Headset connected — " + runtime
+                    : lastHeadsetReady == false
+                        ? "●  OPENXR   " + lastHeadsetDetail
+                        : "●  OPENXR   Runtime ready — Start VR checks the headset connection";
+            openXrStatus.ForeColor = lastHeadsetReady == true ? Success : Warning;
 
             bool installed = compatible && GameLocator.LooksInstalled(root);
             bool managedInstall = compatible && GameLocator.HasManagedInstall(root);
-            modStatus.Text = installed && managedInstall
-                ? "●  VR MOD   Chapter 2 installed — " + BuildInfo.ManagedFileCount + " managed files"
-                : installed
-                    ? "●  VR MOD   Matching manual feature candidate found — Install will adopt it safely"
-                : managedInstall
-                    ? "●  VR MOD   Installation is incomplete or modified — Restore & Reinstall is available"
-                    : "●  VR MOD   Not installed";
-            modStatus.ForeColor = installed && managedInstall ? Success : installed || managedInstall ? Warning : MutedText;
+            bool traces = compatible && GameLocator.HasVrTraces(root);
+            string managedVersion = managedInstall ? GameLocator.ManagedVersion(root) : String.Empty;
+            bool verificationForRoot = String.Equals(lastVerificationRoot, root, StringComparison.OrdinalIgnoreCase);
+            if (installed && managedInstall)
+            {
+                modStatus.Text = verificationForRoot && lastVerificationPassed == true
+                    ? "●  VR MOD   " + managedVersion + " installed — automatic verification passed"
+                    : verificationForRoot && lastVerificationPassed == false
+                        ? "●  VR MOD   Managed files need attention — Install will replace them safely"
+                        : "●  VR MOD   " + managedVersion + " installed — checking automatically";
+            }
+            else if (managedInstall)
+                modStatus.Text = "●  VR MOD   Older, incomplete, or modified managed version detected: " + managedVersion;
+            else if (traces)
+                modStatus.Text = "●  VR MOD   Current or older unmanaged VR files detected";
+            else
+                modStatus.Text = "●  VR MOD   Not installed";
+            modStatus.ForeColor = installed && managedInstall && verificationForRoot && lastVerificationPassed == true
+                ? Success : traces || managedInstall ? Warning : MutedText;
 
-            installButton.Text = managedInstall && !installed ? "RESTORE & REINSTALL" : "INSTALL VR MOD";
-            installButton.Enabled = compatible && (!installed || !managedInstall);
+            installButton.Text = "INSTALL VR MOD";
+            installButton.Enabled = compatible;
             startButton.Enabled = installed;
-            verifyButton.Enabled = compatible;
-            repairButton.Text = managedInstall ? "FORCE RESET / REINSTALL" : "REPAIR / CLEAN OLD VR FILES";
-            repairButton.Enabled = compatible;
-            uninstallButton.Enabled = managedInstall;
-            logsButton.Enabled = valid;
+            uninstallButton.Enabled = compatible && (managedInstall || traces);
+            logsButton.Enabled = valid || Directory.Exists(Path.Combine(PackageManager.StateRoot, "logs"));
+        }
+
+        private void AutomaticStartupVerification()
+        {
+            if (automaticVerificationRunning)
+                return;
+            string root = gamePath.Text.Trim();
+            if (!GameLocator.IsGameRoot(root) ||
+                !String.Equals(GameLocator.GameHash(root), BuildInfo.GameExeHash, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            bool currentFiles = GameLocator.LooksInstalled(root);
+            bool managedInstall = GameLocator.HasManagedInstall(root);
+            if (!currentFiles || !managedInstall)
+            {
+                if (managedInstall)
+                    Append("Automatic startup inspection found managed version " + GameLocator.ManagedVersion(root) + ". Install will remove it with its verified backups before installing " + BuildInfo.Version + ".");
+                else if (GameLocator.HasVrTraces(root))
+                    Append("Automatic startup inspection found unmanaged current or older VR files. Install or Uninstall will explain the guarded cleanup before asking for approval.");
+                else
+                    Append("Automatic startup inspection passed: no VR mod is currently installed.");
+                return;
+            }
+
+            try
+            {
+                automaticVerificationRunning = true;
+                SetBusy(true);
+                Append("Automatically verifying all " + BuildInfo.ManagedFileCount + " installed VR files...");
+                CommandResult result = PatcherRunner.RunCaptured("Verify", root);
+                lastVerificationRoot = root;
+                lastVerificationPassed = result.ExitCode == 0;
+                Append(result.Output);
+                Append(result.ExitCode == 0
+                    ? "Automatic startup verification passed."
+                    : "Automatic startup verification found a problem. Install will restore the existing version and replace it safely after approval.");
+            }
+            catch (Exception ex)
+            {
+                lastVerificationRoot = root;
+                lastVerificationPassed = false;
+                Append("Automatic startup verification could not complete: " + ex.Message);
+            }
+            finally
+            {
+                automaticVerificationRunning = false;
+                RefreshState();
+                SetBusy(false);
+            }
         }
 
         private void BrowseClicked(object sender, EventArgs e)
@@ -944,25 +1245,49 @@ namespace ScrapMechanicVRPatcher
         private void InstallClicked(object sender, EventArgs e)
         {
             string root = gamePath.Text.Trim();
+            bool managedInstall = GameLocator.HasManagedInstall(root);
+            bool traces = GameLocator.HasVrTraces(root);
+            string existing = managedInstall
+                ? "Detected managed VR version: " + GameLocator.ManagedVersion(root) +
+                  "\nIts verified state and backups will be used to restore and remove it first."
+                : traces
+                    ? "Detected current or older VR files without a managed restore state.\nRecognized files will be preserved before guarded cleanup; Steam verification may be required for original game files."
+                    : "No existing VR mod was detected.";
             if (MessageBox.Show(this,
-                "Install the Chapter 2 VR mod into:\n\n" + root +
-                "\n\nAny existing managed installation will be restored first. Modified managed files are preserved under LocalAppData before originals are restored. ScrapMechanic.exe and saves are never modified.",
-                "Install Scrap Mechanic VR — Chapter 2", MessageBoxButtons.OKCancel, MessageBoxIcon.Information) != DialogResult.OK)
+                existing + "\n\nAfter approval, the installer will:\n" +
+                "1. Verify the supported game and all embedded files.\n" +
+                "2. Remove any managed older/current VR version using its exact backups.\n" +
+                "3. Back up required originals and install " + BuildInfo.ManagedFileCount + " files for " + BuildInfo.Version + ".\n" +
+                "4. Automatically verify the completed installation and refresh the launch shortcuts.\n\n" +
+                "Game directory:\n" + root + "\n\nScrapMechanic.exe and save files are never modified. Continue?",
+                "Install Scrap Mechanic VR", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes)
+            {
+                Append("Install cancelled before any files were changed.");
                 return;
+            }
 
             try
             {
                 SetBusy(true);
-                Append("Validating the embedded payload and requesting installation privileges...");
+                Append("Install approved. Verifying the package, inspecting the existing version, and requesting installation privileges...");
                 CommandResult result = PatcherRunner.RunVisible("Install", root, true);
                 Append(result.Output);
                 if (result.ExitCode != 0)
+                {
+                    if (result.Output.IndexOf("STEAM_REPAIR_REQUIRED", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        OpenSteamVerification();
+                        throw new InvalidOperationException("The older VR files were removed, but one or more original game files need Steam verification. Steam verification has been opened; let it finish, then click Install VR Mod again.\n\n" + PatcherRunner.FailureMessage("Installation", result));
+                    }
                     throw new InvalidOperationException(PatcherRunner.FailureMessage("Installation", result));
+                }
                 GameLocator.Save(root);
                 Shortcuts.Install(root);
-                Append("Installation completed and desktop/Start Menu launchers were created.");
+                lastVerificationRoot = root;
+                lastVerificationPassed = true;
+                Append("Installation and automatic post-install verification passed. Desktop and Start Menu launchers were refreshed.");
                 MessageBox.Show(this,
-                    "The Chapter 2 VR mod is installed.\n\nStart Meta Quest Link, connect the headset, then use the new 'Start Scrap Mechanic VR - Chapter 2' shortcut.",
+                    BuildInfo.Version + " is installed and all " + BuildInfo.ManagedFileCount + " managed files passed verification.\n\nStart your OpenXR runtime, connect the headset, then click Start VR. The game will not launch until OpenXR reports a connected headset.",
                     "Installation complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Win32Exception ex)
@@ -981,132 +1306,38 @@ namespace ScrapMechanicVRPatcher
             }
         }
 
+        private static void OpenSteamVerification()
+        {
+            ProcessStartInfo steam = new ProcessStartInfo();
+            steam.FileName = "steam://validate/387990";
+            steam.UseShellExecute = true;
+            Process.Start(steam);
+        }
+
         private void StartClicked(object sender, EventArgs e)
         {
             try
             {
+                SetBusy(true);
                 string root = gamePath.Text.Trim();
+                string runtime = GameLocator.ActiveOpenXrRuntime();
+                if (String.IsNullOrWhiteSpace(runtime) || !File.Exists(runtime))
+                    throw new InvalidOperationException("No active 64-bit OpenXR runtime was found. Enable Meta Quest Link or SteamVR OpenXR, then try again.");
+                Append("Checking whether the active OpenXR runtime reports a connected headset...");
+                string headsetDetail;
+                bool headsetReady = OpenXrProbe.HeadsetAvailableWithTimeout(out headsetDetail);
+                lastHeadsetReady = headsetReady;
+                lastHeadsetDetail = headsetDetail;
+                if (!headsetReady)
+                    throw new InvalidOperationException("Start VR was stopped because no OpenXR headset is ready: " + headsetDetail + ". Connect and wake the headset, then try again.");
                 GameLocator.Save(root);
-                Append("Starting Scrap Mechanic Chapter 2 through Steam with the active OpenXR runtime...");
+                Append("OpenXR reports a connected headset. Starting Scrap Mechanic Chapter 2 through Steam...");
                 PatcherRunner.StartDetached(root);
             }
             catch (Exception ex)
             {
                 Append("START FAILED: " + ex.Message);
                 MessageBox.Show(this, ex.Message, "VR launch failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void VerifyClicked(object sender, EventArgs e)
-        {
-            try
-            {
-                SetBusy(true);
-                Append("Running full payload and installed-file verification...");
-                CommandResult result = PatcherRunner.RunCaptured("Verify", gamePath.Text.Trim());
-                Append(result.Output);
-                if (result.ExitCode == 0)
-                    MessageBox.Show(this, "All installed VR files match the manifest.", "Verification passed", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                else
-                    MessageBox.Show(this, "Verification did not pass. Review the detailed output in the manager window.", "Verification failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-            catch (Exception ex)
-            {
-                Append("VERIFY FAILED: " + ex.Message);
-            }
-            finally
-            {
-                RefreshState();
-                SetBusy(false);
-            }
-        }
-
-        private void RepairClicked(object sender, EventArgs e)
-        {
-            string root = gamePath.Text.Trim();
-            bool managedInstall = GameLocator.HasManagedInstall(root);
-            if (managedInstall)
-            {
-                if (MessageBox.Show(this,
-                    "Force Reset / Reinstall will restore every recognized current or legacy VR file, preserve unknown old state records without touching their files, and then install this version.\n\n" +
-                    "Game directory:\n" + root +
-                    "\n\nThe supported game-build check and original-file hash checks remain enforced. Continue?",
-                    "Force Reset / Reinstall", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
-                    return;
-
-                try
-                {
-                    SetBusy(true);
-                    Append("Requesting Force Reset / Reinstall privileges and migrating legacy install state...");
-                    CommandResult result = PatcherRunner.RunVisible("ForceInstall", root, true);
-                    Append(result.Output);
-                    if (result.ExitCode != 0)
-                    {
-                        if (result.Output.IndexOf("STEAM_REPAIR_REQUIRED", StringComparison.OrdinalIgnoreCase) >= 0)
-                        {
-                            ProcessStartInfo steam = new ProcessStartInfo();
-                            steam.FileName = "steam://validate/387990";
-                            steam.UseShellExecute = true;
-                            Process.Start(steam);
-                        }
-                        throw new InvalidOperationException(PatcherRunner.FailureMessage("Force Reset / Reinstall", result));
-                    }
-                    GameLocator.Save(root);
-                    Shortcuts.Install(root);
-                    Append("Force Reset / Reinstall completed and launch shortcuts were refreshed.");
-                    MessageBox.Show(this,
-                        "The stale installation state was migrated and Scrap Mechanic VR was reinstalled successfully.",
-                        "Force reinstall complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                catch (Win32Exception ex)
-                {
-                    Append("Force Reset / Reinstall was cancelled or elevation failed: " + ex.Message);
-                }
-                catch (Exception ex)
-                {
-                    Append("FORCE RESET / REINSTALL FAILED: " + ex.Message);
-                    MessageBox.Show(this, ex.Message, "Force reinstall failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-                finally
-                {
-                    RefreshState();
-                    SetBusy(false);
-                }
-                return;
-            }
-
-            if (MessageBox.Show(this,
-                    "Back up and remove stale files only from the current VR-managed paths and three explicitly recognized legacy VR paths in:\n\n" + root +
-                    "\n\nModified original files will be removed so Steam can download clean copies. Existing ReShade files at these exact VR paths may also be removed, but every removed file is quarantined under LocalAppData.\n\nContinue?",
-                "Repair old or conflicting VR files", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
-                return;
-
-            try
-            {
-                SetBusy(true);
-                Append("Requesting repair privileges and quarantining stale VR-managed files...");
-                CommandResult result = PatcherRunner.RunVisible("Repair", root, true);
-                Append(result.Output);
-                if (result.ExitCode != 0)
-                    throw new InvalidOperationException(PatcherRunner.FailureMessage("Repair", result));
-                Shortcuts.Remove();
-                Append("Repair cleanup completed. Opening Steam file verification for Scrap Mechanic...");
-                ProcessStartInfo steam = new ProcessStartInfo();
-                steam.FileName = "steam://validate/387990";
-                steam.UseShellExecute = true;
-                Process.Start(steam);
-                MessageBox.Show(this,
-                    "Steam verification has been opened. Wait until Steam finishes restoring Scrap Mechanic, then return here and click Install VR Mod.",
-                    "Repair cleanup complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Win32Exception ex)
-            {
-                Append("Repair was cancelled or elevation/Steam launch failed: " + ex.Message);
-            }
-            catch (Exception ex)
-            {
-                Append("REPAIR FAILED: " + ex.Message);
-                MessageBox.Show(this, ex.Message, "Repair failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
@@ -1118,21 +1349,46 @@ namespace ScrapMechanicVRPatcher
         private void UninstallClicked(object sender, EventArgs e)
         {
             string root = gamePath.Text.Trim();
+            bool managedInstall = GameLocator.HasManagedInstall(root);
+            string removalPlan = managedInstall
+                ? "Detected managed VR version: " + GameLocator.ManagedVersion(root) +
+                  "\nThe installer will validate its saved state and backups, preserve any user-modified managed files, restore original game files, remove mod-owned files and shortcuts, then verify the result."
+                : "No managed restore state was found, but recognized current or older VR files are present.\nThe installer will preserve and remove those files. If original game files cannot be restored safely, Steam verification will open automatically.";
             if (MessageBox.Show(this,
-                "Restore every patcher-managed game file to its exact pre-install state?\n\nSave files are not touched.",
+                removalPlan + "\n\nGame directory:\n" + root +
+                "\n\nScrapMechanic.exe and save files are never modified. Continue?",
                 "Uninstall Scrap Mechanic VR", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+            {
+                Append("Uninstall cancelled before any files were changed.");
                 return;
+            }
             try
             {
                 SetBusy(true);
-                Append("Requesting restore privileges and verifying backups...");
+                Append("Uninstall approved. Inspecting the installed version, verifying restore data, and requesting privileges...");
                 CommandResult result = PatcherRunner.RunVisible("Uninstall", root, true);
                 Append(result.Output);
                 if (result.ExitCode != 0)
+                {
+                    if (result.Output.IndexOf("STEAM_REPAIR_REQUIRED", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        Shortcuts.Remove();
+                        lastVerificationRoot = root;
+                        lastVerificationPassed = null;
+                        OpenSteamVerification();
+                        Append("VR files were removed. Steam verification was opened to restore original game files that had no usable backup.");
+                        MessageBox.Show(this,
+                            "The VR mod files were removed. Steam verification has been opened to restore the remaining original Scrap Mechanic files. Let Steam finish before launching the game.",
+                            "Steam verification required", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
                     throw new InvalidOperationException(PatcherRunner.FailureMessage("Uninstall / restore", result));
+                }
                 Shortcuts.Remove();
-                Append("Uninstall completed; game originals were hash-verified after restore.");
-                MessageBox.Show(this, "The VR mod was removed and original files were restored.", "Restore complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                lastVerificationRoot = root;
+                lastVerificationPassed = null;
+                Append("Uninstall and automatic post-uninstall verification passed. Original files were restored and no recognized VR payload remains.");
+                MessageBox.Show(this, "The VR mod was removed. Original files were restored and verified automatically.", "Uninstall complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Win32Exception ex)
             {
@@ -1226,6 +1482,7 @@ namespace ScrapMechanicVRPatcher
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             bool selfTest = args.Length > 0 && String.Equals(args[0], "--self-test", StringComparison.OrdinalIgnoreCase);
+            bool headsetProbeWorker = args.Length > 0 && String.Equals(args[0], "--headset-probe-worker", StringComparison.OrdinalIgnoreCase);
             string headlessAction = null;
             if (args.Length > 0)
             {
@@ -1236,9 +1493,17 @@ namespace ScrapMechanicVRPatcher
                 else if (String.Equals(args[0], "--verify", StringComparison.OrdinalIgnoreCase))
                     headlessAction = "Verify";
             }
-            bool testCommand = selfTest || headlessAction != null;
+            bool testCommand = selfTest || headsetProbeWorker || headlessAction != null;
             try
             {
+                if (headsetProbeWorker)
+                {
+                    if (args.Length < 2)
+                        throw new InvalidOperationException("The OpenXR probe result path is missing.");
+                    PackageManager.EnsureExtracted();
+                    Environment.ExitCode = OpenXrProbe.RunWorker(args[1]) ? 0 : 2;
+                    return;
+                }
                 if (selfTest)
                 {
                     RunSelfTest();
@@ -1256,7 +1521,13 @@ namespace ScrapMechanicVRPatcher
                 {
                     string root = GameLocator.Find();
                     if (!GameLocator.IsGameRoot(root) || !GameLocator.LooksInstalled(root))
-                        throw new InvalidOperationException("The managed Chapter 2 VR installation could not be found. Run this manager and reinstall or verify it.");
+                        throw new InvalidOperationException("The Chapter 2 VR installation could not be found or is incomplete. Open this manager and click Install VR Mod.");
+                    string runtime = GameLocator.ActiveOpenXrRuntime();
+                    if (String.IsNullOrWhiteSpace(runtime) || !File.Exists(runtime))
+                        throw new InvalidOperationException("No active 64-bit OpenXR runtime was found. Enable Meta Quest Link or SteamVR OpenXR before using Start VR.");
+                    string headsetDetail;
+                    if (!OpenXrProbe.HeadsetAvailableWithTimeout(out headsetDetail))
+                        throw new InvalidOperationException("Start VR was stopped because no OpenXR headset is ready: " + headsetDetail + ". Connect and wake the headset, then try again.");
                     PatcherRunner.StartDetached(root);
                     return;
                 }
@@ -1270,6 +1541,7 @@ namespace ScrapMechanicVRPatcher
                     {
                         Directory.CreateDirectory(PackageManager.StateRoot);
                         string failureLog = selfTest ? "self-test.log" :
+                            headsetProbeWorker ? "headset-probe-worker.log" :
                             "installer-" + headlessAction.ToLowerInvariant() + "-test.log";
                         File.WriteAllText(Path.Combine(PackageManager.StateRoot, failureLog),
                             "FAIL\r\n" + ex + "\r\n", new UTF8Encoding(false));

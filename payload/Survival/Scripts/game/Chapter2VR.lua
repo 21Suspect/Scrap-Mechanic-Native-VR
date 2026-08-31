@@ -55,7 +55,10 @@ local VrGunMuzzleLocalOffsets = {
 	["9fde0601-c2ba-4c70-8d5c-2a7a9fdd122b"] = { -0.198, -0.035, -0.509 },
 	["d51ec758-057b-4263-bd16-7a731e149480"] = { -0.234, -0.050, -0.384 },
 	["a2a2bb33-a841-4b23-88da-b758063d9206"] = { -0.198, -0.035, -0.426 },
-	["6993e5df-6852-4e84-88ae-df49f765e784"] = { -0.085, -0.035, -0.424 }
+	["6993e5df-6852-4e84-88ae-df49f765e784"] = { -0.085, -0.035, -0.424 },
+	["3a3280e4-03b6-4a4d-9e02-e348478213c9"] = { 0.000, -0.035, -0.180 },
+	["e3bdeea5-d349-4d08-9b5a-5695ea05537e"] = { 0.000, -0.035, -0.180 },
+	["d2fab7ef-21db-4681-a22a-cd4f278fc355"] = { -0.090, -0.035, -0.310 }
 }
 
 local VrToolLaserItems = {
@@ -589,6 +592,77 @@ end
 -- must never silently fall back to the desktop camera while a live VR session
 -- is present: if tracking or the equipped-tool calibration is not ready, the
 -- caller receives authoritative=true with no pose and skips that shot.
+local function refreshNativeProjectilePose( tick )
+	local nativePose = ScrapVRProjectilePoseNative
+	if type( nativePose ) ~= "function" then return false end
+	local ok, authoritative, active, px, py, pz, dx, dy, dz, item, sequence = pcall( nativePose )
+	if not ok then
+		Chapter2VR.directGunReadReason = "native_bridge_call_failed"
+		return false
+	end
+
+	Chapter2VR.directGunBridgeVrActive = authoritative == true
+	Chapter2VR.directGunBridgeAuthoritative = authoritative == true
+	Chapter2VR.directGunMuzzleActive = active == true
+	Chapter2VR.directGunMuzzleSource = "native_logic_task"
+	Chapter2VR.directGunBridgeSequenceObserved = validNumber( sequence ) and sequence or -1
+	if authoritative == true then Chapter2VR.directGunAuthorityTick = tick end
+	if Chapter2VR.directGunSequence ~= sequence and validNumber( sequence ) then
+		Chapter2VR.directGunSequence = sequence
+		Chapter2VR.directGunBridgeTick = tick
+	end
+
+	if authoritative ~= true then
+		Chapter2VR.directGunReadReason = "native_desktop_fallback"
+		return true
+	end
+	if active ~= true then
+		Chapter2VR.directGunReadReason = "native_pose_inactive"
+		return true
+	end
+	if not validNumber( px ) or not validNumber( py ) or not validNumber( pz ) or
+		not validNumber( dx ) or not validNumber( dy ) or not validNumber( dz ) then
+		Chapter2VR.directGunReadReason = "native_pose_invalid"
+		return true
+	end
+
+	local activeItem = tostring( sm.localPlayer.getActiveItem() )
+	if type( item ) ~= "string" or item ~= activeItem then
+		Chapter2VR.directGunReadReason = "native_item_mismatch"
+		return true
+	end
+	local direction = sm.vec3.new( dx, dy, dz )
+	if direction:length() < 0.5 then
+		Chapter2VR.directGunReadReason = "native_direction_invalid"
+		return true
+	end
+	direction = direction:normalize()
+	local position = sm.vec3.new( px, py, pz )
+	Chapter2VR.directGunPose = {
+		position = position,
+		direction = direction,
+		item = activeItem,
+		source = "native_logic_task",
+		sequence = sequence,
+		tick = tick
+	}
+	Chapter2VR.directGunReadReason = "tracked_barrel_native_logic_task"
+
+	-- Keep legacy action consumers synchronized without involving the cached
+	-- JSON transport in the actual projectile call.
+	g_vrBridgeActive = true
+	g_vrBridgeFreshTimer = 0.0
+	g_vrGunAimActive = true
+	g_vrGunMuzzlePosition = position
+	g_vrGunDirection = direction
+	g_vrGunItem = activeItem
+	if Chapter2VR.nativeProjectileBridgeLogged ~= true then
+		Chapter2VR.nativeProjectileBridgeLogged = true
+		sm.log.warning( "SCRAPVR_PROJECTILE_BRIDGE transport=native_logic_task" )
+	end
+	return true
+end
+
 local function refreshDirectGunPose()
 	local tick = sm.game.getCurrentTick()
 	if Chapter2VR.directGunReadTick == tick then return tick end
@@ -599,6 +673,7 @@ local function refreshDirectGunPose()
 	Chapter2VR.directGunBridgeSequenceObserved = -1
 	Chapter2VR.directGunMuzzleActive = false
 	Chapter2VR.directGunMuzzleSource = nil
+	if refreshNativeProjectilePose( tick ) then return tick end
 
 	local ok, data = pcall( sm.json.open, VrHandBridgePath )
 	if not ok or type( data ) ~= "table" then
@@ -695,7 +770,8 @@ function Chapter2VR.gunFirePose( tool, firing )
 		tick - cached.tick <= VrDirectPoseFreshTicks
 	local reason = Chapter2VR.directGunReadReason or "unknown"
 	local currentPoseReady = reason == "tracked_barrel_native_calibration" or
-		reason == "tracked_barrel_lua_calibration"
+		reason == "tracked_barrel_lua_calibration" or
+		reason == "tracked_barrel_native_logic_task"
 
 	if authoritative and bridgeFresh and poseFresh and currentPoseReady then
 		local direction = cached.direction
@@ -712,4 +788,11 @@ function Chapter2VR.gunFirePose( tool, firing )
 
 	if firing then writeGunFireDiagnostic( nil, nil, authoritative, reason ) end
 	return nil, nil, authoritative
+end
+
+-- Thrown Glowsticks/Cornades and the Fire Extinguisher use the identical fresh,
+-- authoritative calibrated-pose contract as guns. Keeping this named wrapper
+-- makes the tool scripts explicit without maintaining a second aim pipeline.
+function Chapter2VR.projectileFirePose( tool, firing )
+	return Chapter2VR.gunFirePose( tool, firing )
 end

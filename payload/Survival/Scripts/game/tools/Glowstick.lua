@@ -280,15 +280,19 @@ function Glowstick.client_onEquippedUpdate( self, primaryState, secondaryState, 
 		if time >= frameTime and frameTime ~= 0 then
 			self.pendingThrowFlag = false
 			if self.tool:getOwner().character then
-				local vrPose, vrActive = nil, false
-				if Chapter2VR and Chapter2VR.actionPose then vrPose, vrActive = Chapter2VR.actionPose() end
-				local facingDir = vrActive and vrPose.direction:normalize() or sm.localPlayer.getDirection()
+				local vrFirePos, vrDirection, vrAuthoritative = nil, nil, false
+				if Chapter2VR and Chapter2VR.projectileFirePose then
+					vrFirePos, vrDirection, vrAuthoritative = Chapter2VR.projectileFirePose( self.tool, true )
+				end
+				if vrAuthoritative and not vrFirePos then return true, true end
+				local vrActive = vrFirePos ~= nil and vrDirection ~= nil
+				local facingDir = vrActive and vrDirection:normalize() or sm.localPlayer.getDirection()
 				local modifier = math.sqrt( math.max( 0, 1 - ( facingDir.z * facingDir.z ) ) )
 				local maxVelocity = 25.0
 				local minVelocity = 15.0
 				local fireVelocity = minVelocity + ( maxVelocity - minVelocity ) * modifier
 				local dir = facingDir
-				local handPosition = vrActive and vrPose.position or self.tool:getTpBonePos("jnt_right_hand")
+				local handPosition = vrActive and vrFirePos or self.tool:getTpBonePos("jnt_right_hand")
 				local firePos = handPosition
 				if not vrActive then
 					dir = facingDir:rotate( math.rad( 6.943279 ) * modifier, sm.camera.getRight() )

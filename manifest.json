@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "patchId": "scrap-mechanic-native-vr-chapter2",
-  "patchVersion": "1.3.0-chapter2-20260831",
+  "patchVersion": "1.3.1-chapter2-20260831",
   "description": "Scrap Mechanic Chapter 2 native OpenXR VR with tracked Quest Touch and Valve Index controllers, optional Quest optical hands, Custom Game content bridging, complete held-item geometry, grouped live pose calibration, barrel-aimed weapons, spatial live game menus, native queued UI input, transparent composition, and restrained haptics",
   "game": {
     "appId": "387990",
@@ -62,7 +62,7 @@
     },
     {
       "path": "Release\\smvr_native_vr_v1.addon64",
-      "patchedSha256": "542B8E9AC3F5C544A979D6DB499BE47B994D9A0358E9C022EE166E1D3E8C42A1",
+      "patchedSha256": "1292B0C0FF8845C2AC297C7435D6CD189D0A6B952131E0E5136B1A80CC28197C",
       "originalMayBeMissing": true,
       "module": "chapter2-native-openxr"
     },
@@ -100,19 +100,19 @@
     },
     {
       "path": "Release\\ScrapMechanicVR-HeldItems.bin",
-      "patchedSha256": "C27DE18C8C2F879237136A86B3A3CA24F74FABA7E6A3F9B2B96F96516DA555E2",
+      "patchedSha256": "E7E2B6D74503225E99B3C1A444B8EF091CE3211EBFF445DFDB4755F2EC1C06BD",
       "originalMayBeMissing": true,
       "module": "chapter2-held-item-geometry-catalog"
     },
     {
       "path": "Release\\ScrapMechanicVR-HeldItems.tsv",
-      "patchedSha256": "3BD3F22EEDD684AB9B8AF636CBA67A5095ABA101A915AE02DBF7508DED94B7EC",
+      "patchedSha256": "BF16A71EB912E900877BFECCC3274CDA0A37A5B590A9F9418592C7EB2CFBE20B",
       "originalMayBeMissing": true,
       "module": "chapter2-held-item-catalog-index"
     },
     {
       "path": "Survival\\Scripts\\game\\Chapter2VR.lua",
-      "patchedSha256": "925AFE10792D0155517FA41A14E58376D9CBB29E96BEA61D6B3EB3F12F89A515",
+      "patchedSha256": "4F7097F8C9BF7EA012EE94AB385CC9A7398C80A084648DCC42744D50156FF7C9",
       "originalMayBeMissing": true,
       "module": "chapter2-gameplay-bridge"
     },
@@ -216,7 +216,7 @@
     },
     {
       "path": "Survival\\Scripts\\game\\tools\\Glowstick.lua",
-      "patchedSha256": "C86FCD35090208F9AD1CAFB79075E696D3B0E960E73A7DD7259E58261B2EAEBC",
+      "patchedSha256": "6E4296AF7FD30118965787EB7F80F9E82BE7CCFDED656F48DB7CC122445F1A79",
       "originalSha256": [
         "460C3D5EAD8D9F586364733F6EE7FEACED7BBA5842B9318BA817015FE67E53A3"
       ],
@@ -224,7 +224,7 @@
     },
     {
       "path": "Survival\\Scripts\\game\\tools\\Cornade.lua",
-      "patchedSha256": "8ED99893BC05BE0FA9D028BFDB3C5D3E2C80140A2896C789747EAB5937AED08C",
+      "patchedSha256": "CD2D9F068885CB320072B7B7A927A06102FB7AED8F70CDED14A4AD1211769399",
       "originalSha256": [
         "D692B1B2FFDEADA99991A448DB81CB5CAC81803A2F1E32CD7FF88366C03CE20B"
       ],
@@ -240,7 +240,7 @@
     },
     {
       "path": "Survival\\Scripts\\game\\tools\\ExtinguisherTool.lua",
-      "patchedSha256": "F9A404DF2D6C2EF7759B3B46A1E910A0B2F039D5C70F19A2B890B6C145B7EC1B",
+      "patchedSha256": "DA42FEF41F7BFFE73E98DB61FE97C9981ECEEDBC2EAB0F3860F08B05DD3E6C7D",
       "originalSha256": [
         "6E58497FEFFBE228C9B38650268F45F7B377CE7580763DD3684B9D1523FB4FB3"
       ],

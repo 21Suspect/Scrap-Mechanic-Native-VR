@@ -855,6 +855,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         send_key(VK_CONTROL, false, key_crouch_);
         send_key(VK_SPACE, false, key_jump_);
         send_key('E', false, key_use_);
+        send_key('Q', false, key_context_);
         send_key('V', false, key_camera_);
         send_key('X', false, key_zoom_in_);
         send_key('C', false, key_zoom_out_);
@@ -921,8 +922,18 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     send_key(VK_CONTROL, right_click && !recenter_down, key_crouch_);
     send_key(VK_SPACE, a, key_jump_);
     send_key('E', b, key_use_);
+    const scrapvr::tools::ContextAction context_action = scrapvr::tools::active_context_action();
+    const bool contextual_b = b && context_action != scrapvr::tools::ContextAction::none;
+    send_key('Q', contextual_b, key_context_);
     send_key(VK_ESCAPE, menu, key_menu_);
-    if (b && !b_was_down_) pulse_haptic(1,0.08f,14,70.0f);
+    if (b && !b_was_down_)
+    {
+        pulse_haptic(1,0.08f,14,70.0f);
+        if (context_action == scrapvr::tools::ContextAction::rotate_placement)
+            log_line("VR_CONTEXT_ACTION source=right_B action=next_rotation use_interact=preserved");
+        else if (context_action == scrapvr::tools::ContextAction::paint_palette)
+            log_line("VR_CONTEXT_ACTION source=right_B action=paint_palette use_interact=preserved");
+    }
 
     if (right_trigger_pressed)
     {
@@ -1004,7 +1015,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     if (!input_active_logged_)
     {
         input_active_logged_ = true;
-        log_line("VR_INPUT_ACTIVE mapping=openxr_controller left_profile=%s right_profile=%s locomotion=hmd_relative turn=right_stick triggers=mouse buttons=right_A_jump,right_B_use,left_A_B_hotbar_or_seated_zoom,left_A+B_inventory,menu=dedicated_or_index_trackpad recenter=dual_stick_1s",
+        log_line("VR_INPUT_ACTIVE mapping=openxr_controller left_profile=%s right_profile=%s locomotion=hmd_relative turn=right_stick triggers=mouse buttons=right_A_jump,right_B_use+context_Q,left_A_B_hotbar_or_seated_zoom,left_A+B_inventory,menu=dedicated_or_index_trackpad recenter=dual_stick_1s",
             interaction_profile_name(active_profile_paths_[0]),
             interaction_profile_name(active_profile_paths_[1]));
     }
@@ -1020,6 +1031,7 @@ void InputBridge::release_injected_input()
     send_key(VK_CONTROL, false, key_crouch_);
     send_key(VK_SPACE, false, key_jump_);
     send_key('E', false, key_use_);
+    send_key('Q', false, key_context_);
     send_key('V', false, key_camera_);
     send_key('X', false, key_zoom_in_);
     send_key('C', false, key_zoom_out_);

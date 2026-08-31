@@ -108,6 +108,14 @@ def diffuse(value: dict) -> str | None:
     return result or None
 
 
+def alpha_mask(value: dict) -> str | None:
+    textures = value.get("textures") or {}
+    result = textures.get("asg")
+    if not result and value.get("textureList") and len(value["textureList"]) > 1:
+        result = value["textureList"][1]
+    return result or None
+
+
 def render_description(game_root: Path, item: dict) -> dict | None:
     value = item.get("renderable")
     if isinstance(value, dict):
@@ -119,10 +127,18 @@ def render_description(game_root: Path, item: dict) -> dict | None:
     return None
 
 
-def lod_materials(lod: dict) -> tuple[dict[str, str | None], list[str | None] | None]:
+def material_descriptor(value: dict) -> dict:
+    return {
+        "texture": diffuse(value),
+        "mask": alpha_mask(value),
+        "material": str(value.get("material") or ""),
+    }
+
+
+def lod_materials(lod: dict) -> tuple[dict[str, dict], list[dict] | None]:
     if isinstance(lod.get("subMeshMap"), dict):
-        return {name: diffuse(value) for name, value in lod["subMeshMap"].items()}, None
-    return {}, [diffuse(value) for value in lod.get("subMeshList", [])]
+        return {name: material_descriptor(value) for name, value in lod["subMeshMap"].items()}, None
+    return {}, [material_descriptor(value) for value in lod.get("subMeshList", [])]
 
 
 def normalized_material(value: str) -> str:
@@ -130,7 +146,7 @@ def normalized_material(value: str) -> str:
     return re.sub(r"\.\d{3}$", "", value).lower()
 
 
-def texture_for_group(group: dict, by_name: dict[str, str | None], ordered: list[str | None] | None) -> str | None:
+def descriptor_for_group(group: dict, by_name: dict[str, dict], ordered: list[dict] | None) -> dict:
     material = group["material"]
     if material in by_name:
         return by_name[material]
@@ -141,10 +157,23 @@ def texture_for_group(group: dict, by_name: dict[str, str | None], ordered: list
     order = int(group.get("order", 0))
     if ordered is not None and 0 <= order < len(ordered):
         return ordered[order]
-    return None
+    return {"texture": None, "mask": None, "material": ""}
 
 
-def box_vertices() -> list[tuple[float, ...]]:
+def material_mode(material: str) -> str:
+    value = material.lower().replace("_", "")
+    if "opaque" in value:
+        return "opaque"
+    if any(token in value for token in
+           ("glass", "liquid", "translucent", "transparent", "goop", "diamondouter", "lightcone", "lightflare")):
+        return "glass"
+    if any(token in value for token in
+           ("alpha", "leaves", "crops", "trunk", "meshdecal")):
+        return "cutout"
+    return "opaque"
+
+
+def box_vertices(uv_scale: float = 1.0) -> list[tuple[float, ...]]:
     faces = (
         ((1, 0, 0), ((1, -1, -1), (1, 1, -1), (1, 1, 1), (1, -1, 1))),
         ((-1, 0, 0), ((-1, 1, -1), (-1, -1, -1), (-1, -1, 1), (-1, 1, 1))),
@@ -153,13 +182,47 @@ def box_vertices() -> list[tuple[float, ...]]:
         ((0, 0, 1), ((-1, -1, 1), (1, -1, 1), (1, 1, 1), (-1, 1, 1))),
         ((0, 0, -1), ((-1, 1, -1), (1, 1, -1), (1, -1, -1), (-1, -1, -1))),
     )
-    uvs = ((0, 1), (1, 1), (1, 0), (0, 0))
+    uvs = ((0, uv_scale), (uv_scale, uv_scale), (uv_scale, 0), (0, 0))
     vertices = []
     for normal, corners in faces:
         for index in (0, 1, 2, 0, 2, 3):
             point, uv = corners[index], uvs[index]
             vertices.append((*point, *normal, *uv))
     return vertices
+
+
+def wedge_vertices(uv_scale: float = 1.0) -> list[tuple[float, ...]]:
+    slope = math.sqrt(0.5)
+    quads = (
+        ((0, -1, 0), ((-1, -1, -1), (1, -1, -1), (1, -1, 1), (-1, -1, 1))),
+        ((0, 0, 1), ((-1, -1, 1), (1, -1, 1), (1, 1, 1), (-1, 1, 1))),
+        ((0, slope, -slope), ((-1, -1, -1), (-1, 1, 1), (1, 1, 1), (1, -1, -1))),
+    )
+    triangles = (
+        ((-1, 0, 0), ((-1, -1, -1), (-1, -1, 1), (-1, 1, 1))),
+        ((1, 0, 0), ((1, -1, 1), (1, -1, -1), (1, 1, 1))),
+    )
+    quad_uvs = ((0, uv_scale), (uv_scale, uv_scale), (uv_scale, 0), (0, 0))
+    triangle_uvs = ((0, uv_scale), (uv_scale, uv_scale), (uv_scale, 0))
+    vertices = []
+    for normal, corners in quads:
+        for index in (0, 1, 2, 0, 2, 3):
+            vertices.append((*corners[index], *normal, *quad_uvs[index]))
+    for normal, corners in triangles:
+        for index in (0, 1, 2):
+            vertices.append((*corners[index], *normal, *triangle_uvs[index]))
+    return vertices
+
+
+def tiling_scale(item: dict | None) -> float:
+    value = (item or {}).get("tiling", 1.0)
+    if isinstance(value, list):
+        value = value[0] if value else 1.0
+    try:
+        tiling = float(value)
+    except (TypeError, ValueError):
+        tiling = 1.0
+    return 1.0 / max(1.0, tiling)
 
 
 def append_vertices(stream, vertices: list[tuple[float, ...]]) -> tuple[int, int]:
@@ -255,7 +318,7 @@ def collect_items(game_root: Path) -> dict[str, tuple[str, dict, Path]]:
     result: dict[str, tuple[str, dict, Path]] = {}
     for path in shape_files:
         data = read_json(path)
-        for kind in ("blockList", "partList"):
+        for kind in ("blockList", "wedgeList", "partList"):
             for item in data.get(kind, []):
                 uuid = item.get("uuid")
                 if uuid and uuid not in result:
@@ -279,7 +342,7 @@ def main() -> None:
     render_info: dict[str, tuple[dict, dict, str]] = {}
     fbx_tasks: dict[str, Path] = {}
     for uuid, (kind, item, _) in items.items():
-        if kind == "blockList":
+        if kind in ("blockList", "wedgeList"):
             continue
         rend = render_description(args.game_root, item)
         if not rend or not rend.get("lodList"):
@@ -308,6 +371,8 @@ def main() -> None:
         subprocess.run(command, check=True)
         mesh_meta = json.loads(meta_path.read_text(encoding="utf-8"))
 
+    block_items = {uuid: item for uuid, (kind, item, _) in items.items() if kind == "blockList"}
+
     with args.vertices.open("ab") as stream:
         for _, (_, _, mesh) in render_info.items():
             if mesh in mesh_meta:
@@ -318,10 +383,16 @@ def main() -> None:
                     mesh_meta[mesh] = append_dae(path, stream)
                 except Exception as error:
                     mesh_meta[mesh] = {"error": f"{type(error).__name__}: {error}"}
+        scales = {tiling_scale(item) for item in block_items.values()}
+        for _, (kind, item, _) in items.items():
+            if kind == "wedgeList":
+                scales.add(tiling_scale(block_items.get(item.get("blockUuid"))))
+        box_geometry = {scale: append_vertices(stream, box_vertices(scale)) for scale in sorted(scales)}
+        wedge_geometry = {scale: append_vertices(stream, wedge_vertices(scale)) for scale in sorted(scales)}
         proxy_first, proxy_count = append_vertices(stream, box_vertices())
 
     proxy_groups = [{"material": "proxy", "order": 0, "first": proxy_first, "count": proxy_count}]
-    submeshes: list[tuple[int, int, str | None, int]] = []
+    submeshes: list[tuple[int, int, str | None, str | None, int, str]] = []
     assets: list[tuple[int, int]] = []
     asset_cache: dict[tuple, int] = {}
     catalog_items = []
@@ -332,12 +403,24 @@ def main() -> None:
         packed_color = color_rgba(item.get("color"))
         descriptors = []
         if kind == "blockList":
-            descriptors.append((proxy_first, proxy_count, game_relative(item.get("dif")), packed_color))
+            first, count = box_geometry[tiling_scale(item)]
+            mode = "glass" if item.get("glass") else "cutout" if item.get("alpha") else "opaque"
+            descriptors.append((first, count, game_relative(item.get("dif")),
+                                game_relative(item.get("asg")) if mode == "cutout" else None,
+                                packed_color, mode))
+        elif kind == "wedgeList":
+            block = block_items.get(item.get("blockUuid"), {})
+            first, count = wedge_geometry[tiling_scale(block)]
+            mode = ("glass" if "glass" in str(item.get("material") or "").lower() or block.get("glass") else
+                    "cutout" if block.get("alpha") else "opaque")
+            descriptors.append((first, count, game_relative(block.get("dif") or diffuse(item)),
+                                game_relative(block.get("asg") or alpha_mask(item)) if mode == "cutout" else None,
+                                packed_color, mode))
         else:
             info = render_info.get(uuid)
             groups = None
-            by_name: dict[str, str | None] = {}
-            ordered: list[str | None] | None = None
+            by_name: dict[str, dict] = {}
+            ordered: list[dict] | None = None
             if info:
                 _, lod, mesh = info
                 meta = mesh_meta.get(mesh, {})
@@ -347,8 +430,12 @@ def main() -> None:
                 failures += 1
                 groups = proxy_groups
             for group in groups:
-                texture = texture_for_group(group, by_name, ordered)
-                descriptors.append((int(group["first"]), int(group["count"]), game_relative(texture), packed_color))
+                material = descriptor_for_group(group, by_name, ordered)
+                mode = material_mode(material["material"])
+                descriptors.append((int(group["first"]), int(group["count"]),
+                                    game_relative(material["texture"]),
+                                    game_relative(material["mask"]) if mode == "cutout" else None,
+                                    packed_color, mode))
         key = tuple(descriptors)
         asset_index = asset_cache.get(key)
         if asset_index is None:
@@ -365,14 +452,16 @@ def main() -> None:
         "// Generated from the installed Scrap Mechanic Chapter 2 shape databases and shipping meshes.",
         "namespace scrapvr::held_item_catalog {",
         "enum class Profile : unsigned char { " + ", ".join(CATALOG_PROFILES) + ", count };",
-        "struct Submesh { unsigned long long first_vertex; unsigned int vertex_count; const wchar_t *texture; unsigned int rgba; };",
+        "enum class Material : unsigned char { opaque, cutout, glass };",
+        "struct Submesh { unsigned long long first_vertex; unsigned int vertex_count; const wchar_t *texture; const wchar_t *mask; unsigned int rgba; Material material; };",
         "struct Asset { unsigned int first_submesh; unsigned int submesh_count; };",
         "struct Item { const char *uuid; const char *name; Profile profile; unsigned int asset; unsigned int tint; };",
         f"inline constexpr unsigned int packed_vertex_size = {PACKED_VERTEX_SIZE}u;",
         "inline constexpr Submesh submeshes[] = {",
     ]
-    for first, count, texture, rgba in submeshes:
-        header.append(f"    {{ {first}ull, {count}u, {cpp_wstring(texture)}, 0x{rgba:08x}u }},")
+    for first, count, texture, mask, rgba, material in submeshes:
+        header.append(f"    {{ {first}ull, {count}u, {cpp_wstring(texture)}, {cpp_wstring(mask)}, "
+                      f"0x{rgba:08x}u, Material::{material} }},")
     header += ["};", "inline constexpr Asset assets[] = {"]
     for first, count in assets:
         header.append(f"    {{ {first}u, {count}u }},")

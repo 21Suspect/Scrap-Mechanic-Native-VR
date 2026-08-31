@@ -36,9 +36,9 @@ Only use the payload with the exact executable hash documented in `README.md`. D
 .\Build-OneFileInstaller.ps1
 ```
 
-The public artifact is `dist/ScrapMechanicVR-Installer.exe`. It validates its embedded patcher, manifest, native add-on, branded UI assets, soundtrack, and all 47 managed payload files before installation. It discovers Steam and the active 64-bit OpenXR runtime, rejects unsupported game builds, backs up original files, and supports verify, repair/restore, and uninstall.
+The public artifact is `dist/ScrapMechanicVR-Installer.exe`. It validates its embedded patcher, manifest, native add-on, branded UI assets, soundtrack, and all 47 managed payload files before installation. Its four user actions are Install VR Mod, Uninstall VR Mod, Start VR, and Open Logs. Install automatically migrates a managed older/current build and verifies the completed installation. Uninstall removes managed current/older builds, restores backups, and verifies the result. Start VR requires the active OpenXR runtime to report a connected headset.
 
-Current version: `1.3.0-chapter2-20260831`
+Current version: `1.3.1-chapter2-20260831`
 
 The installer SHA-256 is recorded in `SHA256SUMS.txt`.
 

@@ -144,10 +144,13 @@ function ExtinguisherTool.client_onUpdate( self, dt )
 	local effectPos, rot
 
 	if self.tool:isLocal() then
-		local vrPose, vrActive = nil, false
-		if Chapter2VR and Chapter2VR.actionPose then vrPose, vrActive = Chapter2VR.actionPose() end
-		local dir = vrActive and vrPose.direction:normalize() or sm.localPlayer.getDirection()
-		local firePos = vrActive and vrPose.position or self.tool:getFpBonePos( "pejnt_muzzle" )
+		local vrFirePos, vrDirection = nil, nil
+		if Chapter2VR and Chapter2VR.projectileFirePose then
+			vrFirePos, vrDirection = Chapter2VR.projectileFirePose( self.tool, false )
+		end
+		local vrActive = vrFirePos ~= nil and vrDirection ~= nil
+		local dir = vrActive and vrDirection:normalize() or sm.localPlayer.getDirection()
+		local firePos = vrActive and vrFirePos or self.tool:getFpBonePos( "pejnt_muzzle" )
 
 		effectPos = firePos + dir * 0.2
 
@@ -513,11 +516,15 @@ function ExtinguisherTool.cl_fire( self )
 	if hasAmmo then
 
 		local firstPerson = self.tool:isInFirstPersonView()
-		local vrPose, vrActive = nil, false
-		if Chapter2VR and Chapter2VR.actionPose then vrPose, vrActive = Chapter2VR.actionPose() end
-		local dir = vrActive and vrPose.direction:normalize() or sm.localPlayer.getDirection()
-		local firePos = vrActive and vrPose.position or self:calculateFirePosition()
-		local fakePosition = vrActive and vrPose.position or self:calculateTpMuzzlePos()
+		local vrFirePos, vrDirection, vrAuthoritative = nil, nil, false
+		if Chapter2VR and Chapter2VR.projectileFirePose then
+			vrFirePos, vrDirection, vrAuthoritative = Chapter2VR.projectileFirePose( self.tool, true )
+		end
+		if vrAuthoritative and not vrFirePos then return end
+		local vrActive = vrFirePos ~= nil and vrDirection ~= nil
+		local dir = vrActive and vrDirection:normalize() or sm.localPlayer.getDirection()
+		local firePos = vrActive and vrFirePos or self:calculateFirePosition()
+		local fakePosition = vrActive and vrFirePos or self:calculateTpMuzzlePos()
 		local fakePositionSelf = fakePosition
 		if firstPerson and not vrActive then fakePositionSelf = self:calculateFpMuzzlePos() end
 

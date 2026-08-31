@@ -103,7 +103,7 @@ try {
     $arguments = @(
         '/nologo',
         '/target:winexe',
-        '/platform:anycpu',
+        '/platform:x64',
         '/optimize+',
         "/win32manifest:$applicationManifest",
         "/win32icon:$iconPath",
