@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
+import subprocess
 from pathlib import Path
 
 
@@ -28,6 +30,20 @@ ADAPTER_FILES = (
 )
 
 
+# A small number of public/intermediate installers were distributed without a
+# matching repository tag. Keep their path-specific hashes here so a newer
+# installer can identify them as our payload, while still rejecting arbitrary
+# files at the same paths.
+KNOWN_HISTORICAL_PATCHED_HASHES = {
+    "Release\\smvr_native_vr_v1.addon64": {
+        "4DF805BB27DA7479C03BECB8843173CF8AB2E3A933C63A25BF083B65CF17EE82",
+    },
+    "Survival\\Scripts\\game\\Chapter2VR.lua": {
+        "3D8E9B61BFB36D7602046ED81C4528DFE2BFB9B4FEEE3297E9F576D23A1326E3",
+    },
+}
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -46,6 +62,62 @@ def replace_constant(text: str, name: str, value: str) -> str:
     if count != 1:
         raise RuntimeError(f"missing installer constant: {name}")
     return text
+
+
+def add_manifest_history(history: dict[str, set[str]], value: object) -> None:
+    if not isinstance(value, dict):
+        return
+    for entry in (*value.get("files", []), *value.get("legacyFiles", [])):
+        if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
+            continue
+        hashes = history.setdefault(entry["path"], set())
+        for candidate in (entry.get("patchedSha256"), *entry.get("historicalPatchedSha256", [])):
+            if isinstance(candidate, str) and re.fullmatch(r"[0-9A-Fa-f]{64}", candidate):
+                hashes.add(candidate.upper())
+
+
+def collect_manifest_history(root: Path, current: dict[str, object]) -> dict[str, set[str]]:
+    history: dict[str, set[str]] = {
+        path: {candidate.upper() for candidate in hashes}
+        for path, hashes in KNOWN_HISTORICAL_PATCHED_HASHES.items()
+    }
+    add_manifest_history(history, current)
+
+    # Repository tags are the authoritative record of published builds.
+    tags = subprocess.run(
+        ["git", "tag", "--list", "chapter2-v*"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    for tag in tags:
+        result = subprocess.run(
+            ["git", "show", f"{tag}:manifest.json"],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            continue
+        try:
+            add_manifest_history(history, json.loads(result.stdout))
+        except json.JSONDecodeError:
+            continue
+
+    # Local extracted packages include development/public candidates that may
+    # have reached a tester before a tag was created. Once collected, the
+    # hashes are persisted in the next manifest and no longer depend on this PC.
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        packages = Path(local_app_data) / "ScrapMechanicVR-Chapter2" / "packages"
+        for candidate in packages.glob("*/manifest.json") if packages.is_dir() else ():
+            try:
+                add_manifest_history(history, json.loads(candidate.read_text(encoding="utf-8-sig")))
+            except (OSError, json.JSONDecodeError):
+                continue
+    return history
 
 
 def main() -> None:
@@ -69,6 +141,7 @@ def main() -> None:
         raise FileNotFoundError(addon)
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+    historical_hashes = collect_manifest_history(root, manifest)
     manifest["patchVersion"] = args.version
     manifest["description"] = (
         "Scrap Mechanic Chapter 2 native OpenXR VR with tracked Quest Touch and Valve Index "
@@ -113,6 +186,22 @@ def main() -> None:
         if not patched.is_file():
             raise FileNotFoundError(patched)
         entry["patchedSha256"] = sha256(patched)
+    for entry in (*manifest["files"], *manifest.get("legacyFiles", [])):
+        current_hash = str(entry.get("patchedSha256", "")).upper()
+        originals = {
+            str(candidate).upper()
+            for candidate in entry.get("originalSha256", [])
+            if candidate
+        }
+        prior = sorted(
+            candidate
+            for candidate in historical_hashes.get(entry["path"], set())
+            if candidate != current_hash and candidate not in originals
+        )
+        if prior:
+            entry["historicalPatchedSha256"] = prior
+        else:
+            entry.pop("historicalPatchedSha256", None)
     dump_json(manifest_path, manifest)
 
     snapshot = json.loads(snapshot_path.read_text(encoding="utf-8-sig"))

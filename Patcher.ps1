@@ -50,6 +50,25 @@ function Test-OriginalHash($Entry, [string]$Hash) {
     return $false
 }
 
+function Test-HistoricalPatchedHash($Entry, [string]$Hash) {
+    if ([string]::IsNullOrWhiteSpace($Hash)) { return $false }
+    foreach ($candidate in @($Entry.historicalPatchedSha256)) {
+        if ($candidate -and $candidate.ToUpperInvariant() -eq $Hash.ToUpperInvariant()) {
+            return $true
+        }
+    }
+    return $false
+}
+
+function Test-ManagedPatchedHash($Entry, [string]$Hash) {
+    if ([string]::IsNullOrWhiteSpace($Hash)) { return $false }
+    if ($Entry.patchedSha256 -and
+        $Entry.patchedSha256.ToUpperInvariant() -eq $Hash.ToUpperInvariant()) {
+        return $true
+    }
+    return Test-HistoricalPatchedHash $Entry $Hash
+}
+
 function Assert-Payload($Manifest) {
     $failures = @()
     foreach ($entry in $Manifest.files) {
@@ -229,6 +248,15 @@ function Assert-GameClosed {
     if ($running) {
         throw 'Scrap Mechanic is running. Close the game before installing or uninstalling.'
     }
+    $helperNames = @(
+        'ScrapMechanicVR-ClayCalibration',
+        'ScrapMechanicVR-HeldCalibration'
+    )
+    $runningHelpers = @(Get-Process -Name $helperNames -ErrorAction SilentlyContinue)
+    if ($runningHelpers.Count -gt 0) {
+        $names = @($runningHelpers | Select-Object -ExpandProperty ProcessName -Unique)
+        throw "A Scrap Mechanic VR calibration helper is running. Close it before installing or uninstalling: $($names -join ', ')"
+    }
 }
 
 function Clear-CompiledDataCache([string]$Root) {
@@ -336,6 +364,9 @@ function Get-TargetStatus([string]$Root, $Entry) {
     if ($Entry.patchedSha256 -and $hash -eq $Entry.patchedSha256.ToUpperInvariant()) {
         return [pscustomobject]@{ Status = 'patched'; Hash = $hash; Target = $target }
     }
+    if (Test-HistoricalPatchedHash $Entry $hash) {
+        return [pscustomobject]@{ Status = 'historical'; Hash = $hash; Target = $target }
+    }
     if (Test-OriginalHash $Entry $hash) {
         return [pscustomobject]@{ Status = 'original'; Hash = $hash; Target = $target }
     }
@@ -359,7 +390,7 @@ function Remove-ExactLegacyVrFiles([string]$Root, $Manifest) {
     $matches = @()
     foreach ($entry in @($Manifest.legacyFiles)) {
         $status = Get-TargetStatus $Root $entry
-        if ($status.Status -eq 'patched') {
+        if ($status.Status -eq 'patched' -or $status.Status -eq 'historical') {
             $matches += [pscustomobject]@{ Entry = $entry; Status = $status }
         }
     }
@@ -392,7 +423,7 @@ function Install-Patch([string]$Root, $Manifest) {
         $existingState = Get-Content -Raw -LiteralPath $statePath | ConvertFrom-Json
         Write-Host "Existing managed VR version '$($existingState.patchVersion)' detected." -ForegroundColor Yellow
         Write-Host 'The previous version will now be restored and removed using its verified backup metadata before this version is installed.' -ForegroundColor Yellow
-        Uninstall-Patch $Root $Manifest
+        Uninstall-Patch $Root $Manifest -ForUpgrade
     }
     Remove-ExactLegacyVrFiles $Root $Manifest
     Assert-NoLegacyVrFiles $Root $Manifest
@@ -405,6 +436,12 @@ function Install-Patch([string]$Root, $Manifest) {
             # Adopt exact pre-existing Chapter 2 files into managed state. They
             # are mod-owned, so a later uninstall should remove them.
             $plan += [pscustomobject]@{ Entry = $entry; Status = $status; Adopt = $true }
+            continue
+        }
+        if ($status.Status -eq 'historical') {
+            # This is an exact, path-specific payload from one of our previous
+            # releases. Replace it without adopting it as a game original.
+            $plan += [pscustomobject]@{ Entry = $entry; Status = $status; Adopt = $false; ReplaceHistorical = $true }
             continue
         }
         if ($status.Status -eq 'conflict') {
@@ -422,7 +459,7 @@ function Install-Patch([string]$Root, $Manifest) {
             $conflicts += "$($entry.path) (required original is missing)"
             continue
         }
-        $plan += [pscustomobject]@{ Entry = $entry; Status = $status; Adopt = $false }
+        $plan += [pscustomobject]@{ Entry = $entry; Status = $status; Adopt = $false; ReplaceHistorical = $false }
     }
     if ($conflicts.Count -gt 0) {
         throw "Refusing to overwrite unsupported or separately modified files:`n$($conflicts -join "`n")"
@@ -448,10 +485,12 @@ function Install-Patch([string]$Root, $Manifest) {
             $source = Join-Path $payloadRoot $entry.path
             $record = [ordered]@{
                 path = [string]$entry.path
-                existed = [bool](-not $item.Adopt -and (Test-Path -LiteralPath $target -PathType Leaf))
-                originalSha256 = $(if ($item.Adopt) { $null } else { $item.Status.Hash })
+                existed = [bool](-not $item.Adopt -and -not $item.ReplaceHistorical -and (Test-Path -LiteralPath $target -PathType Leaf))
+                originalSha256 = $(if ($item.Adopt -or $item.ReplaceHistorical) { $null } else { $item.Status.Hash })
                 installedSha256 = [string]$entry.patchedSha256
                 backupRelativePath = $null
+                replacedManagedSha256 = $(if ($item.ReplaceHistorical) { [string]$item.Status.Hash } else { $null })
+                rollbackRelativePath = $null
             }
             if ($item.Adopt) {
                 [void]$changed.Add($record)
@@ -466,6 +505,16 @@ function Install-Patch([string]$Root, $Manifest) {
                     throw "Backup verification failed for $($entry.path)"
                 }
                 $record.backupRelativePath = [string]$entry.path
+            }
+            elseif ($item.ReplaceHistorical) {
+                $rollback = Join-Path $backupRoot ("managed-migration\\" + [string]$entry.path)
+                New-Item -ItemType Directory -Force -Path (Split-Path -Parent $rollback) | Out-Null
+                Copy-Item -LiteralPath $target -Destination $rollback -Force
+                if ((Get-Sha256 $rollback) -ne $record.replacedManagedSha256) {
+                    throw "Previous-version preservation failed for $($entry.path)"
+                }
+                $record.rollbackRelativePath = "managed-migration\\$($entry.path)"
+                Write-Host "Migrating recognized previous VR file $($entry.path) [$($record.replacedManagedSha256)]" -ForegroundColor Yellow
             }
             [void]$changed.Add($record)
 
@@ -514,6 +563,13 @@ function Install-Patch([string]$Root, $Manifest) {
                 $backup = Join-Path $backupRoot $record.backupRelativePath
                 if (Test-Path -LiteralPath $backup) {
                     Copy-Item -LiteralPath $backup -Destination $target -Force
+                }
+            }
+            elseif ($record.rollbackRelativePath) {
+                $rollback = Join-Path $backupRoot $record.rollbackRelativePath
+                if (Test-Path -LiteralPath $rollback -PathType Leaf) {
+                    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
+                    Copy-Item -LiteralPath $rollback -Destination $target -Force
                 }
             }
             else {
@@ -572,7 +628,7 @@ function Repair-PatchTargets([string]$Root, $Manifest) {
         if ($entry.originalMayBeMissing) {
             $remove = $status.Status -ne 'missing'
         }
-        elseif ($status.Status -eq 'patched' -or $status.Status -eq 'conflict') {
+        elseif ($status.Status -eq 'patched' -or $status.Status -eq 'historical' -or $status.Status -eq 'conflict') {
             $remove = $true
             [void]$needsSteam.Add([string]$entry.path)
         }
@@ -623,7 +679,7 @@ function Repair-PatchTargets([string]$Root, $Manifest) {
     Write-Host 'Repair cleanup completed. Run Steam Verify for Scrap Mechanic, wait for it to finish, then run Install again.' -ForegroundColor Green
 }
 
-function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRecords) {
+function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRecords, [switch]$ForUpgrade) {
     Assert-GameClosed
     $statePath = Get-StatePath $Root
     if (-not (Test-Path -LiteralPath $statePath)) {
@@ -635,7 +691,13 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
     }
 
     $entryByPath = @{}
+    $currentEntryByPath = @{}
     $previousEntryByPath = @{}
+    foreach ($entry in @($Manifest.files) + @($Manifest.legacyFiles)) {
+        $entryPath = [string]$entry.path
+        $entryByPath[$entryPath] = $entry
+        $currentEntryByPath[$entryPath] = $entry
+    }
     $previousManifest = Get-CompatiblePackageManifest $state $Manifest
     if ($previousManifest) {
         foreach ($entry in @($previousManifest.files) + @($previousManifest.legacyFiles)) {
@@ -645,14 +707,10 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
             if (-not $contained) {
                 throw "Previous package metadata contains an unsafe managed path: $entryPath"
             }
-            $entryByPath[$entryPath] = $entry
             $previousEntryByPath[$entryPath] = $entry
-        }
-    }
-    foreach ($entry in @($Manifest.files) + @($Manifest.legacyFiles)) {
-        $entryPath = [string]$entry.path
-        if (-not $entryByPath.ContainsKey($entryPath)) {
-            $entryByPath[$entryPath] = $entry
+            if (-not $entryByPath.ContainsKey($entryPath)) {
+                $entryByPath[$entryPath] = $entry
+            }
         }
     }
 
@@ -663,6 +721,7 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
     $stateIssues = New-Object Collections.ArrayList
     $recognizedRecords = New-Object Collections.ArrayList
     $unknownRecords = New-Object Collections.ArrayList
+    $historicalOriginalPaths = @{}
     if ($state.backupRoot) {
         try {
             $allowedBackupRoot = [IO.Path]::GetFullPath((Join-Path $StateRoot 'backups')).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
@@ -697,19 +756,21 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
         $previousEntry = $previousEntryByPath[$recordPath]
         if ($previousEntry -and $record.installedSha256 -and
             [string]$previousEntry.patchedSha256 -ne [string]$record.installedSha256) {
-            [void]$stateIssues.Add("installed hash for $recordPath does not match verified package $($state.patchVersion)")
+            Write-Warning "The extracted package for '$($state.patchVersion)' differs from the recorded installed hash for $recordPath. The state record and its hash-verified backup will be used instead."
         }
         if ($record.existed) {
-            if (-not $record.originalSha256 -or
-                (-not $entry.runtimeMutable -and
-                 -not (Test-OriginalHash $entry ([string]$record.originalSha256)))) {
-                [void]$stateIssues.Add("unsupported original hash for $recordPath")
+            if (-not $record.originalSha256) {
+                [void]$stateIssues.Add("missing original hash for $recordPath")
+            }
+            elseif (Test-HistoricalPatchedHash $currentEntryByPath[$recordPath] ([string]$record.originalSha256)) {
+                $historicalOriginalPaths[$recordPath] = $true
+                Write-Warning "The backup recorded as the original for $recordPath is actually a recognized older VR payload. It will not be restored as a game original."
             }
             if ([string]$record.backupRelativePath -ne $recordPath) {
                 [void]$stateIssues.Add("unsafe backup path for $recordPath")
             }
         }
-        elseif (-not $entry.originalMayBeMissing) {
+        elseif (-not $entry.originalMayBeMissing -and -not $record.replacedManagedSha256) {
             [void]$stateIssues.Add("state claims required original was absent: $recordPath")
         }
     }
@@ -797,11 +858,13 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
         $isInstalled = $actual -eq $record.installedSha256.ToUpperInvariant()
         $entry = $entryByPath[[string]$record.path]
         $isOriginal = $record.existed -and
+            -not $historicalOriginalPaths.ContainsKey([string]$record.path) -and
             ($actual -eq $record.originalSha256.ToUpperInvariant() -or
              ($entry -and (Test-OriginalHash $entry $actual)))
+        $isKnownManaged = $entry -and (Test-ManagedPatchedHash $entry $actual)
         $backupInfo = $backupStatus[[string]$record.path]
         $hasRestorableBackup = -not $record.existed -or ($backupInfo -and $backupInfo.Valid)
-        if ($isOriginal -or ($isInstalled -and $hasRestorableBackup)) { continue }
+        if ($isOriginal -or $isKnownManaged -or ($isInstalled -and $hasRestorableBackup)) { continue }
 
         $preservedPath = Join-Path $quarantineRoot $record.path
         New-Item -ItemType Directory -Force -Path (Split-Path -Parent $preservedPath) | Out-Null
@@ -833,6 +896,24 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
     foreach ($record in @($recognizedRecords)) {
         $target = Join-Path $Root $record.path
         if ($record.existed) {
+            if ($historicalOriginalPaths.ContainsKey([string]$record.path)) {
+                if ($ForUpgrade) {
+                    Write-Host "Leaving recognized previous VR payload in place for direct migration: $($record.path)" -ForegroundColor Yellow
+                    continue
+                }
+                if (Test-Path -LiteralPath $target -PathType Leaf) {
+                    Remove-Item -LiteralPath $target -Force
+                }
+                $entry = $entryByPath[[string]$record.path]
+                if (-not $entry.originalMayBeMissing) {
+                    [void]$needsSteam.Add([string]$record.path)
+                    Write-Host "NEEDS STEAM $($record.path) (an older VR payload had been recorded as its original)" -ForegroundColor Yellow
+                }
+                else {
+                    Write-Host "Removed nested previous VR payload $($record.path)"
+                }
+                continue
+            }
             $backupInfo = $backupStatus[[string]$record.path]
             if ($backupInfo -and $backupInfo.Valid) {
                 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target) | Out-Null
@@ -866,6 +947,9 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
         }
         else {
             Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
+            if (Test-Path -LiteralPath $target -PathType Leaf) {
+                throw "Could not remove $($record.path). Close any VR calibration helper or other program using this file, then try again."
+            }
             Write-Host "Removed $($record.path)"
         }
     }
@@ -916,7 +1000,7 @@ function Verify-UninstalledPatch([string]$Root, $Manifest) {
     foreach ($entry in @($Manifest.files) + @($Manifest.legacyFiles)) {
         $status = Get-TargetStatus $Root $entry
         if ($entry.originalMayBeMissing) {
-            if ($status.Status -eq 'patched') {
+            if ($status.Status -eq 'patched' -or $status.Status -eq 'historical') {
                 $failures += "$($entry.path) still matches a VR-mod payload"
             }
             continue

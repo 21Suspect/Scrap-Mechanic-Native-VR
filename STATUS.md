@@ -1,6 +1,6 @@
 # Chapter 2 release status
 
-Release candidate: `1.3.1-chapter2-20260831`
+Release candidate: `1.3.2-chapter2-20260831`
 
 Branch: `main`
 
@@ -22,6 +22,7 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 - Seat, headset-focus, tool-switching, primary-action, and lift-placement state recover automatically after transitions.
 - Survival, Creative, and Custom Game content contexts use the same tracked-hand and spatial-UI bridge.
 - Steam discovery ignores stale or offline library drives and prioritizes the game directory already validated by the installer.
+- Guarded migration recognizes path-specific payload hashes from prior Chapter 2 releases, carries verified restore state forward, and never mistakes known older VR files for unrelated modifications.
 
 ## Rendering architecture
 
@@ -33,6 +34,6 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 
 ## Installer
 
-`dist/ScrapMechanicVR-Installer.exe` embeds and validates all 47 managed payload files, the branded installer artwork, its soundtrack, and a verified first-launch game-data cache. It starts music at 50% with a compact volume control and presents only Install VR Mod, Uninstall VR Mod, Start VR, and Open Logs. Install and uninstall detect current/older managed versions, explain the exact operation before asking for approval, migrate or restore safely, and verify automatically. Start VR requires a connected headset reported by the active OpenXR runtime.
+`dist/ScrapMechanicVR-Installer.exe` embeds and validates all 47 managed payload files, the branded installer artwork, its soundtrack, and a verified first-launch game-data cache. It starts music at 50% with a compact volume control and presents only Install VR Mod, Uninstall VR Mod, Start VR, and Open Logs. Install and uninstall detect current/older managed versions, explain the exact operation before asking for approval, migrate or restore safely, and verify automatically. Known prior-release payloads are migrated by exact path and SHA-256, same-version metadata refreshes retain their verified restore authority, and open calibration helpers are reported before any transaction begins. Start VR requires a connected headset reported by the active OpenXR runtime.
 
 Installer and payload hashes are recorded in `SHA256SUMS.txt`.

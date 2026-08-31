@@ -1,5 +1,5 @@
 {
-  "snapshot": "chapter2-v1.3.1",
+  "snapshot": "chapter2-v1.3.2",
   "status": "chapter2-stable",
   "legacyBranch": "legacy-pre-1.0",
   "chapter2Branch": "main",
@@ -39,7 +39,7 @@
     "sha256": "1292B0C0FF8845C2AC297C7435D6CD189D0A6B952131E0E5136B1A80CC28197C"
   },
   "localCandidateArtifact": {
-    "version": "1.3.1-chapter2-20260831",
+    "version": "1.3.2-chapter2-20260831",
     "path": "payload/Release/smvr_native_vr_v1.addon64",
     "size": 8346112,
     "sha256": "1292B0C0FF8845C2AC297C7435D6CD189D0A6B952131E0E5136B1A80CC28197C",
@@ -120,8 +120,10 @@
     "installerSelfTest": "PASS",
     "missingSteamDriveDiscoveryRegression": "PASS",
     "installerVisibleActions": "PASS_INSTALL_UNINSTALL_START_LOGS_ONLY",
-    "olderVersionAutomaticMigration": "PASS_1.3.0_TO_1.3.1",
-    "olderVersionDirectUninstall": "PASS_1.3.0",
+    "olderVersionAutomaticMigration": "PASS_1.1.2_AND_BROKEN_1.3.1_TO_1.3.2",
+    "olderVersionDirectUninstall": "PASS_BROKEN_1.3.1_STATE_47_OF_47",
+    "historicalPayloadRecognition": "PASS_PATH_SPECIFIC_HASH_REGISTRY_INCLUDING_REPORTED_1.1.4_ADDON",
+    "openCalibrationHelperGuard": "PASS_CLEAR_PRETRANSACTION_ERROR_AND_POSTREMOVE_CHECK",
     "headsetLaunchGate": "PASS_BOUNDED_5_SECOND_NO_HMD_CHECK",
     "installerInstallVerify": "PASS_47_OF_47",
     "installerUninstallRestore": "PASS_47_OF_47",
@@ -129,9 +131,9 @@
     "microsoftDefenderInstallerScan": "PASS_NO_THREATS"
   },
   "installer": {
-    "version": "1.3.1-chapter2-20260831",
+    "version": "1.3.2-chapter2-20260831",
     "path": "dist/ScrapMechanicVR-Installer.exe",
-    "selfTest": "SKIPPED_USER_CONFIRMED_RUNTIME",
+    "selfTest": "PASS",
     "published": false
   }
 }
