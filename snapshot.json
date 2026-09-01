@@ -1,5 +1,5 @@
 {
-  "snapshot": "chapter2-v1.3.2",
+  "snapshot": "chapter2-v1.3.3",
   "status": "chapter2-stable",
   "legacyBranch": "legacy-pre-1.0",
   "chapter2Branch": "main",
@@ -39,7 +39,7 @@
     "sha256": "1292B0C0FF8845C2AC297C7435D6CD189D0A6B952131E0E5136B1A80CC28197C"
   },
   "localCandidateArtifact": {
-    "version": "1.3.2-chapter2-20260831",
+    "version": "1.3.3-chapter2-20260901",
     "path": "payload/Release/smvr_native_vr_v1.addon64",
     "size": 8346112,
     "sha256": "1292B0C0FF8845C2AC297C7435D6CD189D0A6B952131E0E5136B1A80CC28197C",
@@ -97,11 +97,14 @@
         "ResourceTool.lua": "24AF81B2489938DE4C23C5B9C3C22CC2C24EEE78A90FF92D5937BE2EC2DEEE3D",
         "CarryTool.lua": "EA1D41EC69FF45C803ADB3AEDD9B9BB06A7F331CF58A666751D583B8909D530E",
         "LogBook.lua": "185A8BB807D2E2D01360CB1FF4B55E316AF878600575678AA7963DB94C4CDD22"
-      }
+      },
+      "installerHeadsetProbeTestSha256": "D03F35D835A1B71138B95A1C4C0B3A824F8EE9658911ED9557B0F0718A72FE07",
+      "installerSourceSha256": "7F70C110C6A448AA7E166CD6292D5397F881ABB9B59A933AD6632B3725A07BDC",
+      "installerBuildScriptSha256": "BB2F7A74BD7137ABD279FCF5DBA17664225E2590AD45BAC610B75642D2F73EB5"
     }
   },
   "validation": {
-    "date": "2026-08-31",
+    "date": "2026-09-01",
     "installerManagedFiles": 47,
     "headsetConfirmed": true,
     "noHmdDesktopFallbackConfirmed": true,
@@ -120,18 +123,19 @@
     "installerSelfTest": "PASS",
     "missingSteamDriveDiscoveryRegression": "PASS",
     "installerVisibleActions": "PASS_INSTALL_UNINSTALL_START_LOGS_ONLY",
-    "olderVersionAutomaticMigration": "PASS_1.1.2_AND_BROKEN_1.3.1_TO_1.3.2",
+    "olderVersionAutomaticMigration": "PASS_1.1.2_BROKEN_1.3.1_AND_1.3.2_TO_1.3.3",
     "olderVersionDirectUninstall": "PASS_BROKEN_1.3.1_STATE_47_OF_47",
     "historicalPayloadRecognition": "PASS_PATH_SPECIFIC_HASH_REGISTRY_INCLUDING_REPORTED_1.1.4_ADDON",
     "openCalibrationHelperGuard": "PASS_CLEAR_PRETRANSACTION_ERROR_AND_POSTREMOVE_CHECK",
     "headsetLaunchGate": "PASS_BOUNDED_5_SECOND_NO_HMD_CHECK",
+    "openXrLoaderDependencyIsolation": "PASS_ERROR_126_REPRODUCED_ON_1.3.2_AND_FIXED_WITHOUT_PATH_ASSISTANCE",
     "installerInstallVerify": "PASS_47_OF_47",
     "installerUninstallRestore": "PASS_47_OF_47",
     "microsoftDefenderAddonScan": "PASS_NO_THREATS",
     "microsoftDefenderInstallerScan": "PASS_NO_THREATS"
   },
   "installer": {
-    "version": "1.3.2-chapter2-20260831",
+    "version": "1.3.3-chapter2-20260901",
     "path": "dist/ScrapMechanicVR-Installer.exe",
     "selfTest": "PASS",
     "published": false

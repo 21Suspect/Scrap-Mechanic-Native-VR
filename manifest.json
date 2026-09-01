@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "patchId": "scrap-mechanic-native-vr-chapter2",
-  "patchVersion": "1.3.2-chapter2-20260831",
+  "patchVersion": "1.3.3-chapter2-20260901",
   "description": "Scrap Mechanic Chapter 2 native OpenXR VR with tracked Quest Touch and Valve Index controllers, optional Quest optical hands, Custom Game content bridging, complete held-item geometry, grouped live pose calibration, barrel-aimed weapons, spatial live game menus, native queued UI input, transparent composition, and restrained haptics",
   "game": {
     "appId": "387990",

@@ -17,14 +17,14 @@ using Microsoft.Win32;
 [assembly: AssemblyDescription("Installer, verifier, repair manager, and restorer for Scrap Mechanic Chapter 2 VR")]
 [assembly: AssemblyCompany("Scrap Mechanic VR Community Project")]
 [assembly: AssemblyProduct("Scrap Mechanic VR Chapter 2")]
-[assembly: AssemblyVersion("1.3.2.0")]
-[assembly: AssemblyFileVersion("1.3.2.0")]
+[assembly: AssemblyVersion("1.3.3.0")]
+[assembly: AssemblyFileVersion("1.3.3.0")]
 
 namespace ScrapMechanicVRPatcher
 {
     internal static class BuildInfo
     {
-        internal const string Version = "1.3.2-chapter2-20260831";
+        internal const string Version = "1.3.3-chapter2-20260901";
         internal const string GameBuild = "24529696";
         internal const string GameExeHash = "5D663BA2EC5DC8C7ABEFCC5C9344AE86F0A066C4069A91F54833524AC9A5B4F5";
         internal const string AddonHash = "1292B0C0FF8845C2AC297C7435D6CD189D0A6B952131E0E5136B1A80CC28197C";
@@ -32,7 +32,7 @@ namespace ScrapMechanicVRPatcher
         internal const string LoaderHash = "018C6519AFBDEADE6DA9E7D59C406068DD58674D87A65AE27353484A05E6674A";
         internal const string MusicHash = "02E8E98721A899C2731ED8AFDF6378DB98DC09BB87FA5896FBA911CE5D875660";
         internal const string LogoHash = "C692A16C8CB01B94618951C09F64A156D7DD6A71D349B91E023B018165504C34";
-        internal const string ManifestHash = "CADB09AF2882451D060AA2B967BDCE6B0F53CFBAA035952C930CABEFE9FE1C18";
+        internal const string ManifestHash = "ADDBA6CE30B00C11DDC0FDD02EEB5484B1B81F9A3C1A11BB6C185C1281C28E4B";
         internal const string PatcherHash = "7DA69B2FB835E7166C2E58A4FD4CF4D758BC8BF56EA3D3BEE212CB0A3A2CD911";
         internal const int ManagedFileCount = 47;
         internal const string ResourceName = "ScrapMechanicVR.Payload.zip";
@@ -366,6 +366,8 @@ namespace ScrapMechanicVRPatcher
         private const int XrFormFactorHeadMountedDisplay = 1;
         private const int XrErrorFormFactorUnavailable = -35;
         private const ulong XrApiVersion10 = 0x0001000000000000UL;
+        private const uint LoadLibrarySearchDllLoadDir = 0x00000100;
+        private const uint LoadLibrarySearchDefaultDirs = 0x00001000;
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
         private struct XrApplicationInfo
@@ -412,6 +414,13 @@ namespace ScrapMechanicVRPatcher
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern IntPtr LoadLibrary(string path);
 
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr LoadLibraryEx(string path, IntPtr file, uint flags);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetDllDirectory(string path);
+
         [DllImport("kernel32.dll", CharSet = CharSet.Ansi, SetLastError = true)]
         private static extern IntPtr GetProcAddress(IntPtr module, string name);
 
@@ -436,7 +445,28 @@ namespace ScrapMechanicVRPatcher
                 return false;
             }
 
-            IntPtr module = LoadLibrary(loaderPath);
+            // The packaged Khronos loader depends on libc++.dll and
+            // libunwind.dll beside it. LoadLibrary(fullPath) does not reliably
+            // search that directory for transitive dependencies when the
+            // installer is launched from Downloads without development tools
+            // on PATH. Use a
+            // scoped DLL-load directory so the probe behaves exactly like the
+            // installed game and never depends on the user's PATH.
+            IntPtr module = LoadLibraryEx(loaderPath, IntPtr.Zero,
+                LoadLibrarySearchDllLoadDir | LoadLibrarySearchDefaultDirs);
+            if (module == IntPtr.Zero && Marshal.GetLastWin32Error() == 87)
+            {
+                // Compatibility fallback for Windows installations that do not
+                // support the LOAD_LIBRARY_SEARCH_* flags. The headset probe is
+                // an isolated worker process, so this temporary process-wide
+                // search directory cannot affect the installer UI.
+                string loaderDirectory = Path.GetDirectoryName(loaderPath);
+                if (SetDllDirectory(loaderDirectory))
+                {
+                    try { module = LoadLibrary(loaderPath); }
+                    finally { SetDllDirectory(null); }
+                }
+            }
             if (module == IntPtr.Zero)
             {
                 detail = "OpenXR loader could not be opened (Windows error " + Marshal.GetLastWin32Error() + ")";

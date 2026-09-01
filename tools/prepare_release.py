@@ -9,6 +9,7 @@ import json
 import os
 import re
 import subprocess
+from datetime import date
 from pathlib import Path
 
 
@@ -123,7 +124,7 @@ def collect_manifest_history(root: Path, current: dict[str, object]) -> dict[str
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("game_root", type=Path)
-    parser.add_argument("--version", default="1.2.1-chapter2-20260830")
+    parser.add_argument("--version", default="1.3.3-chapter2-20260901")
     parser.add_argument(
         "--headset-confirmed",
         action="store_true",
@@ -241,6 +242,9 @@ def main() -> None:
         "blenderHeldCatalogExtractorSha256": "source/NativeVR/tools/blender_extract_held_catalog.py",
         "heldCalibrationHelperSourceSha256": "tools/HeldCalibration/Program.cs",
         "heldCalibrationBuildScriptSha256": "Build-HeldCalibration.ps1",
+        "installerSourceSha256": "installer/Program.cs",
+        "installerBuildScriptSha256": "Build-OneFileInstaller.ps1",
+        "installerHeadsetProbeTestSha256": "tools/Test-InstallerHeadsetProbe.ps1",
     }
     for key, relative in source_paths.items():
         source_meta[key] = sha256(root / relative)
@@ -258,16 +262,20 @@ def main() -> None:
         for name in ADAPTER_FILES
     }
     validation = snapshot.setdefault("validation", {})
-    validation["date"] = "2026-08-31"
+    validation["date"] = date.today().isoformat()
     validation["installerManagedFiles"] = len(manifest["files"])
     validation["luaSyntax"] = "PASS"
     validation["nativeReleaseBuild"] = "PASS"
     validation["headsetConfirmed"] = args.headset_confirmed
     installer = snapshot.setdefault("installer", {})
+    previous_installer_version = installer.get("version")
+    previous_self_test = installer.get("selfTest")
     installer.update({
         "version": args.version,
         "path": "dist/ScrapMechanicVR-Installer.exe",
-        "selfTest": "SKIPPED_USER_CONFIRMED_RUNTIME",
+        "selfTest": previous_self_test
+        if previous_installer_version == args.version and previous_self_test
+        else "PENDING",
         "published": False,
     })
     dump_json(snapshot_path, snapshot)

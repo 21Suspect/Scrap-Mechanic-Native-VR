@@ -1,6 +1,6 @@
 # Chapter 2 release status
 
-Release candidate: `1.3.2-chapter2-20260831`
+Release candidate: `1.3.3-chapter2-20260901`
 
 Branch: `main`
 
@@ -23,6 +23,7 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 - Survival, Creative, and Custom Game content contexts use the same tracked-hand and spatial-UI bridge.
 - Steam discovery ignores stale or offline library drives and prioritizes the game directory already validated by the installer.
 - Guarded migration recognizes path-specific payload hashes from prior Chapter 2 releases, carries verified restore state forward, and never mistakes known older VR files for unrelated modifications.
+- The Start VR headset probe resolves its bundled OpenXR loader dependencies from the package directory, independent of PATH, and works with Meta Quest Link, Virtual Desktop VDXR, and SteamVR runtimes.
 
 ## Rendering architecture
 

@@ -17,6 +17,8 @@ Native OpenXR VR for the current Scrap Mechanic Chapter 2 / 1.0 release, made by
 3. Click **Install VR Mod** and approve the administrator prompt.
 4. Start your OpenXR runtime, connect and wake the headset, then click **Start VR** or use the new desktop shortcut.
 
+For Virtual Desktop, select **VDXR** as the OpenXR runtime in Virtual Desktop Streamer before connecting the headset. You can also select **SteamVR**, provided SteamVR is configured as the active OpenXR runtime. The installer supports both paths and checks the connected headset through the selected runtime.
+
 The installer has four clear actions: **Install VR Mod**, **Uninstall VR Mod**, **Start VR**, and **Open Logs**. Install automatically removes a detected older/current managed build before upgrading, and both install and uninstall verify their result automatically. Start VR checks that the active OpenXR runtime reports a connected headset. The installer is currently unsigned, so Windows SmartScreen may ask for confirmation.
 
 ## Features
@@ -62,7 +64,7 @@ The installer has four clear actions: **Install VR Mod**, **Uninstall VR Mod**, 
 
 - Windows 10 or Windows 11, x64.
 - Steam Scrap Mechanic `1.0.5.876`, Steam build `24529696`.
-- A 64-bit OpenXR runtime, such as Meta Quest Link or SteamVR OpenXR for Valve Index.
+- A 64-bit OpenXR runtime, such as Meta Quest Link, Virtual Desktop VDXR, or SteamVR OpenXR.
 
 ## Legacy game version
 
