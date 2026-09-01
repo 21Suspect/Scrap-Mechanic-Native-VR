@@ -349,13 +349,12 @@ end
 
 function Sledgehammer.client_onEquippedUpdate( self, primaryState, secondaryState )
 	primaryState = Chapter2VR.primaryState( self, primaryState )
-	local vrPhysicalSwing = g_vrHammerSwingDirection and
-		( g_vrHammerSwingFreshTimer or 1.0 ) <= 0.6
-	local vrHandAttack = g_vrActionActive == true and g_vrActionOrigin and
-		g_vrActionDirection and g_vrActionDirection:length() > 0.5
-	local raycastStart = vrHandAttack and g_vrActionOrigin or sm.localPlayer.getRaycastStart()
-	local direction = vrPhysicalSwing and g_vrHammerSwingDirection or
-		( vrHandAttack and g_vrActionDirection:normalize() or sm.localPlayer.getDirection() )
+	-- Preserve Scrap Mechanic's stock hammer action and animation. In live VR,
+	-- replace only the attack segment with the right-hand OpenXR aim ray; on PC
+	-- the original camera ray is left completely unchanged.
+	local actionPose, vrHandAttack = Chapter2VR.actionPose()
+	local raycastStart = vrHandAttack and actionPose.position or sm.localPlayer.getRaycastStart()
+	local direction = vrHandAttack and actionPose.direction:normalize() or sm.localPlayer.getDirection()
 
 	if self.pendingRaycastFlag then
 		local time = 0.0
@@ -366,7 +365,12 @@ function Sledgehammer.client_onEquippedUpdate( self, primaryState, secondaryStat
 		end
 		if time >= frameTime and frameTime ~= 0 then
 			self.pendingRaycastFlag = false
-			local success, result = sm.localPlayer.getRaycast( Range, raycastStart, direction )
+			local success
+			if vrHandAttack then
+				success = Chapter2VR.actionRaycast( Range, self.tool:getOwner():getCharacter() )
+			else
+				success = sm.localPlayer.getRaycast( Range, raycastStart, direction )
+			end
 			sm.melee.meleeAttack( melee_sledgehammer, Damage, raycastStart, direction * Range, self.tool:getOwner() )
 			if success then
 				self.freezeTimer = self.freezeDuration

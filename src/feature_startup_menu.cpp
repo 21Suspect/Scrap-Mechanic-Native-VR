@@ -24,18 +24,12 @@ constexpr float kPanelAspect = 1024.0f / 1400.0f;
 constexpr float kPanelWidth = kPanelHeight * kPanelAspect;
 constexpr float kDynamicPanelHeight = 0.72f;
 constexpr uint64_t kWorldStatePollMilliseconds = 100;
-// The cached panel itself is drawn at the headset rate. Only the native game-UI
-// texture is throttled because producing it briefly returns Scrap Mechanic to
-// its desktop render extent. 24 Hz is smooth for fades/hover transitions and is
-// exactly every third frame on the Quest 3's 72 Hz mode; slower idle tiers avoid
-// paying that desktop phase when the menu image is effectively static.
-constexpr uint64_t kNativeCaptureActiveIntervalMs = 42;
-constexpr uint64_t kNativeCapturePanelIdleIntervalMs = 80;
-constexpr uint64_t kNativeCaptureUnfocusedIntervalMs = 160;
-constexpr uint64_t kNativeCaptureOpenActivityMs = 1100;
-constexpr uint64_t kNativeCapturePointerActivityMs = 240;
-constexpr uint64_t kNativeCaptureClickActivityMs = 900;
-constexpr uint64_t kNativeCaptureScrollActivityMs = 600;
+// The cached panel itself is drawn at the headset rate. Refreshing the native
+// texture briefly asks Scrap Mechanic for its desktop UI extent, so captures are
+// event-driven: initial/final transition states, clicks, scrolling, and one
+// refresh after the pointer settles. This avoids continuous render-target
+// rebuilds and the resulting eye flash while retaining exact native hover art.
+constexpr uint64_t kNativeCapturePointerSettleMs = 75;
 
 struct ButtonRegion
 {
@@ -411,7 +405,6 @@ void StartupMenuUi::update_visibility(bool game_ui_open_intent)
         release(native_menu_view_); release(native_menu_texture_);
         native_width_=native_height_=0;
         native_capture_last_ms_=0;
-        native_capture_active_until_ms_=now+kNativeCaptureOpenActivityMs;
         request_native_capture(0);
         native_capture_followup_ms_=now+(world_active?300u:350u);
         log_line(world_active ?
@@ -431,17 +424,13 @@ void StartupMenuUi::request_native_capture(uint64_t delay_ms)
     native_capture_requested_=true;
 }
 
-void StartupMenuUi::keep_native_capture_active(uint64_t duration_ms)
+void StartupMenuUi::request_native_capture_after_pointer_settles(uint64_t delay_ms)
 {
-    native_capture_active_until_ms_=(std::max)(native_capture_active_until_ms_,
-        GetTickCount64()+duration_ms);
-}
-
-uint64_t StartupMenuUi::native_capture_interval(uint64_t now) const
-{
-    if (now<native_capture_active_until_ms_) return kNativeCaptureActiveIntervalMs;
-    if (pointer_on_panel_) return kNativeCapturePanelIdleIntervalMs;
-    return kNativeCaptureUnfocusedIntervalMs;
+    // Pointer movement is a debounce: while the laser is moving the already
+    // cached panel remains stable at the headset refresh rate. Once it rests,
+    // one desktop capture obtains Scrap Mechanic's exact hovered button state.
+    native_capture_requested_=true;
+    native_capture_due_ms_=GetTickCount64()+delay_ms;
 }
 
 bool StartupMenuUi::native_capture_due() const
@@ -449,11 +438,8 @@ bool StartupMenuUi::native_capture_due() const
     if (!visible_) return false;
     if (!native_menu_view_) return true;
     const uint64_t now=GetTickCount64();
-    if ((native_capture_requested_ && now>=native_capture_due_ms_) ||
-        (native_capture_followup_ms_!=0 && now>=native_capture_followup_ms_))
-        return true;
-    return native_capture_last_ms_==0 ||
-        now-native_capture_last_ms_>=native_capture_interval(now);
+    return (native_capture_requested_ && now>=native_capture_due_ms_) ||
+        (native_capture_followup_ms_!=0 && now>=native_capture_followup_ms_);
 }
 
 void StartupMenuUi::set_world_anchor(const XrPosef &player_anchor)
@@ -592,8 +578,7 @@ void StartupMenuUi::update_pointer(const XrPosef &hand, bool active)
             native_capture_pointer_x_=client_x;
             native_capture_pointer_y_=client_y;
             native_capture_pointer_valid_=true;
-            keep_native_capture_active(kNativeCapturePointerActivityMs);
-            request_native_capture(kNativeCaptureActiveIntervalMs);
+            request_native_capture_after_pointer_settles(kNativeCapturePointerSettleMs);
         }
         if (pointer_client_valid_ && !was_on_panel &&
             pending_haptic_event_==UiHapticEvent::none)
@@ -634,7 +619,6 @@ void StartupMenuUi::update_interaction(bool select_down, float scroll_axis)
                 engine_button_down_=true;
                 ++ui_click_count_;
                 pending_haptic_event_=UiHapticEvent::click;
-                keep_native_capture_active(kNativeCaptureClickActivityMs);
                 request_native_capture(0);
                 native_capture_followup_ms_=GetTickCount64()+350;
                 if (!input_route_logged_)
@@ -655,7 +639,6 @@ void StartupMenuUi::update_interaction(bool select_down, float scroll_axis)
             if (EngineInputQueue::instance().queue_mouse_button(0,false))
             {
                 engine_button_down_=false;
-                keep_native_capture_active(kNativeCaptureClickActivityMs);
                 request_native_capture(0);
             }
         }
@@ -670,7 +653,6 @@ void StartupMenuUi::update_interaction(bool select_down, float scroll_axis)
         if (EngineInputQueue::instance().queue_mouse_wheel(wheel))
         {
             scroll_last_ms_=now;
-            keep_native_capture_active(kNativeCaptureScrollActivityMs);
             request_native_capture(0);
             native_capture_followup_ms_=now+260;
         }
@@ -859,8 +841,7 @@ void StartupMenuUi::reset_state()
     dynamic_mode_=false; select_down_=false; pointer_client_valid_=false;
     pointer_client_initialized_=false;
     native_capture_requested_=true; native_capture_pointer_valid_=false;
-    native_capture_due_ms_=native_capture_followup_ms_=native_capture_last_ms_=
-        native_capture_active_until_ms_=0;
+    native_capture_due_ms_=native_capture_followup_ms_=native_capture_last_ms_=0;
     in_game_mode_=false; pending_haptic_event_=UiHapticEvent::none;
 }
 
@@ -876,8 +857,7 @@ void StartupMenuUi::shutdown()
     dynamic_panel_pose_={{0,0,0,1},{0,0,0}}; pointer_u_=pointer_v_=0.5f;
     hidden_frames_after_menu_=hovered_button_=0;
     native_capture_count_=ui_click_count_=scroll_last_ms_=0;
-    native_capture_due_ms_=native_capture_followup_ms_=native_capture_last_ms_=
-        native_capture_active_until_ms_=0;
+    native_capture_due_ms_=native_capture_followup_ms_=native_capture_last_ms_=0;
     world_state_poll_ms_=0;
     world_state_path_.clear();
     world_anchor_valid_=world_active_=world_state_known_=pointer_on_panel_=pointer_laser_active_=visible_=logged_=false;

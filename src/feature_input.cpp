@@ -15,6 +15,8 @@ namespace smvr::features
 namespace
 {
 constexpr uint32_t kHandCount = 2;
+constexpr uint64_t kInventoryHoldMilliseconds = 420;
+constexpr float kTurnReferenceRateHz = 72.0f;
 
 BOOL CALLBACK find_game_window(HWND window, LPARAM parameter)
 {
@@ -842,6 +844,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     const bool left_trigger = hands_[0].optical ? optical_pinch_down_[0] : trigger[0] > 0.55f;
     const bool right_trigger_pressed=right_trigger && !right_primary_was_down_;
     const bool left_trigger_pressed=left_trigger && !left_primary_was_down_;
+    right_use_down_ = !startup_menu_visible_ && b;
     if (startup_menu_visible_)
     {
         // While the dedicated startup panel is present, controller input belongs
@@ -882,6 +885,10 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         hands_[0].interaction = hands_[0].firing = false;
         hands_[1].interaction = hands_[1].firing = false;
         x_was_down_ = y_was_down_ = xy_chord_latched_ = false;
+        y_inventory_latched_ = false;
+        y_hold_start_ms_ = 0;
+        last_turn_update_ms_ = now;
+        turn_residual_x_ = turn_residual_y_ = 0.0f;
         right_primary_was_down_=right_trigger;
         left_primary_was_down_=left_trigger;
         menu_was_down_=menu;
@@ -966,24 +973,46 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     send_key('C', player_seated && y, key_zoom_out_);
     if (!player_seated)
     {
-        if (x && y && !xy_chord_latched_)
+        if (y && !y_was_down_)
+            y_hold_start_ms_ = now;
+        else if (!y)
+            y_hold_start_ms_ = 0;
+
+        const bool inventory_chord_pressed = x && y && !xy_chord_latched_ &&
+            !y_inventory_latched_;
+        const bool inventory_hold_pressed = y && !x && !y_inventory_latched_ &&
+            !xy_chord_latched_ && y_hold_start_ms_ != 0 &&
+            now - y_hold_start_ms_ >= kInventoryHoldMilliseconds;
+        if (inventory_chord_pressed || inventory_hold_pressed)
         {
             game_ui_open_intent_until_ms_=now+1200;
             pulse_haptic(0,0.10f,18,75.0f);
+            log_line("VR_INVENTORY_REQUEST source=%s key=I pulse=1",
+                inventory_hold_pressed ? "left_Y_hold" : "left_X+Y");
         }
         if (x && y) xy_chord_latched_ = true;
-        send_key('I', x && y, key_inventory_);
+        if (inventory_hold_pressed) y_inventory_latched_ = true;
+        // A one-update key pulse is sufficient for Scrap Mechanic's toggle and
+        // cannot leave the inventory action held across a menu/focus transition.
+        send_key('I', inventory_chord_pressed || inventory_hold_pressed, key_inventory_);
         if (!x && x_was_down_ && !xy_chord_latched_) send_mouse_wheel(WHEEL_DELTA);
-        if (!y && y_was_down_ && !xy_chord_latched_) send_mouse_wheel(-WHEEL_DELTA);
+        if (!y && y_was_down_ && !xy_chord_latched_ && !y_inventory_latched_)
+            send_mouse_wheel(-WHEEL_DELTA);
     }
     else
     {
         xy_chord_latched_ = false;
+        y_inventory_latched_ = false;
+        y_hold_start_ms_ = 0;
         send_key('I', false, key_inventory_);
     }
     x_was_down_ = x;
     y_was_down_ = y;
-    if (!x && !y) xy_chord_latched_ = false;
+    if (!x && !y)
+    {
+        xy_chord_latched_ = false;
+        y_inventory_latched_ = false;
+    }
 
     right_primary_was_down_=right_trigger;
     left_primary_was_down_=left_trigger;
@@ -993,15 +1022,35 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     send_mouse_button(0,right_trigger,mouse_attack_);
     send_mouse_button(1,left_trigger,mouse_secondary_);
 
-    if (std::fabs(turn.x) > deadzone || std::fabs(turn.y) > deadzone)
+    const uint64_t elapsed_turn_ms = last_turn_update_ms_ != 0 && now >= last_turn_update_ms_
+        ? now - last_turn_update_ms_ : 0;
+    last_turn_update_ms_ = now;
+    const float turn_seconds = elapsed_turn_ms == 0
+        ? (1.0f / 72.0f)
+        : std::clamp(static_cast<float>(elapsed_turn_ms) / 1000.0f, 0.0f, 0.050f);
+    auto shaped_stick = [deadzone](float value) {
+        const float magnitude = std::fabs(value);
+        if (magnitude <= deadzone) return 0.0f;
+        const float normalized = (magnitude - deadzone) / (1.0f - deadzone);
+        return std::copysign(normalized * normalized, value);
+    };
+    float horizontal = shaped_stick(turn.x);
+    float vertical = shaped_stick(turn.y);
+    if (std::fabs(horizontal) >= std::fabs(vertical)) vertical = 0.0f;
+    else horizontal = 0.0f;
+    // The public turn-speed values were calibrated as mouse pixels per update
+    // at Quest's 72 Hz reference rate. Time-normalize that proven scale instead
+    // of interpreting it as pixels per second (which made yaw roughly 72x too
+    // weak to move Scrap Mechanic's camera at ordinary sensitivity settings).
+    const float reference_frames = turn_seconds * kTurnReferenceRateHz;
+    turn_residual_x_ += horizontal * config_.horizontal_turn_speed * reference_frames;
+    turn_residual_y_ += -vertical * config_.vertical_turn_speed * reference_frames;
+    const int delta_x = static_cast<int>(std::trunc(turn_residual_x_));
+    const int delta_y = static_cast<int>(std::trunc(turn_residual_y_));
+    turn_residual_x_ -= static_cast<float>(delta_x);
+    turn_residual_y_ -= static_cast<float>(delta_y);
+    if (delta_x != 0 || delta_y != 0)
     {
-        float horizontal = std::fabs(turn.x) > deadzone ? turn.x : 0.0f;
-        float vertical = std::fabs(turn.y) > deadzone ? turn.y : 0.0f;
-        if (std::fabs(horizontal) >= std::fabs(vertical)) vertical = 0.0f;
-        const int delta_x = static_cast<int>(horizontal * std::fabs(horizontal) *
-            config_.horizontal_turn_speed);
-        const int delta_y = static_cast<int>(-vertical * std::fabs(vertical) *
-            config_.vertical_turn_speed);
         if (HWND window=game_window(); window)
         {
             RECT client{};
@@ -1015,7 +1064,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     if (!input_active_logged_)
     {
         input_active_logged_ = true;
-        log_line("VR_INPUT_ACTIVE mapping=openxr_controller left_profile=%s right_profile=%s locomotion=hmd_relative turn=right_stick triggers=mouse buttons=right_A_jump,right_B_use+context_Q,left_A_B_hotbar_or_seated_zoom,left_A+B_inventory,menu=dedicated_or_index_trackpad recenter=dual_stick_1s",
+        log_line("VR_INPUT_ACTIVE mapping=openxr_controller left_profile=%s right_profile=%s locomotion=hmd_relative turn=right_stick_smooth_time_normalized triggers=mouse buttons=right_A_jump,right_B_use+context_Q,left_X_Y_hotbar_or_seated_zoom,left_Y_hold_or_X+Y_inventory,menu=dedicated_or_index_trackpad recenter=dual_stick_1s",
             interaction_profile_name(active_profile_paths_[0]),
             interaction_profile_name(active_profile_paths_[1]));
     }
@@ -1041,8 +1090,13 @@ void InputBridge::release_injected_input()
     send_mouse_button(1,false,mouse_secondary_);
     ui_select_down_ = false;
     controller_ui_trigger_was_down_ = false;
+    right_use_down_ = false;
     ui_scroll_axis_ = 0.0f;
     x_was_down_ = y_was_down_ = xy_chord_latched_ = false;
+    y_inventory_latched_ = false;
+    y_hold_start_ms_ = 0;
+    last_turn_update_ms_ = 0;
+    turn_residual_x_ = turn_residual_y_ = 0.0f;
     right_primary_was_down_=left_primary_was_down_=menu_was_down_=b_was_down_=false;
 }
 
@@ -1077,6 +1131,7 @@ void InputBridge::reset_runtime_state()
     startup_menu_pointer_active_ = false;
     ui_select_down_ = false;
     controller_ui_trigger_was_down_ = false;
+    right_use_down_ = false;
     ui_scroll_axis_ = 0.0f;
     startup_menu_scroll_last_ms_ = 0;
     game_ui_open_intent_until_ms_=0;

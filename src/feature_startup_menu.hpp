@@ -56,8 +56,7 @@ private:
     bool poll_world_active();
     bool modal_cursor_visible() const;
     void request_native_capture(uint64_t delay_ms);
-    void keep_native_capture_active(uint64_t duration_ms);
-    uint64_t native_capture_interval(uint64_t now) const;
+    void request_native_capture_after_pointer_settles(uint64_t delay_ms);
     void draw_menu(ID3D11DeviceContext *context, ID3D11RenderTargetView *target,
                    uint32_t width, uint32_t height, const XrView &view);
     void draw_laser(ID3D11DeviceContext *context, ID3D11RenderTargetView *target,
@@ -98,7 +97,6 @@ private:
     uint64_t native_capture_due_ms_ = 0;
     uint64_t native_capture_followup_ms_ = 0;
     uint64_t native_capture_last_ms_ = 0;
-    uint64_t native_capture_active_until_ms_ = 0;
     std::wstring world_state_path_;
     int native_capture_pointer_x_ = 0;
     int native_capture_pointer_y_ = 0;

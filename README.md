@@ -32,7 +32,8 @@ The installer has four clear actions: **Install VR Mod**, **Uninstall VR Mod**, 
 - Tracked hammer, connection tool, paint tool, weld tool, lift, handbook, potato weapons, Chapter 2 scrap spudgun, potato launcher, and clay gun.
 - Complete grouped held-item geometry for blocks, parts, buckets and their contents, glowsticks, cornades, loose clay, extinguisher, seed packets, fertilizer, every food and drink, feeder food, soil bags, keycards, power cores, resources, carried objects, and the logbook.
 - VR-hand action origins for throwing, spraying, placing, targeting, inserting, dropping, eating, and using held items.
-- Physical hammer swings and VR-aimed gunfire from each tracked weapon barrel.
+- Aim the right hand and use B for Scrap Mechanic's normal interactions, including holding B to refine loose wood, stone, or metal.
+- Physical controller or optical-hand hammer-head collision, plus VR-aimed gunfire from each tracked weapon barrel.
 - Calibrated Chapter 2 clay-gun grip and moving parts, with an included live calibration helper.
 - World-locked startup and in-game spatial menus using Scrap Mechanic's live native UI.
 - Right-hand menu laser, native hover/click/hold/drag input, and smooth transparent menu presentation.
@@ -47,18 +48,18 @@ The installer has four clear actions: **Install VR Mod**, **Uninstall VR Mod**, 
 | Quest / Valve Index control | Action |
 | --- | --- |
 | Left stick | Move |
-| Right stick | Turn; scroll an open menu |
+| Right stick | Smooth turn / look up and down; scroll an open menu |
 | Quest A / Index right A | Jump; click, hold, or drag in a menu |
-| Quest B / Index right B | Use / interact |
+| Quest B / Index right B | Use / interact along the right-hand aim ray; hold to refine loose resources |
 | Right trigger | Primary action |
 | Left trigger | Secondary action |
 | Quest X / Y or Index left A / B while standing | Previous / next hotbar item |
-| Quest X + Y or Index left A + B while standing | Open backpack |
+| Hold Quest Y / Index left B, or press Quest X + Y / Index left A + B while standing | Open backpack |
 | Quest X / Y or Index left A / B while seated | Zoom in / out |
 | Quest left menu / Index left trackpad press | Pause / resume |
 | Hold both thumbsticks for one second | Recenter view and floor |
 | Optical pinch | Primary tool or menu interaction |
-| Physical hammer swing | Hammer attack |
+| Swing the right controller or tracked hand while holding the hammer | Strike exactly where the moving VR hammer head makes contact |
 
 ## Requirements
 

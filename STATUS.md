@@ -1,6 +1,6 @@
 # Chapter 2 release status
 
-Release candidate: `1.3.3-chapter2-20260901`
+Release candidate: `1.3.5-chapter2-20260901`
 
 Branch: `main`
 
@@ -10,11 +10,12 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 
 - Native stereo OpenXR rendering at `2064 × 2272` per eye with six-degree-of-freedom head tracking.
 - Exact runtime FOV, correct depth and perspective, VR seam correction, and normal Scrap Mechanic color and contrast.
-- Standing VR keeps the world upright and cancels desktop pitch-orbit height movement; seated VR uses the original game camera behavior.
+- Standing VR keeps the world upright, preserves smooth desktop/controller pitch, and removes only pitch-orbit height movement; seated VR uses the original game camera behavior.
 - Quest Touch and Valve Index OpenXR controllers, plus optional Meta optical hand tracking with tracked mechanic gloves.
-- Tracked tools and Chapter 2 weapons, including physical hammer swings and gunfire from the VR barrel pose.
+- Tracked tools and Chapter 2 weapons, including stock trigger-driven hammer attacks aimed from the right OpenXR hand, OpenXR tool targeting, and gunfire from the separately calibrated VR barrel pose.
 - Complete grouped held-item geometry with a live position/rotation calibration helper, including blocks, parts, buckets, glowsticks, cornades, loose clay, extinguisher, planting, fertilizer, food and drink, feeder food, soil, keys and power cores, resources, arbitrary carried objects, and the logbook.
 - Held-item actions use the right-hand VR pose for throwing, spraying, placing, targeting, inserting, dropping, and use interactions.
+- Right-controller B keeps Scrap Mechanic's stock Use interaction and redirects only its selection ray to the OpenXR right hand, including normal hold-to-refine behavior.
 - World-locked startup and in-game spatial UI with the live native game menus, transparent composition, hover, click, hold, and drag.
 - UI events are queued directly into Scrap Mechanic's input manager without Windows mouse simulation.
 - Restrained native OpenXR haptics for controller interaction.
@@ -31,7 +32,7 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 - OpenXR swapchains use the runtime-recommended extent and an sRGB format.
 - The centered engine source is `2565 × 2711` and is cropped to the runtime FOV without a rotational guard band.
 - The user's desktop resolution setting remains independent from the VR eye resolution.
-- The live menu compositor uses an adaptive capture scheduler while stereo placement, head tracking, laser input, and haptics continue at headset rate.
+- The live menu compositor captures native UI on transitions and interactions while its cached stereo panel, head tracking, laser input, and haptics continue at headset rate.
 
 ## Installer
 

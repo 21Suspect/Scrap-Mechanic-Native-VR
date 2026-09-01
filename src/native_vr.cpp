@@ -159,6 +159,7 @@ std::atomic<uint64_t> g_viewmodel_camera_hides{0};
 std::atomic<bool> g_viewmodel_camera_hide_logged{false};
 std::atomic<bool> g_viewmodel_pass_patched{false};
 std::atomic<bool> g_vr_target_tracking_suppressed_logged{false};
+std::atomic<bool> g_vr_target_tracking_locked{false};
 std::atomic<uint64_t> g_vr_target_reacquires{0};
 std::atomic<uint64_t> g_mirror_present_failures{0};
 std::atomic<bool> g_mirror_present_failure_logged{false};
@@ -174,6 +175,7 @@ std::atomic<bool> g_hands_render_failure_logged{false};
 
 void mark_openxr_failed(bool retry = true)
 {
+    g_vr_target_tracking_locked.store(false, std::memory_order_release);
     g_openxr_retry_after_ms.store(retry ? GetTickCount64() + kOpenXrRetryDelayMs : 0,
         std::memory_order_release);
     g_failed.store(true, std::memory_order_release);
@@ -186,19 +188,16 @@ std::atomic<bool> g_hand_bridge_inactive_authoritative{false};
 bool g_previous_right_interaction = false;
 bool g_previous_gun_muzzle_active = false;
 std::string g_previous_gun_muzzle_item;
-XrVector3f g_optical_hammer_previous{};
-uint64_t g_optical_hammer_previous_ms = 0;
-uint64_t g_optical_hammer_last_swing_ms = 0;
-uint64_t g_optical_hammer_swing_sequence = 0;
-XrVector3f g_optical_hammer_swing_direction{0.0f, 0.0f, -1.0f};
-uint32_t g_optical_hammer_click_publishes = 0;
-bool g_optical_hammer_armed = true;
-std::atomic<bool> g_optical_hammer_logged{false};
 bool g_right_hand_world_active = false;
 XrVector3f g_right_hand_world{};
 XrVector3f g_right_hand_forward{};
 XrVector3f g_right_hand_up{};
 uint64_t g_right_hand_world_ms = 0;
+bool g_right_aim_world_active = false;
+XrVector3f g_right_aim_world{};
+XrVector3f g_right_aim_forward{};
+XrVector3f g_right_aim_up{};
+uint64_t g_right_aim_world_ms = 0;
 struct NativeProjectilePose
 {
     bool authoritative = false;
@@ -216,6 +215,7 @@ std::vector<const void *> g_lua_registered_environments;
 std::atomic<bool> g_lua_projectile_registration_logged{false};
 std::atomic<bool> g_lua_projectile_call_logged{false};
 std::atomic<bool> g_tool_raycast_logged{false};
+std::atomic<bool> g_use_raycast_logged{false};
 thread_local int g_active_eye = -1;
 thread_local uint32_t g_eye_camera_build_index = 0;
 std::mutex g_log_mutex;
@@ -630,7 +630,7 @@ void ensure_lua_projectile_api(lua_State *state, int argument_count)
         g_lua_settop(state, top);
     }
     if ((register_global || argument_count >= 0) && !g_lua_projectile_registration_logged.exchange(true))
-        log_line("VR_LUA_PROJECTILE_API_REGISTERED transport=native_logic_task");
+        log_line("VR_LUA_NATIVE_API_REGISTERED transport=native_logic_task projectile_pose=1");
 }
 
 int __cdecl hk_lua_pcall(lua_State *state, int argument_count, int result_count, int error_function)
@@ -744,6 +744,8 @@ void reset_hand_bridge(bool reset_session = false)
     g_hand_bridge_inactive_authoritative.store(false, std::memory_order_release);
     g_right_hand_world_active = false;
     g_right_hand_world_ms = 0;
+    g_right_aim_world_active = false;
+    g_right_aim_world_ms = 0;
     set_native_projectile_pose(false, false);
 }
 
@@ -756,6 +758,8 @@ void deactivate_hand_bridge(bool vr_authoritative = false)
     g_hand_bridge_logged.store(false, std::memory_order_release);
     g_right_hand_world_active = false;
     g_right_hand_world_ms = 0;
+    g_right_aim_world_active = false;
+    g_right_aim_world_ms = 0;
     set_native_projectile_pose(vr_authoritative, false);
 
     // A static inactive file is sufficient until tracking becomes active. Do not
@@ -771,12 +775,10 @@ void deactivate_hand_bridge(bool vr_authoritative = false)
     const int length = std::snprintf(json, sizeof(json),
         "{\"sequence\":%llu,\"vrActive\":false,\"vrAuthoritative\":%s,\"opticalGunTrigger\":false,"
         "\"gunMuzzle\":{\"active\":false,\"item\":\"\",\"x\":0,\"y\":0,\"z\":0},"
-        "\"hammerSwingSequence\":%llu,\"hammerSwingDirection\":{\"x\":0,\"y\":0,\"z\":0},"
         "\"left\":{\"active\":false,\"interact\":false,\"optical\":false},"
         "\"right\":{\"active\":false,\"interact\":false,\"optical\":false}}",
         static_cast<unsigned long long>(hand_sequence),
-        vr_authoritative ? "true" : "false",
-        static_cast<unsigned long long>(g_optical_hammer_swing_sequence));
+        vr_authoritative ? "true" : "false");
     if (length > 0 && static_cast<size_t>(length) < sizeof(json))
     {
         const size_t json_length = static_cast<size_t>(length);
@@ -846,6 +848,30 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
         g_right_hand_world_ms = now;
     }
 
+    // The rendered glove uses a controller-to-mesh calibration. That transform
+    // is correct for the model, but it is not OpenXR's pointing direction and
+    // made generic tool raycasts land near the player's feet on some Touch
+    // runtimes. Publish the runtime aim pose independently for interaction.
+    g_right_aim_world_active = g_input.pointer_pose_active(1);
+    if (g_right_aim_world_active)
+    {
+        const XrPosef &aim_pose = g_input.pointer_pose(1);
+        const XrVector3f aim_delta{
+            aim_pose.position.x - reference.position.x,
+            aim_pose.position.y - reference.position.y,
+            aim_pose.position.z - reference.position.z
+        };
+        g_right_aim_world = view_point_to_world(game_world_to_view,
+            rotate_vector(inverse_reference, aim_delta));
+        const XrQuaternionf aim_relative = quaternion_multiply(
+            inverse_reference, aim_pose.orientation);
+        g_right_aim_forward = view_vector_to_world(game_world_to_view,
+            rotate_vector(aim_relative, {0.0f, 0.0f, -1.0f}));
+        g_right_aim_up = view_vector_to_world(game_world_to_view,
+            rotate_vector(aim_relative, {0.0f, 1.0f, 0.0f}));
+        g_right_aim_world_ms = now;
+    }
+
     XrVector3f gun_muzzle_offset{};
     XrVector3f gun_muzzle_direction{0.0f, 0.0f, -1.0f};
     const char *gun_muzzle_item = nullptr;
@@ -854,60 +880,16 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
     const bool gun_muzzle_active = active[1] && gun_tool_active && gun_muzzle_item;
     update_native_projectile_pose(active[1], gun_tool_active, world[1], forward[1], up[1],
         gun_muzzle_offset, gun_muzzle_direction, gun_muzzle_item);
-    const bool hammer_active = scrapvr::tools::is_hammer_active();
-    if (active[1] && optical[1] && hammer_active)
-    {
-        if (g_optical_hammer_previous_ms != 0 && now > g_optical_hammer_previous_ms)
-        {
-            const uint64_t elapsed_ms = now - g_optical_hammer_previous_ms;
-            if (elapsed_ms >= 5 && elapsed_ms <= 100)
-            {
-                XrVector3f direction{
-                    poses[1].position.x - g_optical_hammer_previous.x,
-                    poses[1].position.y - g_optical_hammer_previous.y,
-                    poses[1].position.z - g_optical_hammer_previous.z
-                };
-                const float distance = std::sqrt(direction.x * direction.x + direction.y * direction.y +
-                    direction.z * direction.z);
-                const float speed = distance * (1000.0f / static_cast<float>(elapsed_ms));
-                if (speed < 0.55f) g_optical_hammer_armed = true;
-                if (g_optical_hammer_armed && speed >= 1.55f &&
-                    (g_optical_hammer_last_swing_ms == 0 || now - g_optical_hammer_last_swing_ms >= 450) &&
-                    normalize_vector(direction))
-                {
-                    XrVector3f world_direction = view_vector_to_world(game_world_to_view,
-                        rotate_vector(inverse_reference, direction));
-                    if (normalize_vector(world_direction))
-                    {
-                        g_optical_hammer_armed = false;
-                        g_optical_hammer_last_swing_ms = now;
-                        g_optical_hammer_swing_direction = world_direction;
-                        ++g_optical_hammer_swing_sequence;
-                        g_optical_hammer_click_publishes = 2;
-                        if (!g_optical_hammer_logged.exchange(true))
-                            log_line("VR_OPTICAL_HAMMER_SWING threshold_mps=1.55 rearm_mps=0.55 cooldown_ms=450");
-                    }
-                }
-            }
-        }
-        g_optical_hammer_previous = poses[1].position;
-        g_optical_hammer_previous_ms = now;
-        // Physical motion replaces pinch for the optical-hand hammer only.
-        interaction[1] = g_optical_hammer_click_publishes > 0;
-    }
-    else
-    {
-        g_optical_hammer_previous_ms = 0;
-        g_optical_hammer_armed = true;
-    }
+    const bool hammer_tool_active = scrapvr::tools::is_hammer_active();
 
     const bool right_interaction_changed = interaction[1] != g_previous_right_interaction;
     const std::string gun_item = gun_muzzle_item ? gun_muzzle_item : "";
     const bool gun_muzzle_changed = gun_muzzle_active != g_previous_gun_muzzle_active ||
         gun_item != g_previous_gun_muzzle_item;
-    // Keep an equipped gun's pose current even before the trigger moves. This
-    // prevents the first shot after hand motion from using an old barrel pose.
-    const uint64_t publish_interval_ms = gun_tool_active ? 20u : (interaction[1] ? 20u : 1000u);
+    // Keep an equipped gun or hammer pose current even before the trigger moves.
+    // Hammer Lua samples this ordinary action aim at the stock impact frame.
+    const uint64_t publish_interval_ms = (gun_tool_active || hammer_tool_active)
+        ? 20u : (interaction[1] ? 20u : 1000u);
     if (!right_interaction_changed && !gun_muzzle_changed &&
         now - g_last_hand_bridge_publish_ms < publish_interval_ms) return;
 
@@ -915,11 +897,12 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
     if (!hand_bridge_paths(path, temporary, true)) return;
     const bool optical_gun_trigger = optical[1] && gun_tool_active && interaction[1];
     const uint64_t hand_sequence = ++g_hand_bridge_sequence;
-    char json[1536]{};
+    const bool action_aim_active = active[1] && g_right_aim_world_active;
+    char json[2048]{};
     const int length = std::snprintf(json, sizeof(json),
         "{\"sequence\":%llu,\"vrActive\":true,\"vrAuthoritative\":true,\"opticalGunTrigger\":%s,"
         "\"gunMuzzle\":{\"active\":%s,\"item\":\"%s\",\"x\":%.5f,\"y\":%.5f,\"z\":%.5f,\"dx\":%.5f,\"dy\":%.5f,\"dz\":%.5f},"
-        "\"hammerSwingSequence\":%llu,\"hammerSwingDirection\":{\"x\":%.5f,\"y\":%.5f,\"z\":%.5f},"
+        "\"actionAim\":{\"active\":%s,\"x\":%.5f,\"y\":%.5f,\"z\":%.5f,\"fx\":%.5f,\"fy\":%.5f,\"fz\":%.5f,\"ux\":%.5f,\"uy\":%.5f,\"uz\":%.5f},"
         "\"left\":{\"active\":%s,\"interact\":%s,\"optical\":%s,\"x\":%.5f,\"y\":%.5f,\"z\":%.5f,\"fx\":%.5f,\"fy\":%.5f,\"fz\":%.5f,\"ux\":%.5f,\"uy\":%.5f,\"uz\":%.5f},"
         "\"right\":{\"active\":%s,\"interact\":%s,\"optical\":%s,\"x\":%.5f,\"y\":%.5f,\"z\":%.5f,\"fx\":%.5f,\"fy\":%.5f,\"fz\":%.5f,\"ux\":%.5f,\"uy\":%.5f,\"uz\":%.5f}}",
         static_cast<unsigned long long>(hand_sequence),
@@ -927,9 +910,10 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
         gun_muzzle_active ? "true" : "false", gun_item.c_str(),
         gun_muzzle_offset.x, gun_muzzle_offset.y, gun_muzzle_offset.z,
         gun_muzzle_direction.x, gun_muzzle_direction.y, gun_muzzle_direction.z,
-        static_cast<unsigned long long>(g_optical_hammer_swing_sequence),
-        g_optical_hammer_swing_direction.x, g_optical_hammer_swing_direction.y,
-        g_optical_hammer_swing_direction.z,
+        action_aim_active ? "true" : "false",
+        g_right_aim_world.x, g_right_aim_world.y, g_right_aim_world.z,
+        g_right_aim_forward.x, g_right_aim_forward.y, g_right_aim_forward.z,
+        g_right_aim_up.x, g_right_aim_up.y, g_right_aim_up.z,
         active[0] ? "true" : "false", interaction[0] ? "true" : "false", optical[0] ? "true" : "false",
         world[0].x, world[0].y, world[0].z, forward[0].x, forward[0].y, forward[0].z,
         up[0].x, up[0].y, up[0].z,
@@ -951,10 +935,9 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
         log_line("VR_GUN_MUZZLE_BRIDGE active=%u right_tracked=%u tool_is_gun=%u item=%s",
             gun_muzzle_active ? 1u : 0u, active[1] ? 1u : 0u,
             gun_tool_active ? 1u : 0u, gun_item.empty() ? "none" : gun_item.c_str());
-    if (g_optical_hammer_click_publishes > 0) --g_optical_hammer_click_publishes;
     if (!g_hand_bridge_logged.exchange(true))
     {
-        log_line("VR_HAND_BRIDGE_ACTIVE path=content-aware world_space=1 gun_projectile_override=tracked_barrel");
+        log_line("VR_HAND_BRIDGE_ACTIVE path=content-aware world_space=1 action_aim=openxr_pointer gun_projectile_override=tracked_barrel hammer=stock_trigger_hand_ray use=stock_interaction_hand_ray");
     }
 }
 
@@ -966,15 +949,31 @@ uint8_t __fastcall hk_raycast(void *world, void *unused, const float *origin,
     const uintptr_t caller = reinterpret_cast<uintptr_t>(__builtin_return_address(0));
     const uint64_t now = GetTickCount64();
     if (g_enabled.load(std::memory_order_acquire) &&
-        caller == g_game_base + kPlayerToolRaycastReturnRva && g_right_hand_world_active &&
-        now - g_right_hand_world_ms <= 250 && origin && delta)
+        caller == g_game_base + kPlayerToolRaycastReturnRva && origin && delta)
     {
         XrVector3f local_offset{0.0f, -0.035f, -0.120f};
         XrVector3f local_direction{0.0f, 0.0f, -1.0f};
-        scrapvr::tools::get_interaction_laser_offset(local_offset, &local_direction);
-        XrVector3f forward = g_right_hand_forward;
-        XrVector3f up = g_right_hand_up;
-        if (normalize_vector(forward))
+        const bool runtime_aim_fresh = g_right_aim_world_active &&
+            now - g_right_aim_world_ms <= 250;
+        const bool glove_pose_fresh = g_right_hand_world_active &&
+            now - g_right_hand_world_ms <= 250;
+        // B remains Scrap Mechanic's own Use key. While it is held, override
+        // only the engine's stock player-selection ray with OpenXR's semantic
+        // aim pose. This lets the untouched HarvestCore interaction refine the
+        // pointed-at log while retaining its normal hold timing and server path.
+        const bool use_hand_aim = g_input.right_use_down() && runtime_aim_fresh;
+        const bool calibrated_laser = !use_hand_aim &&
+            scrapvr::tools::get_interaction_laser_offset(local_offset, &local_direction);
+        if (!calibrated_laser && runtime_aim_fresh)
+            local_offset = {0.0f, 0.0f, 0.0f};
+        const XrVector3f ray_origin = !calibrated_laser && runtime_aim_fresh
+            ? g_right_aim_world : g_right_hand_world;
+        XrVector3f forward = !calibrated_laser && runtime_aim_fresh
+            ? g_right_aim_forward : g_right_hand_forward;
+        XrVector3f up = !calibrated_laser && runtime_aim_fresh
+            ? g_right_aim_up : g_right_hand_up;
+        const bool pose_fresh = (!calibrated_laser && runtime_aim_fresh) || glove_pose_fresh;
+        if (pose_fresh && normalize_vector(forward))
         {
             const float projection = up.x * forward.x + up.y * forward.y + up.z * forward.z;
             up.x -= forward.x * projection; up.y -= forward.y * projection; up.z -= forward.z * projection;
@@ -988,9 +987,9 @@ uint8_t __fastcall hk_raycast(void *world, void *unused, const float *origin,
                 range_squared >= 0.01f && range_squared <= 400.0f)
             {
                 const float redirected_origin[3]{
-                    g_right_hand_world.x + right.x * local_offset.x + up.x * local_offset.y - forward.x * local_offset.z,
-                    g_right_hand_world.y + right.y * local_offset.x + up.y * local_offset.y - forward.y * local_offset.z,
-                    g_right_hand_world.z + right.z * local_offset.x + up.z * local_offset.y - forward.z * local_offset.z
+                    ray_origin.x + right.x * local_offset.x + up.x * local_offset.y - forward.x * local_offset.z,
+                    ray_origin.y + right.y * local_offset.x + up.y * local_offset.y - forward.y * local_offset.z,
+                    ray_origin.z + right.z * local_offset.x + up.z * local_offset.y - forward.z * local_offset.z
                 };
                 const float range = std::sqrt(range_squared);
 				XrVector3f redirected_direction{
@@ -999,12 +998,17 @@ uint8_t __fastcall hk_raycast(void *world, void *unused, const float *origin,
 					right.z * local_direction.x + up.z * local_direction.y - forward.z * local_direction.z
 				};
 				if (!normalize_vector(redirected_direction)) redirected_direction = forward;
-				const float redirected_delta[3]{redirected_direction.x * range,
-					redirected_direction.y * range, redirected_direction.z * range};
-                if (!g_tool_raycast_logged.exchange(true))
-                    log_line("VR_ACTION_RAY_ACTIVE raycast_rva=%llx caller_rva=%llx calibrated_tool_origin=1",
-                        static_cast<unsigned long long>(kRaycastRva),
+                const float redirected_delta[3]{redirected_direction.x * range,
+                    redirected_direction.y * range, redirected_direction.z * range};
+                if (use_hand_aim && !g_use_raycast_logged.exchange(true))
+                    log_line("VR_USE_RAY_ACTIVE input=right_B action=stock_use source=openxr_aim_pose caller_rva=%llx",
                         static_cast<unsigned long long>(kPlayerToolRaycastReturnRva));
+                if (!g_tool_raycast_logged.exchange(true))
+                    log_line("VR_ACTION_RAY_ACTIVE raycast_rva=%llx caller_rva=%llx generic_source=%s interaction_lasers=calibrated_visible_tool",
+                        static_cast<unsigned long long>(kRaycastRva),
+                        static_cast<unsigned long long>(kPlayerToolRaycastReturnRva),
+                        calibrated_laser ? "calibrated_visible_tool" :
+                            (runtime_aim_fresh ? "openxr_aim_pose" : "grip_fallback"));
                 return original(world, unused, redirected_origin, redirected_delta, ignore, result);
             }
         }
@@ -1072,14 +1076,14 @@ struct StandingCameraState
     }
 };
 
-// Scrap Mechanic's desktop camera owns player/world translation and horizontal
-// turning, but its mouse/controller pitch must not become a second VR head
-// rotation. The desktop camera also moves along a small orbit while pitching.
-// Removing only its rotation would preserve that orbit's vertical component and
-// make looking up/down raise or lower the VR viewpoint. Learn the orbit radius
-// from consecutive rigid camera samples and remove its Z component as well.
-// Real player/world vertical motion remains in camera_height and still passes
-// through. This path is standing-only; seats use the untouched game matrix.
+// Scrap Mechanic's desktop camera owns player/world translation and stick/mouse
+// turning. Its pitch camera moves along a small orbit, however, so applying the
+// orientation while retaining the raw position makes looking up/down raise or
+// lower the VR viewpoint. Learn that orbit radius from consecutive rigid camera
+// samples and remove only its vertical translation. Preserve yaw and pitch, but
+// rebuild the basis from world-up so accidental desktop roll can never tilt the
+// VR horizon. Real player/world vertical motion still passes through. Seats use
+// the untouched game matrix because their larger intentional orbit is correct.
 bool build_upright_world_to_view(const float *source, StandingCameraState &state,
                                  float upright[16])
 {
@@ -1164,17 +1168,16 @@ bool build_upright_world_to_view(const float *source, StandingCameraState &state
     state.previous_forward = source_forward;
     state.previous_output_height = camera_height;
 
-    // Projecting camera-forward onto the game's XY ground plane keeps heading
-    // while removing both pitch and roll. Only a mathematically vertical camera
-    // needs the projected-right fallback to retain its last meaningful yaw.
-    XrVector3f forward{-source[2], -source[6], 0.0f};
-    const float forward_length = std::sqrt(forward.x * forward.x + forward.y * forward.y);
+    // World-up plus the camera forward vector defines a roll-free basis. Unlike
+    // the previous upright implementation, source_forward.z remains intact, so
+    // the right stick can look up/down smoothly without changing eye height.
+    XrVector3f forward = source_forward;
+    const float horizontal_length = std::sqrt(
+        forward.x * forward.x + forward.y * forward.y);
     XrVector3f right{};
-    if (std::isfinite(forward_length) && forward_length > 0.0001f)
+    if (std::isfinite(horizontal_length) && horizontal_length > 0.0001f)
     {
-        forward.x /= forward_length;
-        forward.y /= forward_length;
-        right = {forward.y, -forward.x, 0.0f};
+        right = {forward.y / horizontal_length, -forward.x / horizontal_length, 0.0f};
     }
     else
     {
@@ -1183,31 +1186,44 @@ bool build_upright_world_to_view(const float *source, StandingCameraState &state
         if (!std::isfinite(right_length) || right_length <= 0.0001f) return false;
         right.x /= right_length;
         right.y /= right_length;
-        forward = {-right.y, right.x, 0.0f};
     }
+    XrVector3f camera_up{
+        right.y * forward.z - right.z * forward.y,
+        right.z * forward.x - right.x * forward.z,
+        right.x * forward.y - right.y * forward.x
+    };
+    if (!normalize_vector(camera_up)) return false;
+    const XrVector3f camera_position_locked{
+        camera_position.x, camera_position.y, camera_height
+    };
     std::memset(upright, 0, sizeof(float) * 16);
 
     // Column-major rigid world-to-view matrix. Rows are camera right, camera
-    // up (+game Z), and camera back (-forward), respectively.
+    // up, and camera back (-forward), respectively.
     upright[0] = right.x;
     upright[4] = right.y;
-    upright[1] = 0.0f;
-    upright[5] = 0.0f;
-    upright[9] = 1.0f;
+    upright[8] = right.z;
+    upright[1] = camera_up.x;
+    upright[5] = camera_up.y;
+    upright[9] = camera_up.z;
     upright[2] = -forward.x;
     upright[6] = -forward.y;
-    upright[10] = 0.0f;
-    upright[12] = -(right.x * camera_position.x + right.y * camera_position.y);
-    upright[13] = -camera_height;
-    upright[14] = forward.x * camera_position.x + forward.y * camera_position.y;
+    upright[10] = -forward.z;
+    upright[12] = -(right.x * camera_position_locked.x +
+        right.y * camera_position_locked.y + right.z * camera_position_locked.z);
+    upright[13] = -(camera_up.x * camera_position_locked.x +
+        camera_up.y * camera_position_locked.y + camera_up.z * camera_position_locked.z);
+    upright[14] = forward.x * camera_position_locked.x +
+        forward.y * camera_position_locked.y + forward.z * camera_position_locked.z;
     upright[15] = 1.0f;
 
     if (!world_to_view_matrix(upright)) return false;
     if (!g_vr_upright_camera_logged.exchange(true, std::memory_order_acq_rel))
     {
         const XrVector3f source_up = view_vector_to_world(source, {0.0f, 1.0f, 0.0f});
-        log_line("VR_CAMERA_UPRIGHT_LOCK active=1 game_world_up=+Z mouse_pitch=discarded "
-            "mouse_yaw=preserved controller_turn=preserved source_up=%.5f,%.5f,%.5f",
+        log_line("VR_CAMERA_UPRIGHT_LOCK active=1 game_world_up=+Z roll=discarded "
+            "mouse_controller_pitch=preserved pitch_orbit_height=discarded "
+            "mouse_yaw=preserved source_up=%.5f,%.5f,%.5f",
             source_up.x, source_up.y, source_up.z);
     }
     return true;
@@ -2133,6 +2149,7 @@ struct OpenXrState
 
     void destroy()
     {
+        g_vr_target_tracking_locked.store(false, std::memory_order_release);
         abandon_pending_frame();
         // xrDestroySwapchain requires all graphics commands that reference its
         // images to have completed. Keep this blocking wait on teardown only;
@@ -2435,6 +2452,7 @@ struct OpenXrState
                     abandon_pending_frame();
                     result = xrEndSession(session);
                     running = false; anchor_valid = false;
+                    g_vr_target_tracking_locked.store(false, std::memory_order_release);
                     camera_mode_known = false; standing_camera.reset();
                     g_startup_menu.reset_world_anchor();
                     g_startup_menu.reset_state();
@@ -2445,6 +2463,7 @@ struct OpenXrState
                 else if (state == XR_SESSION_STATE_EXITING || state == XR_SESSION_STATE_LOSS_PENDING)
                 {
                     running = false;
+                    g_vr_target_tracking_locked.store(false, std::memory_order_release);
                     g_startup_menu.reset_world_anchor();
                     g_startup_menu.reset_state();
                     restore_render_size_override();
@@ -2476,6 +2495,7 @@ struct OpenXrState
         }
         context = bound_context(context, "render_stereo");
         if (!context) return fail("bound_d3d11_context_missing", XR_ERROR_GRAPHICS_DEVICE_INVALID);
+        g_vr_target_tracking_locked.store(true, std::memory_order_release);
 
         const bool player_seated = scrapvr::tools::is_player_seated();
         if (!camera_mode_known || camera_mode_seated != player_seated)
@@ -2485,7 +2505,8 @@ struct OpenXrState
             standing_camera.reset();
             log_line("VR_CAMERA_PATH seated=%u base_transform=%s",
                 player_seated ? 1u : 0u,
-                player_seated ? "original_game_camera" : "upright_pitch_neutral");
+                player_seated ? "original_game_camera" :
+                    "roll_neutral_pitch_preserved_height_locked");
         }
         float upright_world_to_view[16]{};
         const float *vr_world_to_view = game_world_to_view;
@@ -3243,15 +3264,16 @@ bool on_copy_texture(reshade::api::command_list *command_list, reshade::api::res
 {
     reshade::api::device *selected_device = g_game_api_device.load(std::memory_order_acquire);
     if (selected_device && (!command_list || command_list->get_device() != selected_device)) return false;
-    // During either real eye render the engine copies its completed scene toward
-    // the desktop-present chain. That desktop resource is not the VR eye source.
-    // Tracking it here caused g_final_target to oscillate between 1920x1080 and
-    // the persistent VR target every eye and forced redundant COM work/logging.
-    // PC mode remains unchanged because g_active_eye is -1 outside VR renders.
-    if (g_active_eye >= 0)
+    // During an active OpenXR session the engine also copies toward the desktop
+    // present chain. That resource is not the persistent VR eye source. Tracking
+    // it here made g_final_target oscillate between desktop and VR extents during
+    // native-menu captures, forcing redundant COM work and visible eye flashes.
+    // Tracking is unlocked again whenever OpenXR stops, so PC mode is unchanged.
+    if (g_active_eye >= 0 || g_vr_target_tracking_locked.load(std::memory_order_acquire))
     {
         if (!g_vr_target_tracking_suppressed_logged.exchange(true, std::memory_order_acq_rel))
-            log_line("VR_DESKTOP_TARGET_TRACKING_SUPPRESSED eye=%d", g_active_eye);
+            log_line("VR_DESKTOP_TARGET_TRACKING_SUPPRESSED scope=active_openxr_session eye=%d",
+                g_active_eye);
         return false;
     }
     if (dest.handle == 0 || source.handle == 0 || source_subresource != 0 || dest_subresource != 0) return false;

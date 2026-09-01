@@ -218,7 +218,7 @@ function SoilBag.client_onEquippedUpdate( self, primaryState, secondaryState, fo
 			return false, false
 		end
 		
-		local valid, worldPos, worldNormal = self.constructionRayCast()
+		local valid, worldPos, worldNormal = self:constructionRayCast()
 		if valid then
 
 			self.effect:setPosition( worldPos )

@@ -10,6 +10,7 @@
 #include <Windows.h>
 #include <openxr/openxr.h>
 
+#include <atomic>
 #include <array>
 #include <cstdint>
 
@@ -22,6 +23,8 @@ struct InputConfig
     bool haptics = true;
     float haptic_strength = 0.65f;
     float stick_deadzone = 0.30f;
+    // Private input-queue mouse pixels per 72 Hz reference update at full stick.
+    // Runtime input is time-normalized so behavior remains stable at other rates.
     float horizontal_turn_speed = 36.0f;
     float vertical_turn_speed = 28.0f;
 };
@@ -61,6 +64,10 @@ public:
     const HandState &hand(uint32_t index) const { return hands_[index < 2 ? index : 0]; }
     const XrPosef &pointer_pose(uint32_t index) const { return pointer_poses_[index < 2 ? index : 0]; }
     bool pointer_pose_active(uint32_t index) const { return pointer_pose_active_[index < 2 ? index : 0]; }
+	// Right-controller B is Scrap Mechanic's normal Use input. The native
+	// player-ray hook samples it so stock hold interactions use the OpenXR aim
+	// pose without replacing any game Lua or interaction timing.
+	bool right_use_down() const { return right_use_down_.load(std::memory_order_acquire); }
     bool ui_select_down() const { return ui_select_down_; }
     float ui_scroll_axis() const { return ui_scroll_axis_; }
     bool game_ui_open_intent() const;
@@ -142,6 +149,11 @@ private:
     bool x_was_down_ = false;
     bool y_was_down_ = false;
     bool xy_chord_latched_ = false;
+    bool y_inventory_latched_ = false;
+    uint64_t y_hold_start_ms_ = 0;
+    uint64_t last_turn_update_ms_ = 0;
+    float turn_residual_x_ = 0.0f;
+    float turn_residual_y_ = 0.0f;
     bool input_rearm_required_ = true;
     bool locomotion_reference_valid_ = false;
     XrVector3f locomotion_reference_forward_{0.0f, 0.0f, -1.0f};
@@ -152,6 +164,7 @@ private:
     bool input_suspended_logged_ = false;
     bool sync_failure_logged_ = false;
     bool controller_ui_trigger_was_down_ = false;
+	std::atomic<bool> right_use_down_{false};
     bool right_primary_was_down_ = false;
     bool left_primary_was_down_ = false;
     bool menu_was_down_ = false;

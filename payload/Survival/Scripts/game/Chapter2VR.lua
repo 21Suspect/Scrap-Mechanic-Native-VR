@@ -85,8 +85,6 @@ local function clearTrackedAim()
 	g_vrToolPointerEnabled = false
 	g_vrToolPointerOrigin = nil
 	g_vrToolPointerDirection = nil
-	g_vrHammerSwingDirection = nil
-	g_vrHammerSwingFreshTimer = 1.0
 	clearGunAim()
 end
 
@@ -180,6 +178,12 @@ local function resolveHandPose( data )
 	}
 end
 
+local function resolveActionPose( data )
+	local actionAim = data and data.actionAim
+	if type( actionAim ) ~= "table" or actionAim.active ~= true then return nil end
+	return resolveHandPose( { right = actionAim } )
+end
+
 local function handLocalPosition( pose, offset )
 	return pose.position + pose.right * offset[1] + pose.up * offset[2] - pose.forward * offset[3]
 end
@@ -223,8 +227,6 @@ function Chapter2VR.clientCreate( self )
 	self.cl.vrHandTimer = 0.0
 	self.cl.vrHandSequence = -1
 	self.cl.vrHandBridgePrimed = false
-	self.cl.vrHammerSwingSequence = 0
-	self.cl.vrHammerSwingFreshTimer = 1.0
 	self.cl.vrNativeToolItem = nil
 	self.cl.vrHandFreshTimer = 1.0
 	self.cl.vrBridgeFreshTimer = 1.0
@@ -256,12 +258,17 @@ local function updateToolAim( self, data )
 	end
 	local hand = pose.hand
 
+	-- Keep the proven visual/per-item origin for throws, sprays and placements,
+	-- but take direction from OpenXR's semantic aim pose. Using the calibrated
+	-- glove orientation for generic actions caused hammer and dismantle rays to
+	-- hit near the feet on profiles whose grip and aim poses differ substantially.
+	local actionPose = resolveActionPose( data ) or pose
 	local actionOffset = VrActionLocalOffsets[activeItem] or { 0.000, -0.035, -0.120 }
 	g_vrActionActive = true
 	g_vrActionOrigin = handLocalPosition( pose, actionOffset )
-	g_vrActionDirection = pose.forward
-	g_vrActionUp = pose.up
-	g_vrActionRight = pose.right
+	g_vrActionDirection = actionPose.forward
+	g_vrActionUp = actionPose.up
+	g_vrActionRight = actionPose.right
 	g_vrPrimaryActionAvailable = true
 	g_vrPrimaryActionDown = hand.interact == true
 
@@ -328,9 +335,6 @@ function Chapter2VR.clientUpdate( self, dt )
 	self.cl.vrBridgeFreshTimer = ( self.cl.vrBridgeFreshTimer or 1.0 ) + dt
 	self.cl.vrGunFreshTimer = ( self.cl.vrGunFreshTimer or 1.0 ) + dt
 	g_vrBridgeFreshTimer = self.cl.vrBridgeFreshTimer
-	self.cl.vrHammerSwingFreshTimer = ( self.cl.vrHammerSwingFreshTimer or 1.0 ) + dt
-	g_vrHammerSwingFreshTimer = self.cl.vrHammerSwingFreshTimer
-	if self.cl.vrHammerSwingFreshTimer > 0.6 then g_vrHammerSwingDirection = nil end
 	if self.cl.vrGunFreshTimer > 0.12 then clearGunAim() end
 	if self.cl.vrHandFreshTimer > 0.8 then clearClientAim() end
 	self.cl.vrHandTimer = ( self.cl.vrHandTimer or 0.0 ) + dt
@@ -353,20 +357,6 @@ function Chapter2VR.clientUpdate( self, dt )
 		return
 	end
 	self.cl.vrHandSequence = data.sequence
-	if type( data.hammerSwingSequence ) == "number" and
-		data.hammerSwingSequence > ( self.cl.vrHammerSwingSequence or 0 ) then
-		self.cl.vrHammerSwingSequence = data.hammerSwingSequence
-		local swing = data.hammerSwingDirection
-		if type( swing ) == "table" and validNumber( swing.x ) and validNumber( swing.y ) and
-			validNumber( swing.z ) then
-			local direction = sm.vec3.new( swing.x, swing.y, swing.z )
-			if direction:length() > 0.5 then
-				g_vrHammerSwingDirection = direction:normalize()
-				self.cl.vrHammerSwingFreshTimer = 0.0
-				g_vrHammerSwingFreshTimer = 0.0
-			end
-		end
-	end
 	updateToolAim( self, data )
 	self.network:sendToServer( "sv_n_vrHandPhysics", data )
 end

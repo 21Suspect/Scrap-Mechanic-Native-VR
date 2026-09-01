@@ -124,7 +124,7 @@ def collect_manifest_history(root: Path, current: dict[str, object]) -> dict[str
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("game_root", type=Path)
-    parser.add_argument("--version", default="1.3.3-chapter2-20260901")
+    parser.add_argument("--version", default="1.3.5-chapter2-20260901")
     parser.add_argument(
         "--headset-confirmed",
         action="store_true",
@@ -147,21 +147,27 @@ def main() -> None:
     manifest["description"] = (
         "Scrap Mechanic Chapter 2 native OpenXR VR with tracked Quest Touch and Valve Index "
         "controllers, optional Quest optical hands, Custom Game content bridging, complete "
-        "held-item geometry, grouped live pose calibration, barrel-aimed weapons, spatial live "
-        "game menus, native queued UI input, transparent composition, and restrained haptics"
+        "held-item geometry, grouped live pose calibration, hand-aimed stock hammer and Use "
+        "actions, barrel-aimed weapons, spatial live game menus, native "
+        "queued UI input, transparent composition, and restrained haptics"
     )
 
-    adapter_paths = {
-        f"Survival\\Scripts\\game\\tools\\{name}": name for name in ADAPTER_FILES
+    managed_script_paths = {
+        f"Survival\\Scripts\\game\\tools\\{name}": "chapter2-vr-held-items"
+        for name in ADAPTER_FILES
     }
+    retired_script_paths = {"Survival\\Scripts\\game\\harvestable\\HarvestCore.lua"}
     existing_entries = {entry["path"]: entry for entry in manifest["files"]}
-    files = [entry for entry in manifest["files"] if entry["path"] not in adapter_paths]
+    files = [
+        entry for entry in manifest["files"]
+        if entry["path"] not in managed_script_paths and entry["path"] not in retired_script_paths
+    ]
     insert_at = next(
         (index for index, entry in enumerate(files) if entry["path"].endswith("Sledgehammer.lua")),
         len(files) - 1,
     ) + 1
     additions = []
-    for game_path, name in adapter_paths.items():
+    for game_path, module in managed_script_paths.items():
         patched = payload / Path(game_path.replace("\\", "/"))
         if not patched.is_file():
             raise FileNotFoundError(patched)
@@ -176,7 +182,7 @@ def main() -> None:
             "path": game_path,
             "patchedSha256": sha256(patched),
             "originalSha256": original_hashes,
-            "module": "chapter2-vr-held-items",
+            "module": module,
         })
     files[insert_at:insert_at] = additions
     manifest["files"] = files
@@ -248,6 +254,7 @@ def main() -> None:
     }
     for key, relative in source_paths.items():
         source_meta[key] = sha256(root / relative)
+    source_meta.pop("handRefineScriptSha256", None)
     source_meta["chapter2GameplayBridgeSha256"] = sha256(
         payload / "Survival" / "Scripts" / "game" / "Chapter2VR.lua"
     )
