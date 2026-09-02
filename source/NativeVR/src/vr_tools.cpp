@@ -115,6 +115,7 @@ namespace scrapvr::tools
 		ID3D11PixelShader *g_pixel_shader = nullptr;
 		ID3D11PixelShader *g_cutout_pixel_shader = nullptr;
 		ID3D11PixelShader *g_laser_pixel_shader = nullptr;
+		ID3D11PixelShader *g_target_pixel_shader = nullptr;
 		ID3D11InputLayout *g_input_layout = nullptr;
 		ID3D11SamplerState *g_sampler = nullptr;
 		ID3D11RasterizerState *g_rasterizer = nullptr;
@@ -1397,32 +1398,38 @@ namespace scrapvr::tools
 			float4 ps_cutout(VSOut input) : SV_TARGET { float4 c = tex.Sample(samp, input.uv);
 				clip(c.a - 0.08); return shade(input, c); }
 			float4 ps_laser(VSOut input) : SV_TARGET { return float4(1, 1, 1, 1); }
+			float4 ps_target(VSOut input) : SV_TARGET { return float4(1.0, 0.69, 0.08, 1.0); }
 		)";
 		HMODULE compiler = LoadLibraryW(L"d3dcompiler_47.dll");
 		using Compile = HRESULT (WINAPI *)(LPCVOID, SIZE_T, LPCSTR, const void *, void *, LPCSTR, LPCSTR, UINT, UINT, ID3DBlob **, ID3DBlob **);
 		auto compile = compiler ? reinterpret_cast<Compile>(GetProcAddress(compiler, "D3DCompile")) : nullptr;
-		ID3DBlob *vs = nullptr, *ps = nullptr, *cutout_ps = nullptr, *laser_ps = nullptr, *errors = nullptr;
+		ID3DBlob *vs = nullptr, *ps = nullptr, *cutout_ps = nullptr, *laser_ps = nullptr,
+			*target_ps = nullptr, *errors = nullptr;
 		if (!compile || FAILED(compile(shader, std::strlen(shader), "vr_tools", nullptr, nullptr, "vs_main", "vs_5_0", 0, 0, &vs, &errors))) { release(errors); if (compiler) FreeLibrary(compiler); return false; }
 		release(errors);
 		if (FAILED(compile(shader, std::strlen(shader), "vr_tools", nullptr, nullptr, "ps_main", "ps_5_0", 0, 0, &ps, &errors)) ||
 			FAILED(compile(shader, std::strlen(shader), "vr_tools", nullptr, nullptr, "ps_cutout", "ps_5_0", 0, 0, &cutout_ps, &errors)) ||
-			FAILED(compile(shader, std::strlen(shader), "vr_tools", nullptr, nullptr, "ps_laser", "ps_5_0", 0, 0, &laser_ps, &errors)))
-		{ release(errors); release(vs); release(ps); release(cutout_ps); release(laser_ps); if (compiler) FreeLibrary(compiler); return false; }
+			FAILED(compile(shader, std::strlen(shader), "vr_tools", nullptr, nullptr, "ps_laser", "ps_5_0", 0, 0, &laser_ps, &errors)) ||
+			FAILED(compile(shader, std::strlen(shader), "vr_tools", nullptr, nullptr, "ps_target", "ps_5_0", 0, 0, &target_ps, &errors)))
+		{ release(errors); release(vs); release(ps); release(cutout_ps); release(laser_ps); release(target_ps); if (compiler) FreeLibrary(compiler); return false; }
 		if (compiler) FreeLibrary(compiler);
 		if (FAILED(g_device->CreateVertexShader(vs->GetBufferPointer(), vs->GetBufferSize(), nullptr, &g_vertex_shader)) ||
 			FAILED(g_device->CreatePixelShader(ps->GetBufferPointer(), ps->GetBufferSize(), nullptr, &g_pixel_shader)) ||
 			FAILED(g_device->CreatePixelShader(cutout_ps->GetBufferPointer(), cutout_ps->GetBufferSize(), nullptr, &g_cutout_pixel_shader)) ||
-			FAILED(g_device->CreatePixelShader(laser_ps->GetBufferPointer(), laser_ps->GetBufferSize(), nullptr, &g_laser_pixel_shader))) return false;
+			FAILED(g_device->CreatePixelShader(laser_ps->GetBufferPointer(), laser_ps->GetBufferSize(), nullptr, &g_laser_pixel_shader)) ||
+			FAILED(g_device->CreatePixelShader(target_ps->GetBufferPointer(), target_ps->GetBufferSize(), nullptr, &g_target_pixel_shader))) return false;
 		D3D11_INPUT_ELEMENT_DESC elements[] = {
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 		};
 		if (FAILED(g_device->CreateInputLayout(elements, 3, vs->GetBufferPointer(), vs->GetBufferSize(), &g_input_layout))) return false;
-		release(vs); release(ps); release(cutout_ps); release(laser_ps); release(errors);
+		release(vs); release(ps); release(cutout_ps); release(laser_ps); release(target_ps); release(errors);
 		D3D11_BUFFER_DESC cb = {}; cb.ByteWidth = sizeof(Constants); cb.Usage = D3D11_USAGE_DEFAULT; cb.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 		if (FAILED(g_device->CreateBuffer(&cb, nullptr, &g_constant_buffer))) return false;
-		D3D11_BUFFER_DESC lb = {}; lb.ByteWidth = 2 * sizeof(Vertex); lb.Usage = D3D11_USAGE_DYNAMIC; lb.BindFlags = D3D11_BIND_VERTEX_BUFFER; lb.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		// One shared dynamic line buffer holds either the two-vertex tool pointer
+		// or the compact hand-aim ring (16 segments plus a center cross).
+		D3D11_BUFFER_DESC lb = {}; lb.ByteWidth = 36 * sizeof(Vertex); lb.Usage = D3D11_USAGE_DYNAMIC; lb.BindFlags = D3D11_BIND_VERTEX_BUFFER; lb.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 		if (FAILED(g_device->CreateBuffer(&lb, nullptr, &g_laser_buffer))) return false;
 		D3D11_SAMPLER_DESC sampler = {}; sampler.Filter = D3D11_FILTER_ANISOTROPIC; sampler.AddressU = sampler.AddressV = sampler.AddressW = D3D11_TEXTURE_ADDRESS_WRAP; sampler.MaxAnisotropy = 8; sampler.MaxLOD = D3D11_FLOAT32_MAX;
 		if (FAILED(g_device->CreateSamplerState(&sampler, &g_sampler))) return false;
@@ -1487,10 +1494,19 @@ namespace scrapvr::tools
 	}
 
 	bool render(ID3D11DeviceContext *context, ID3D11RenderTargetView *target, ID3D11DepthStencilView *depth,
-		uint32_t width, uint32_t height, const XrView &eye, const XrPosef &right_hand_pose, bool right_hand_active, bool right_firing)
+		uint32_t width, uint32_t height, const XrView &eye, const XrPosef &right_hand_pose,
+		bool right_hand_active, bool right_firing, const XrPosef &right_aim_pose,
+		bool right_aim_active, float right_target_distance, bool right_target_active)
 	{
 		if (!g_initialized || !context || !target || !depth) return false;
-		poll_active_tool(); if (g_render_suppressed || !right_hand_active || g_active_tool == Tool::none) return false;
+		poll_active_tool();
+		const bool target_marker = right_aim_active && right_target_active &&
+			std::isfinite(right_target_distance) && right_target_distance >= 0.05f &&
+			!has_projectile_aim(g_active_tool) &&
+			g_active_tool != Tool::connect && g_active_tool != Tool::paint &&
+			g_active_tool != Tool::weld;
+		if (g_render_suppressed || !right_hand_active ||
+			(g_active_tool == Tool::none && !target_marker)) return false;
 		poll_held_calibration();
 		if (g_active_tool == Tool::clay) poll_clay_calibration();
 		if (g_active_tool == Tool::catalog && !load_catalog_item(g_active_catalog_item)) return false;
@@ -1624,8 +1640,51 @@ namespace scrapvr::tools
 			context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 			context->PSSetShader(g_pixel_shader, nullptr, 0);
 		}
+		if (target_marker)
+		{
+			// The ring sits on Scrap Mechanic's actual world-ray hit. Its physical
+			// size scales with distance so it remains visually stable, and it stays
+			// a point marker rather than turning world interaction into a laser beam.
+			constexpr uint32_t segments = 16;
+			constexpr float pi = 3.14159265358979323846f;
+			const float distance = std::clamp(right_target_distance, 0.05f, 20.0f);
+			const float marker_depth = std::max(0.04f, distance - 0.012f);
+			const float radius = distance * 0.010f;
+			const float cross_radius = distance * 0.0033f;
+			Vertex marker[segments * 2 + 4]{};
+			for (uint32_t segment = 0; segment < segments; ++segment)
+			{
+				const float a0 = 2.0f * pi * static_cast<float>(segment) / static_cast<float>(segments);
+				const float a1 = 2.0f * pi * static_cast<float>(segment + 1) / static_cast<float>(segments);
+				marker[segment * 2] = {std::cos(a0) * radius, std::sin(a0) * radius,
+					-marker_depth, 0, 0, 1, 0, 0};
+				marker[segment * 2 + 1] = {std::cos(a1) * radius, std::sin(a1) * radius,
+					-marker_depth, 0, 0, 1, 0, 0};
+			}
+			marker[32] = {-cross_radius, 0, -marker_depth, 0, 0, 1, 0, 0};
+			marker[33] = { cross_radius, 0, -marker_depth, 0, 0, 1, 0, 0};
+			marker[34] = {0, -cross_radius, -marker_depth, 0, 0, 1, 0, 0};
+			marker[35] = {0,  cross_radius, -marker_depth, 0, 0, 1, 0, 0};
+			D3D11_MAPPED_SUBRESOURCE mapped = {};
+			if (SUCCEEDED(context->Map(g_laser_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped)))
+			{
+				std::memcpy(mapped.pData, marker, sizeof(marker));
+				context->Unmap(g_laser_buffer, 0);
+				const Matrix marker_model = pose_matrix(right_aim_pose);
+				Constants marker_constants = {multiply(view_projection, marker_model), marker_model,
+					{eye.pose.position.x, eye.pose.position.y, eye.pose.position.z, 1.0f}};
+				context->UpdateSubresource(g_constant_buffer, 0, nullptr, &marker_constants, 0, 0);
+				UINT stride = sizeof(Vertex), offset = 0;
+				context->IASetVertexBuffers(0, 1, &g_laser_buffer, &stride, &offset);
+				context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+				context->PSSetShader(g_target_pixel_shader, nullptr, 0);
+				context->Draw(static_cast<UINT>(std::size(marker)), 0);
+				context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+				context->PSSetShader(g_pixel_shader, nullptr, 0);
+			}
+		}
 		ID3D11ShaderResourceView *none = nullptr; context->PSSetShaderResources(0, 1, &none);
-		if (!g_render_logged && g_log) { g_render_logged = true; g_log("NATIVE VR TOOLS VISIBLE: selected tool uses the tracked-hand stereo pose and depth buffer; white pointers are limited to interaction tools"); }
+		if (!g_render_logged && g_log) { g_render_logged = true; g_log("NATIVE VR TOOLS VISIBLE: selected tool uses the tracked-hand stereo pose and depth buffer; world targeting uses a laser-free OpenXR aim marker; white pointers are limited to interaction tools"); }
 		return true;
 	}
 
@@ -1720,7 +1779,7 @@ namespace scrapvr::tools
 		release_catalog_draws();
 		release(g_alpha_blend_state); release(g_glass_depth_state); release(g_depth_state);
 		release(g_rasterizer); release(g_sampler); release(g_input_layout);
-		release(g_laser_pixel_shader); release(g_cutout_pixel_shader); release(g_pixel_shader);
+		release(g_target_pixel_shader); release(g_laser_pixel_shader); release(g_cutout_pixel_shader); release(g_pixel_shader);
 		release(g_vertex_shader); release(g_laser_buffer); release(g_constant_buffer);
 		g_device = nullptr; g_log = nullptr; g_game_root.clear(); g_active_tool = Tool::none;
 		g_active_variant = ItemVariant::none; g_active_catalog_item = -1; g_active_item_uuid.clear();

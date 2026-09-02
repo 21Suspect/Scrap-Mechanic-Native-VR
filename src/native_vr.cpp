@@ -43,6 +43,7 @@ constexpr uintptr_t kFirstPersonCameraCallerRva = 0x861320;
 constexpr uintptr_t kViewmodelSkipBranchRva = 0x861324;
 constexpr uintptr_t kRaycastRva = 0x478340;
 constexpr uintptr_t kPlayerToolRaycastReturnRva = 0x456FF2;
+constexpr uintptr_t kRaycastResultFractionStoreRva = 0x79B3F8;
 constexpr uint32_t kGameImageSize = 0x1C1D000;
 constexpr uint32_t kGameTimestamp = 0x6A7060DD;
 constexpr uintptr_t kFrameRendererOffset = 0x2A0;
@@ -70,6 +71,14 @@ constexpr uint8_t kViewmodelConditionalBranch[] = { 0x0F,0x84,0x58,0x03,0x00,0x0
 constexpr uint8_t kViewmodelUnconditionalSkip[] = { 0xE9,0x59,0x03,0x00,0x00,0x90 };
 constexpr uint8_t kRaycastPrefix[] = {
     0x48,0x8B,0xC4,0x48,0x89,0x58,0x10,0x48,0x89,0x70,0x18,0x48,0x89,0x78,0x20
+};
+constexpr uint8_t kPlayerToolRaycastCall[] = {
+    0x48,0x8D,0x87,0x30,0x04,0x00,0x00,0x48,0x89,0x44,0x24,0x28,
+    0x4C,0x89,0x6C,0x24,0x20,0x4C,0x8D,0x4C,0x24,0x68,0x4C,0x8D,
+    0x44,0x24,0x58,0x48,0x8B,0xCB,0xE8,0x4E,0x13,0x02,0x00
+};
+constexpr uint8_t kRaycastResultFractionStore[] = {
+    0x8B,0x47,0x08,0x89,0x83,0xF0,0x00,0x00,0x00
 };
 
 using RenderSetupFn = void (__fastcall *)(void *, float, const float *, const float *, void *);
@@ -198,6 +207,8 @@ XrVector3f g_right_aim_world{};
 XrVector3f g_right_aim_forward{};
 XrVector3f g_right_aim_up{};
 uint64_t g_right_aim_world_ms = 0;
+std::atomic<float> g_right_action_target_distance{0.0f};
+std::atomic<uint64_t> g_right_action_target_ms{0};
 struct NativeProjectilePose
 {
     bool authoritative = false;
@@ -746,6 +757,8 @@ void reset_hand_bridge(bool reset_session = false)
     g_right_hand_world_ms = 0;
     g_right_aim_world_active = false;
     g_right_aim_world_ms = 0;
+    g_right_action_target_distance.store(0.0f, std::memory_order_release);
+    g_right_action_target_ms.store(0, std::memory_order_release);
     set_native_projectile_pose(false, false);
 }
 
@@ -760,6 +773,8 @@ void deactivate_hand_bridge(bool vr_authoritative = false)
     g_right_hand_world_ms = 0;
     g_right_aim_world_active = false;
     g_right_aim_world_ms = 0;
+    g_right_action_target_distance.store(0.0f, std::memory_order_release);
+    g_right_action_target_ms.store(0, std::memory_order_release);
     set_native_projectile_pose(vr_authoritative, false);
 
     // A static inactive file is sufficient until tracking becomes active. Do not
@@ -1009,7 +1024,34 @@ uint8_t __fastcall hk_raycast(void *world, void *unused, const float *origin,
                         static_cast<unsigned long long>(kPlayerToolRaycastReturnRva),
                         calibrated_laser ? "calibrated_visible_tool" :
                             (runtime_aim_fresh ? "openxr_aim_pose" : "grip_fallback"));
-                return original(world, unused, redirected_origin, redirected_delta, ignore, result);
+                const uint8_t hit = original(
+                    world, unused, redirected_origin, redirected_delta, ignore, result);
+                // This build's validated player-ray result stores its normalized
+                // hit fraction at +0xF0. Convert it back to distance along the
+                // exact redirected OpenXR ray so the VR marker sits on the real
+                // selected surface instead of floating at an arbitrary depth.
+                uint8_t result_valid = 0;
+                float fraction = 0.0f;
+                if (!calibrated_laser && hit != 0 && result)
+                {
+                    std::memcpy(&result_valid, result, sizeof(result_valid));
+                    std::memcpy(&fraction,
+                        reinterpret_cast<const uint8_t *>(result) + 0xF0,
+                        sizeof(fraction));
+                }
+                if (!calibrated_laser && hit != 0 && result_valid != 0 &&
+                    std::isfinite(fraction) &&
+                    fraction >= 0.0f && fraction <= 1.0f)
+                {
+                    g_right_action_target_distance.store(
+                        std::max(0.05f, range * fraction), std::memory_order_release);
+                    g_right_action_target_ms.store(now, std::memory_order_release);
+                }
+                else if (!calibrated_laser)
+                {
+                    g_right_action_target_ms.store(0, std::memory_order_release);
+                }
+                return hit;
             }
         }
     }
@@ -2220,22 +2262,41 @@ struct OpenXrState
             nullptr, extension_count, &extension_count, extension_properties.data());
         if (XR_FAILED(result)) return fail("xrEnumerateInstanceExtensionProperties", result);
         bool hand_tracking_supported = false;
+        bool generic_controller_supported = false;
         for (const auto &extension : extension_properties)
+        {
             if (std::strcmp(extension.extensionName, XR_EXT_HAND_TRACKING_EXTENSION_NAME) == 0)
                 hand_tracking_supported = true;
+            else if (std::strcmp(extension.extensionName,
+                         XR_KHR_GENERIC_CONTROLLER_EXTENSION_NAME) == 0)
+                generic_controller_supported = true;
+        }
         std::vector<const char *> extensions{XR_KHR_D3D11_ENABLE_EXTENSION_NAME};
         if (g_feature_input_enabled && g_feature_optical_hands_enabled && hand_tracking_supported)
             extensions.push_back(XR_EXT_HAND_TRACKING_EXTENSION_NAME);
+        if (g_feature_input_enabled && generic_controller_supported)
+            extensions.push_back(XR_KHR_GENERIC_CONTROLLER_EXTENSION_NAME);
         XrInstanceCreateInfo instance_info{XR_TYPE_INSTANCE_CREATE_INFO};
         strcpy_s(instance_info.applicationInfo.applicationName, "Scrap Mechanic Native VR v1");
         instance_info.applicationInfo.applicationVersion = 1;
         strcpy_s(instance_info.applicationInfo.engineName, "Scrap Mechanic 1.0");
         instance_info.applicationInfo.engineVersion = 876;
-        instance_info.applicationInfo.apiVersion = XR_MAKE_VERSION(1,0,34);
+        bool openxr_11_enabled = true;
+        instance_info.applicationInfo.apiVersion = XR_MAKE_VERSION(1,1,0);
         instance_info.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
         instance_info.enabledExtensionNames = extensions.data();
         result = xrCreateInstance(&instance_info, &instance);
+        if (result == XR_ERROR_API_VERSION_UNSUPPORTED)
+        {
+            openxr_11_enabled = false;
+            instance_info.applicationInfo.apiVersion = XR_MAKE_VERSION(1,0,34);
+            result = xrCreateInstance(&instance_info, &instance);
+        }
         if (XR_FAILED(result)) return fail("xrCreateInstance", result);
+        log_line("XR_API_SELECTED version=%u.%u generic_controller_extension=%u",
+            XR_VERSION_MAJOR(instance_info.applicationInfo.apiVersion),
+            XR_VERSION_MINOR(instance_info.applicationInfo.apiVersion),
+            generic_controller_supported ? 1u : 0u);
 
         XrInstanceProperties properties{XR_TYPE_INSTANCE_PROPERTIES};
         result = xrGetInstanceProperties(instance, &properties);
@@ -2302,7 +2363,8 @@ struct OpenXrState
         input_config.vertical_turn_speed = static_cast<float>(
             GetPrivateProfileIntW(L"Features", L"VerticalTurnSpeed", 28, g_ini_path.c_str()));
         if (!g_input.initialize(instance, session, space, input_config,
-                hand_tracking_supported && g_feature_optical_hands_enabled))
+                hand_tracking_supported && g_feature_optical_hands_enabled,
+                openxr_11_enabled, generic_controller_supported))
             return fail("feature_input_initialize", XR_ERROR_INITIALIZATION_FAILED);
 
         uint32_t view_count = 0;
@@ -2786,11 +2848,22 @@ struct OpenXrState
         if (g_feature_hands_enabled &&
             (g_input.hand(0).active || g_input.hand(1).active))
         {
+            const uint64_t target_sample_ms =
+                g_right_action_target_ms.load(std::memory_order_acquire);
+            const uint64_t target_now_ms = GetTickCount64();
+            const float target_distance =
+                g_right_action_target_distance.load(std::memory_order_acquire);
+            const bool target_active = target_sample_ms != 0 &&
+                target_now_ms >= target_sample_ms &&
+                target_now_ms - target_sample_ms <= 250 &&
+                std::isfinite(target_distance) && target_distance >= 0.05f;
             for (uint32_t i = 0; i < 2; ++i)
             {
                 if (indices[i] >= eyes[i].render_targets.size() ||
                     !scrapvr::hands::render(context, eyes[i].render_targets[indices[i]],
-                        eyes[i].width, eyes[i].height, views[i]))
+                        eyes[i].width, eyes[i].height, views[i],
+                        g_input.pointer_pose(1), g_input.pointer_pose_active(1),
+                        target_distance, target_active))
                 {
                     if (!g_hands_render_failure_logged.exchange(true))
                         log_line("VR_FEATURE_HANDS_RENDER_FAILED eye=%u visual_stereo_continues=1", i);
@@ -3431,12 +3504,22 @@ bool validate_build()
     const void *entry = reinterpret_cast<const void *>(g_game_base + kRenderSetupRva);
     const void *camera_entry = reinterpret_cast<const void *>(g_game_base + kCameraBuildRva);
     const void *raycast_entry = reinterpret_cast<const void *>(g_game_base + kRaycastRva);
+    const void *player_raycast_call = reinterpret_cast<const void *>(
+        g_game_base + kPlayerToolRaycastReturnRva - sizeof(kPlayerToolRaycastCall));
+    const void *raycast_fraction_store = reinterpret_cast<const void *>(
+        g_game_base + kRaycastResultFractionStoreRva);
     const void *viewmodel_branch = reinterpret_cast<const void *>(g_game_base + kViewmodelSkipBranchRva);
     return readable(entry, sizeof(kRenderPrefix)) && std::memcmp(entry, kRenderPrefix, sizeof(kRenderPrefix)) == 0 &&
         readable(camera_entry, sizeof(kCameraBuildPrefix)) &&
         std::memcmp(camera_entry, kCameraBuildPrefix, sizeof(kCameraBuildPrefix)) == 0 &&
         readable(raycast_entry, sizeof(kRaycastPrefix)) &&
         std::memcmp(raycast_entry, kRaycastPrefix, sizeof(kRaycastPrefix)) == 0 &&
+        readable(player_raycast_call, sizeof(kPlayerToolRaycastCall)) &&
+        std::memcmp(player_raycast_call, kPlayerToolRaycastCall,
+            sizeof(kPlayerToolRaycastCall)) == 0 &&
+        readable(raycast_fraction_store, sizeof(kRaycastResultFractionStore)) &&
+        std::memcmp(raycast_fraction_store, kRaycastResultFractionStore,
+            sizeof(kRaycastResultFractionStore)) == 0 &&
         readable(viewmodel_branch, sizeof(kViewmodelConditionalBranch)) &&
         std::memcmp(viewmodel_branch, kViewmodelConditionalBranch, sizeof(kViewmodelConditionalBranch)) == 0;
 }

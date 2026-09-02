@@ -712,7 +712,9 @@ namespace scrapvr::hands
 		g_poses[hand].precise_fingers = precise;
 	}
 
-	bool render(ID3D11DeviceContext *context, ID3D11RenderTargetView *target, uint32_t width, uint32_t height, const XrView &eye)
+	bool render(ID3D11DeviceContext *context, ID3D11RenderTargetView *target, uint32_t width,
+		uint32_t height, const XrView &eye, const XrPosef &right_aim_pose,
+		bool right_aim_active, float right_target_distance, bool right_target_active)
 	{
 		if (!g_initialized || !context || !target || (!g_poses[0].active && !g_poses[1].active) || !create_depth(width, height)) return false;
 		ContextStateGuard preserved_state(context);
@@ -743,7 +745,9 @@ namespace scrapvr::hands
 			context->Draw(counts[hand], 0);
 		}
 		scrapvr::tools::render(context, target, g_depth_view, width, height, eye,
-			g_poses[1].pose, g_poses[1].active, g_poses[1].firing);
+			g_poses[1].pose, g_poses[1].active, g_poses[1].firing,
+			right_aim_pose, right_aim_active, right_target_distance,
+			right_target_active);
 		ID3D11ShaderResourceView *none = nullptr; context->PSSetShaderResources(0, 1, &none); context->OMSetRenderTargets(1, &target, nullptr);
 		if (!g_render_logged && g_log) { g_render_logged = true; g_log("VISIBLE TRACKED HANDS ACTIVE: mechanic glove geometry rendered independently into both stereo eyes"); }
 		return true;

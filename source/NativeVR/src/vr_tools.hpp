@@ -27,7 +27,11 @@ namespace scrapvr::tools
 		const XrView &eye,
 		const XrPosef &right_hand_pose,
 		bool right_hand_active,
-		bool right_firing);
+		bool right_firing,
+		const XrPosef &right_aim_pose,
+		bool right_aim_active,
+		float right_target_distance,
+		bool right_target_active);
 	// Returns the calibrated hand-local pointer origin only for the three native
 	// tools whose real engine hit-test must follow the visible VR laser.
 	bool get_interaction_laser_offset(XrVector3f &offset, XrVector3f *local_direction = nullptr);

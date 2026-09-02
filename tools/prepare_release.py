@@ -124,7 +124,7 @@ def collect_manifest_history(root: Path, current: dict[str, object]) -> dict[str
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("game_root", type=Path)
-    parser.add_argument("--version", default="1.3.5-chapter2-20260901")
+    parser.add_argument("--version", default="1.3.6-chapter2-20260902")
     parser.add_argument(
         "--headset-confirmed",
         action="store_true",
@@ -145,11 +145,12 @@ def main() -> None:
     historical_hashes = collect_manifest_history(root, manifest)
     manifest["patchVersion"] = args.version
     manifest["description"] = (
-        "Scrap Mechanic Chapter 2 native OpenXR VR with tracked Quest Touch and Valve Index "
-        "controllers, optional Quest optical hands, Custom Game content bridging, complete "
-        "held-item geometry, grouped live pose calibration, hand-aimed stock hammer and Use "
-        "actions, barrel-aimed weapons, spatial live game menus, native "
-        "queued UI input, transparent composition, and restrained haptics"
+        "Scrap Mechanic Chapter 2 native OpenXR VR with OpenXR 1.1 Meta Touch, legacy "
+        "Oculus Touch, Valve Index, and generic controller profiles, optional Quest optical "
+        "hands, Custom Game content bridging, complete held-item geometry, grouped live pose "
+        "calibration, hand-aimed world actions with a laser-free target marker, barrel-aimed "
+        "weapons, lift and inventory shortcuts, spatial live game menus, native queued "
+        "keyboard and pointer input, transparent composition, and restrained haptics"
     )
 
     managed_script_paths = {
@@ -230,6 +231,7 @@ def main() -> None:
         "startupMenuSha256": "src/feature_startup_menu.cpp",
         "startupMenuHeaderSha256": "src/feature_startup_menu.hpp",
         "vrHandsSha256": "source/NativeVR/src/vr_hands.cpp",
+        "vrHandsHeaderSha256": "source/NativeVR/src/vr_hands.hpp",
         "vrToolsSha256": "source/NativeVR/src/vr_tools.cpp",
         "vrToolsHeaderSha256": "source/NativeVR/src/vr_tools.hpp",
         "mechanicHandsAssetSha256": "source/NativeVR/src/mechanic_hands_asset.hpp",

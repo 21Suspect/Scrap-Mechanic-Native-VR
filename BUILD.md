@@ -38,9 +38,9 @@ Only use the payload with the exact executable hash documented in `README.md`. D
 
 The public artifact is `dist/ScrapMechanicVR-Installer.exe`. It validates its embedded patcher, manifest, native add-on, branded UI assets, soundtrack, and all 47 managed payload files before installation. Its four user actions are Install VR Mod, Uninstall VR Mod, Start VR, and Open Logs. Install automatically migrates a managed older/current build and verifies the completed installation. Uninstall removes managed current/older builds, restores backups, and verifies the result. Start VR requires the active OpenXR runtime to report a connected headset.
 
-Current version: `1.3.5-chapter2-20260901`
+Current version: `1.3.6-chapter2-20260902`
 
-The installer SHA-256 is recorded in `SHA256SUMS.txt`.
+Installer SHA-256: `721C708913E64AA90FE63D4455799AA3C1E7151402E4EBA2E07AA5C2D50A4B42` (also recorded in `SHA256SUMS.txt`).
 
 The payload includes a verified `Cache/Bundle/core_data.cbo` seed for the supported game build. This avoids Scrap Mechanic's unstable cold-cache compiler path on the first VR launch; the cache remains runtime-mutable and is backed up/restored like every other managed file.
 

@@ -50,7 +50,8 @@ class InputBridge
 {
 public:
     bool initialize(XrInstance instance, XrSession session, XrSpace base_space,
-                    const InputConfig &config, bool hand_tracking_extension_enabled);
+                    const InputConfig &config, bool hand_tracking_extension_enabled,
+                    bool openxr_11_enabled, bool generic_controller_enabled);
     void on_session_state(XrSessionState state);
     void set_startup_menu(bool visible, bool pointer_active);
     bool sync(XrTime display_time, const XrPosef &head_pose);
@@ -92,6 +93,8 @@ private:
     XrSessionState session_state_ = XR_SESSION_STATE_UNKNOWN;
     InputConfig config_{};
     bool initialized_ = false;
+    bool openxr_11_enabled_ = false;
+    bool generic_controller_enabled_ = false;
 
     XrActionSet action_set_ = XR_NULL_HANDLE;
     XrAction grip_pose_action_ = XR_NULL_HANDLE;
@@ -108,6 +111,8 @@ private:
     XrPath hand_paths_[2]{XR_NULL_PATH, XR_NULL_PATH};
     XrPath touch_profile_path_ = XR_NULL_PATH;
     XrPath index_profile_path_ = XR_NULL_PATH;
+    std::array<XrPath, 5> meta_touch_profile_paths_{};
+    XrPath generic_profile_path_ = XR_NULL_PATH;
     XrPath active_profile_paths_[2]{XR_NULL_PATH, XR_NULL_PATH};
     XrSpace hand_spaces_[2]{XR_NULL_HANDLE, XR_NULL_HANDLE};
     XrSpace aim_spaces_[2]{XR_NULL_HANDLE, XR_NULL_HANDLE};
@@ -139,6 +144,8 @@ private:
     bool key_zoom_out_ = false;
     bool key_inventory_ = false;
     bool key_menu_ = false;
+    bool key_lift_up_ = false;
+    bool key_lift_down_ = false;
     bool mouse_attack_ = false;
     bool mouse_secondary_ = false;
     bool startup_menu_visible_ = false;
@@ -161,7 +168,6 @@ private:
     bool recenter_latched_ = false;
     bool recenter_requested_ = false;
     bool input_active_logged_ = false;
-    bool input_suspended_logged_ = false;
     bool sync_failure_logged_ = false;
     bool controller_ui_trigger_was_down_ = false;
 	std::atomic<bool> right_use_down_{false};
@@ -169,6 +175,8 @@ private:
     bool left_primary_was_down_ = false;
     bool menu_was_down_ = false;
     bool b_was_down_ = false;
+    bool quick_transfer_was_down_ = false;
+    bool lift_axis_was_active_ = false;
     uint64_t game_ui_open_intent_until_ms_ = 0;
     uint64_t last_haptic_ms_[2]{};
     bool haptic_ready_logged_ = false;

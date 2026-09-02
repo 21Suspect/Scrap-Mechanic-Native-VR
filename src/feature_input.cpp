@@ -38,13 +38,6 @@ HWND game_window()
     return window;
 }
 
-bool game_has_foreground()
-{
-    DWORD process_id = 0;
-    GetWindowThreadProcessId(GetForegroundWindow(), &process_id);
-    return process_id == GetCurrentProcessId();
-}
-
 void focus_game_window()
 {
     if (HWND window = game_window(); window != nullptr)
@@ -54,12 +47,7 @@ void focus_game_window()
 bool send_key(WORD key, bool down, bool &state)
 {
     if (down == state) return true;
-    if (down && !game_has_foreground()) return false;
-    INPUT input{};
-    input.type = INPUT_KEYBOARD;
-    input.ki.wScan = static_cast<WORD>(MapVirtualKeyW(key, MAPVK_VK_TO_VSC));
-    input.ki.dwFlags = KEYEVENTF_SCANCODE | (down ? 0u : KEYEVENTF_KEYUP);
-    if (SendInput(1, &input, sizeof(input)) != 1) return false;
+    if (!EngineInputQueue::instance().queue_key(key,down)) return false;
     state = down;
     return true;
 }
@@ -67,7 +55,6 @@ bool send_key(WORD key, bool down, bool &state)
 bool send_mouse_button(uint32_t button, bool down, bool &state)
 {
     if (down == state) return true;
-    if (down && !game_has_foreground()) return false;
     if (!EngineInputQueue::instance().queue_mouse_button(button,down)) return false;
     state = down;
     return true;
@@ -75,7 +62,6 @@ bool send_mouse_button(uint32_t button, bool down, bool &state)
 
 void send_mouse_wheel(LONG delta)
 {
-    if (!game_has_foreground()) return;
     EngineInputQueue::instance().queue_mouse_wheel(delta);
 }
 
@@ -144,7 +130,8 @@ bool bend_angle(const XrHandJointLocationEXT *joints, XrHandJointEXT a,
 } // namespace
 
 bool InputBridge::initialize(XrInstance instance, XrSession session, XrSpace base_space,
-                             const InputConfig &config, bool hand_tracking_extension_enabled)
+                             const InputConfig &config, bool hand_tracking_extension_enabled,
+                             bool openxr_11_enabled, bool generic_controller_enabled)
 {
     shutdown();
     config_ = config;
@@ -156,6 +143,8 @@ bool InputBridge::initialize(XrInstance instance, XrSession session, XrSpace bas
     instance_ = instance;
     session_ = session;
     base_space_ = base_space;
+    openxr_11_enabled_ = openxr_11_enabled;
+    generic_controller_enabled_ = generic_controller_enabled;
     if (instance_ == XR_NULL_HANDLE || session_ == XR_NULL_HANDLE || base_space_ == XR_NULL_HANDLE)
         return false;
     if (!create_actions())
@@ -166,9 +155,10 @@ bool InputBridge::initialize(XrInstance instance, XrSession session, XrSpace bas
     }
     create_optical_trackers(hand_tracking_extension_enabled && config_.optical_hand_tracking);
     initialized_ = true;
-    log_line("VR_FEATURE_INPUT_READY controllers=oculus_touch,valve_index poses=1 locomotion=1 turn=1 buttons=1 recenter=1 haptics=%u strength=%.2f optical_hands=%u",
+    log_line("VR_FEATURE_INPUT_READY controllers=oculus_touch,meta_touch_1_1,valve_index,khr_generic poses=1 locomotion=1 turn=1 buttons=1 recenter=1 haptics=%u strength=%.2f optical_hands=%u openxr_1_1=%u generic_controller=%u",
         config_.haptics ? 1u : 0u, config_.haptic_strength,
-        optical_trackers_[0] != XR_NULL_HANDLE && optical_trackers_[1] != XR_NULL_HANDLE ? 1u : 0u);
+        optical_trackers_[0] != XR_NULL_HANDLE && optical_trackers_[1] != XR_NULL_HANDLE ? 1u : 0u,
+        openxr_11_enabled_ ? 1u : 0u, generic_controller_enabled_ ? 1u : 0u);
     return true;
 }
 
@@ -236,6 +226,22 @@ bool InputBridge::create_actions()
         !path("/user/hand/left/input/a/click", common[14]) ||
         !path("/user/hand/left/input/b/click", common[15])) return false;
 
+    if (openxr_11_enabled_)
+    {
+        constexpr const char *meta_profiles[5]{
+            "/interaction_profiles/meta/touch_plus_controller",
+            "/interaction_profiles/meta/touch_pro_controller",
+            "/interaction_profiles/meta/touch_controller_quest_2",
+            "/interaction_profiles/meta/touch_controller_quest_1_rift_s",
+            "/interaction_profiles/meta/touch_controller_rift_cv1"
+        };
+        for (size_t i = 0; i < std::size(meta_profiles); ++i)
+            if (!path(meta_profiles[i], meta_touch_profile_paths_[i])) return false;
+    }
+    if (generic_controller_enabled_ &&
+        !path("/interaction_profiles/khr/generic_controller", generic_profile_path_))
+        return false;
+
     XrPath touch[5]{};
     if (!path("/user/hand/left/input/x/click", touch[0]) ||
         !path("/user/hand/right/input/a/click", touch[1]) ||
@@ -248,6 +254,14 @@ bool InputBridge::create_actions()
         !path("/user/hand/right/input/b/click", index[1]) ||
         !path("/user/hand/left/input/system/click", index[2]) ||
         !path("/user/hand/left/input/trackpad/force", index[3])) return false;
+
+    XrPath generic[4]{};
+    if (generic_controller_enabled_ &&
+        (!path("/user/hand/left/input/primary/click", generic[0]) ||
+         !path("/user/hand/right/input/primary/click", generic[1]) ||
+         !path("/user/hand/left/input/secondary/click", generic[2]) ||
+         !path("/user/hand/right/input/secondary/click", generic[3])))
+        return false;
 
     const XrActionSuggestedBinding touch_bindings[19]{
         {grip_pose_action_, common[0]}, {grip_pose_action_, common[1]},
@@ -273,6 +287,17 @@ bool InputBridge::create_actions()
         {menu_button_action_, index[2]}, {index_menu_force_action_, index[3]},
         {haptic_action_, common[12]}, {haptic_action_, common[13]}
     };
+    const XrActionSuggestedBinding generic_bindings[18]{
+        {grip_pose_action_, common[0]}, {grip_pose_action_, common[1]},
+        {aim_pose_action_, common[2]}, {aim_pose_action_, common[3]},
+        {trigger_action_, common[4]}, {trigger_action_, common[5]},
+        {thumbstick_action_, common[6]}, {thumbstick_action_, common[7]},
+        {squeeze_action_, common[8]}, {squeeze_action_, common[9]},
+        {primary_button_action_, generic[0]}, {primary_button_action_, generic[1]},
+        {secondary_button_action_, generic[2]}, {secondary_button_action_, generic[3]},
+        {stick_click_action_, common[10]}, {stick_click_action_, common[11]},
+        {haptic_action_, common[12]}, {haptic_action_, common[13]}
+    };
     auto suggest = [&](const char *name, XrPath profile, const XrActionSuggestedBinding *bindings,
                        uint32_t count) -> bool {
         XrInteractionProfileSuggestedBinding suggested{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
@@ -293,7 +318,21 @@ bool InputBridge::create_actions()
         static_cast<uint32_t>(std::size(touch_bindings)));
     const bool index_available = suggest("valve_index", index_profile_path_, index_bindings,
         static_cast<uint32_t>(std::size(index_bindings)));
-    if (!touch_available && !index_available) return false;
+    bool meta_available = false;
+    if (openxr_11_enabled_)
+    {
+        constexpr const char *meta_names[5]{
+            "meta_touch_plus", "meta_touch_pro", "meta_touch_quest_2",
+            "meta_touch_quest_1_rift_s", "meta_touch_rift_cv1"
+        };
+        for (size_t i = 0; i < std::size(meta_names); ++i)
+            meta_available = suggest(meta_names[i], meta_touch_profile_paths_[i], touch_bindings,
+                static_cast<uint32_t>(std::size(touch_bindings))) || meta_available;
+    }
+    const bool generic_available = generic_controller_enabled_ &&
+        suggest("khr_generic", generic_profile_path_, generic_bindings,
+            static_cast<uint32_t>(std::size(generic_bindings)));
+    if (!touch_available && !index_available && !meta_available && !generic_available) return false;
 
     XrSessionActionSetsAttachInfo attach{XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO};
     attach.countActionSets = 1;
@@ -320,6 +359,13 @@ const char *InputBridge::interaction_profile_name(XrPath profile) const
 {
     if (profile == touch_profile_path_) return "oculus_touch";
     if (profile == index_profile_path_) return "valve_index";
+    constexpr const char *meta_names[5]{
+        "meta_touch_plus", "meta_touch_pro", "meta_touch_quest_2",
+        "meta_touch_quest_1_rift_s", "meta_touch_rift_cv1"
+    };
+    for (size_t i = 0; i < meta_touch_profile_paths_.size(); ++i)
+        if (profile != XR_NULL_PATH && profile == meta_touch_profile_paths_[i]) return meta_names[i];
+    if (profile != XR_NULL_PATH && profile == generic_profile_path_) return "khr_generic";
     if (profile == XR_NULL_PATH) return "none";
     return "other";
 }
@@ -754,22 +800,6 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         }
     }
 
-    // A focused OpenXR session may leave the desktop game window without the
-    // Windows foreground flag. UI input is queued directly into the game's
-    // private event buffer after pose synchronization, so keep sampling the
-    // controller while the startup/menu surface is active.
-    if (!game_has_foreground() && !startup_menu_visible_)
-    {
-        release_injected_input();
-        if (!input_suspended_logged_)
-        {
-            input_suspended_logged_ = true;
-            log_line("VR_INPUT_SUSPENDED reason=game_not_foreground");
-        }
-        return;
-    }
-    input_suspended_logged_ = false;
-
     const bool recenter_down = left_click && right_click;
     const uint64_t now = GetTickCount64();
     if (input_rearm_required_)
@@ -844,6 +874,9 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     const bool left_trigger = hands_[0].optical ? optical_pinch_down_[0] : trigger[0] > 0.55f;
     const bool right_trigger_pressed=right_trigger && !right_primary_was_down_;
     const bool left_trigger_pressed=left_trigger && !left_primary_was_down_;
+    const bool right_grip = squeeze[1] > 0.55f;
+    const bool either_grip = right_grip || squeeze[0] > 0.55f;
+    const bool quick_transfer = startup_menu_visible_ && a && either_grip;
     right_use_down_ = !startup_menu_visible_ && b;
     if (startup_menu_visible_)
     {
@@ -854,7 +887,10 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         send_key('S', false, key_backward_);
         send_key('A', false, key_left_);
         send_key('D', false, key_right_);
-        send_key(VK_SHIFT, false, key_sprint_);
+        // Scrap Mechanic already implements quick inventory transfer as
+        // Shift+click. Keep the modifier inside the same private input queue as
+        // the panel click, so Grip+A works without synthesizing desktop input.
+        send_key(VK_SHIFT, quick_transfer, key_sprint_);
         send_key(VK_CONTROL, false, key_crouch_);
         send_key(VK_SPACE, false, key_jump_);
         send_key('E', false, key_use_);
@@ -863,6 +899,8 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         send_key('X', false, key_zoom_in_);
         send_key('C', false, key_zoom_out_);
         send_key('I', false, key_inventory_);
+        send_key(VK_UP, false, key_lift_up_);
+        send_key(VK_DOWN, false, key_lift_down_);
         send_key(VK_ESCAPE, menu, key_menu_);
         // UI selection must react to the current controller trigger sample. Waiting
         // for the gameplay-oriented debouncer made controller clicks dependent
@@ -871,6 +909,11 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         // this does not synthesize any Windows mouse input.
         const bool controller_ui_trigger = !hands_[1].optical && trigger_active[1] && right_trigger;
         ui_select_down_ = controller_ui_trigger || optical_pinch_down_[1] || a;
+        if (quick_transfer && !quick_transfer_was_down_)
+        {
+            pulse_haptic(1,0.08f,15,78.0f);
+            log_line("VR_QUICK_TRANSFER source=grip+A route=engine_shift_click");
+        }
         if (controller_ui_trigger != controller_ui_trigger_was_down_)
         {
             controller_ui_trigger_was_down_ = controller_ui_trigger;
@@ -893,6 +936,8 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         left_primary_was_down_=left_trigger;
         menu_was_down_=menu;
         b_was_down_=b;
+        quick_transfer_was_down_=quick_transfer;
+        lift_axis_was_active_=false;
         return;
     }
     ui_select_down_ = false;
@@ -921,6 +966,10 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     }
 
     const float deadzone = std::clamp(config_.stick_deadzone, 0.05f, 0.95f);
+    const bool player_seated = scrapvr::tools::is_player_seated();
+    const bool player_first_person = scrapvr::tools::is_player_first_person();
+    const bool lift_axis_active = !player_seated && right_grip &&
+        std::fabs(turn.y) > deadzone && std::fabs(turn.y) >= std::fabs(turn.x);
     send_key('W', stable_move.y > deadzone, key_forward_);
     send_key('S', stable_move.y < -deadzone, key_backward_);
     send_key('A', stable_move.x < -deadzone, key_left_);
@@ -932,7 +981,17 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     const scrapvr::tools::ContextAction context_action = scrapvr::tools::active_context_action();
     const bool contextual_b = b && context_action != scrapvr::tools::ContextAction::none;
     send_key('Q', contextual_b, key_context_);
+    send_key(VK_UP, lift_axis_active && turn.y > 0.0f, key_lift_up_);
+    send_key(VK_DOWN, lift_axis_active && turn.y < 0.0f, key_lift_down_);
     send_key(VK_ESCAPE, menu, key_menu_);
+    if (lift_axis_active && !lift_axis_was_active_)
+    {
+        pulse_haptic(1,0.07f,14,72.0f);
+        log_line("VR_LIFT_CONTROL source=right_grip+right_stick direction=%s",
+            turn.y > 0.0f ? "raise" : "lower");
+    }
+    lift_axis_was_active_ = lift_axis_active;
+    quick_transfer_was_down_ = false;
     if (b && !b_was_down_)
     {
         pulse_haptic(1,0.08f,14,70.0f);
@@ -963,8 +1022,6 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     if (left_trigger_pressed)
         pulse_haptic(0,0.07f,12,70.0f);
 
-    const bool player_seated = scrapvr::tools::is_player_seated();
-    const bool player_first_person = scrapvr::tools::is_player_first_person();
     // The old mod's seated path is intentionally edge based: hold V only until
     // Lua reports first-person, so entering a seat cannot repeatedly cycle the
     // game's camera modes. X/Y become the game's X/C vehicle zoom bindings.
@@ -1036,6 +1093,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     };
     float horizontal = shaped_stick(turn.x);
     float vertical = shaped_stick(turn.y);
+    if (lift_axis_active) vertical = 0.0f;
     if (std::fabs(horizontal) >= std::fabs(vertical)) vertical = 0.0f;
     else horizontal = 0.0f;
     // The public turn-speed values were calibrated as mouse pixels per update
@@ -1064,7 +1122,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     if (!input_active_logged_)
     {
         input_active_logged_ = true;
-        log_line("VR_INPUT_ACTIVE mapping=openxr_controller left_profile=%s right_profile=%s locomotion=hmd_relative turn=right_stick_smooth_time_normalized triggers=mouse buttons=right_A_jump,right_B_use+context_Q,left_X_Y_hotbar_or_seated_zoom,left_Y_hold_or_X+Y_inventory,menu=dedicated_or_index_trackpad recenter=dual_stick_1s",
+        log_line("VR_INPUT_ACTIVE mapping=openxr_controller left_profile=%s right_profile=%s locomotion=hmd_relative turn=right_stick_smooth_time_normalized triggers=mouse buttons=right_A_jump,right_B_use+context_Q,left_X_Y_hotbar_or_seated_zoom,left_Y_hold_or_X+Y_inventory,right_grip+stick_lift,grip+A_quick_transfer menu=dedicated_or_index_trackpad recenter=dual_stick_1s route=private_input_event_queue",
             interaction_profile_name(active_profile_paths_[0]),
             interaction_profile_name(active_profile_paths_[1]));
     }
@@ -1085,6 +1143,8 @@ void InputBridge::release_injected_input()
     send_key('X', false, key_zoom_in_);
     send_key('C', false, key_zoom_out_);
     send_key('I', false, key_inventory_);
+    send_key(VK_UP, false, key_lift_up_);
+    send_key(VK_DOWN, false, key_lift_down_);
     send_key(VK_ESCAPE, false, key_menu_);
     send_mouse_button(0,false,mouse_attack_);
     send_mouse_button(1,false,mouse_secondary_);
@@ -1098,6 +1158,8 @@ void InputBridge::release_injected_input()
     last_turn_update_ms_ = 0;
     turn_residual_x_ = turn_residual_y_ = 0.0f;
     right_primary_was_down_=left_primary_was_down_=menu_was_down_=b_was_down_=false;
+    quick_transfer_was_down_=false;
+    lift_axis_was_active_=false;
 }
 
 bool InputBridge::consume_recenter_request()
@@ -1115,7 +1177,6 @@ void InputBridge::reset_runtime_state()
     recenter_latched_ = false;
     recenter_requested_ = false;
     input_active_logged_ = false;
-    input_suspended_logged_ = false;
     sync_failure_logged_ = false;
     active_profile_paths_[0] = active_profile_paths_[1] = XR_NULL_PATH;
     hand_pose_logged_[0] = hand_pose_logged_[1] = false;
@@ -1179,7 +1240,10 @@ void InputBridge::shutdown()
     primary_button_action_ = secondary_button_action_ = stick_click_action_ = menu_button_action_ =
         index_menu_force_action_ = haptic_action_ = XR_NULL_HANDLE;
     hand_paths_[0] = hand_paths_[1] = XR_NULL_PATH;
-    touch_profile_path_ = index_profile_path_ = XR_NULL_PATH;
+    touch_profile_path_ = index_profile_path_ = generic_profile_path_ = XR_NULL_PATH;
+    meta_touch_profile_paths_.fill(XR_NULL_PATH);
+    openxr_11_enabled_ = false;
+    generic_controller_enabled_ = false;
     create_hand_tracker_ = nullptr;
     destroy_hand_tracker_ = nullptr;
     locate_hand_joints_ = nullptr;

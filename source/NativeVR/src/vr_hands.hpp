@@ -26,6 +26,10 @@ namespace scrapvr::hands
 		ID3D11RenderTargetView *target,
 		uint32_t width,
 		uint32_t height,
-		const XrView &eye);
+		const XrView &eye,
+		const XrPosef &right_aim_pose,
+		bool right_aim_active,
+		float right_target_distance,
+		bool right_target_active);
 	void shutdown();
 }

@@ -29,6 +29,7 @@ constexpr uint32_t kExpectedImageSize = 0x01C1D000;
 // Exact RVAs ported by instruction-level comparison between the archived
 // 0.7.4.778 executable used by the working GitHub mod and Steam build 24529696.
 constexpr uintptr_t kInputManagerPointerRva = 0x01A62708;
+constexpr uintptr_t kKeyboardEventRva = 0x0061A2F0;
 constexpr uintptr_t kMouseDownRva = 0x0061A520;
 constexpr uintptr_t kMouseUpRva = 0x0061A600;
 constexpr uintptr_t kMouseMoveRva = 0x0061A6F0;
@@ -37,6 +38,7 @@ constexpr size_t kEventQueueOffset = 0x1E0;
 
 using MouseButtonFunction = void (*)(void *, int, int);
 using MouseMoveFunction = void (*)(void *, int, int, int, int, int);
+using KeyboardEventFunction = void (*)(void *, int, int, int, bool, uint16_t, int);
 using QueueEventFunction = void (*)(void *, const void *);
 
 // Binary layout copied by kQueueEventRva. The +0x08 region is an empty MSVC
@@ -114,6 +116,14 @@ bool EngineInputQueue::validate_build_layout()
     // Prologues plus event-construction sites prove both the entry points and
     // their semantics. Relative call/cookie displacements are intentionally not
     // included, since their targets are independently checked below.
+    const bool keyboard_ok =
+        bytes_equal(base, kKeyboardEventRva, 0x00,
+            std::array<uint8_t, 18>{0x81,0xFA,0xFF,0x00,0x00,0x00,0x0F,0x84,0x1F,
+                0x01,0x00,0x00,0x55,0x53,0x56,0x57,0x41,0x56}) &&
+        bytes_equal(base, kKeyboardEventRva, 0x71,
+            std::array<uint8_t, 4>{0x44,0x89,0x75,0xCF}) &&
+        bytes_equal(base, kKeyboardEventRva, 0xAD,
+            std::array<uint8_t, 7>{0x48,0x8D,0x8F,0xE0,0x01,0x00,0x00});
     const bool down_ok =
         bytes_equal(base, kMouseDownRva, 0x00,
             std::array<uint8_t, 6>{0x40,0x53,0x48,0x83,0xEC,0x70}) &&
@@ -142,12 +152,13 @@ bool EngineInputQueue::validate_build_layout()
         std::array<uint8_t, 20>{0x48,0x89,0x5C,0x24,0x10,0x48,0x89,0x6C,0x24,0x18,
             0x48,0x89,0x74,0x24,0x20,0x57,0x48,0x83,0xEC,0x20});
     const bool pointer_ok = readable_address(base + kInputManagerPointerRva, sizeof(void *));
-    layout_valid_ = down_ok && up_ok && move_ok && queue_ok && pointer_ok;
+    layout_valid_ = keyboard_ok && down_ok && up_ok && move_ok && queue_ok && pointer_ok;
     if (!layout_valid_ && !invalid_logged_)
     {
         invalid_logged_ = true;
-        log_line("VR_UI_ENGINE_INPUT_REJECTED build_layout_mismatch down=%u up=%u move=%u queue=%u pointer=%u win32_fallback=0",
-            down_ok?1u:0u,up_ok?1u:0u,move_ok?1u:0u,queue_ok?1u:0u,pointer_ok?1u:0u);
+        log_line("VR_UI_ENGINE_INPUT_REJECTED build_layout_mismatch keyboard=%u down=%u up=%u move=%u queue=%u pointer=%u win32_fallback=0",
+            keyboard_ok?1u:0u,down_ok?1u:0u,up_ok?1u:0u,move_ok?1u:0u,
+            queue_ok?1u:0u,pointer_ok?1u:0u);
     }
     return layout_valid_;
 }
@@ -186,12 +197,43 @@ bool EngineInputQueue::queue_mouse_move(int delta_x, int delta_y, int client_x, 
     if (!active_logged_)
     {
         active_logged_ = true;
-        log_line("VR_UI_ENGINE_INPUT_ACTIVE route=private_input_event_queue move_rva=%08llx down_rva=%08llx up_rva=%08llx manager_rva=%08llx win32_mouse_simulation=0",
+        log_line("VR_UI_ENGINE_INPUT_ACTIVE route=private_input_event_queue keyboard_rva=%08llx move_rva=%08llx down_rva=%08llx up_rva=%08llx manager_rva=%08llx win32_input_simulation=0",
+            static_cast<unsigned long long>(kKeyboardEventRva),
             static_cast<unsigned long long>(kMouseMoveRva),
             static_cast<unsigned long long>(kMouseDownRva),
             static_cast<unsigned long long>(kMouseUpRva),
             static_cast<unsigned long long>(kInputManagerPointerRva));
     }
+    return true;
+}
+
+bool EngineInputQueue::queue_key(uint32_t virtual_key, bool down)
+{
+    void *manager = input_manager();
+    if (!manager || virtual_key >= 0x100) return false;
+
+    uint32_t modifier_bit = 0;
+    if (virtual_key == VK_SHIFT || virtual_key == VK_LSHIFT || virtual_key == VK_RSHIFT)
+        modifier_bit = 1;
+    else if (virtual_key == VK_CONTROL || virtual_key == VK_LCONTROL || virtual_key == VK_RCONTROL)
+        modifier_bit = 2;
+    else if (virtual_key == VK_MENU || virtual_key == VK_LMENU || virtual_key == VK_RMENU)
+        modifier_bit = 4;
+    if (modifier_bit != 0)
+    {
+        if (down) keyboard_modifiers_ |= modifier_bit;
+        else keyboard_modifiers_ &= ~modifier_bit;
+    }
+
+    const UINT scan_code_ex = MapVirtualKeyW(virtual_key, MAPVK_VK_TO_VSC_EX);
+    const bool extended = (scan_code_ex & 0xFF00u) != 0;
+    int scan_code = static_cast<int>(scan_code_ex & 0xFFu);
+    if (extended) scan_code |= 0x80;
+
+    auto *base = reinterpret_cast<uint8_t *>(GetModuleHandleW(nullptr));
+    reinterpret_cast<KeyboardEventFunction>(base + kKeyboardEventRva)(
+        manager, static_cast<int>(virtual_key), scan_code,
+        static_cast<int>(keyboard_modifiers_), extended, 0, down ? 0 : 1);
     return true;
 }
 
@@ -216,7 +258,7 @@ bool EngineInputQueue::queue_mouse_button(uint32_t button, bool down)
     auto *base = reinterpret_cast<uint8_t *>(GetModuleHandleW(nullptr));
     const uintptr_t rva = down ? kMouseDownRva : kMouseUpRva;
     reinterpret_cast<MouseButtonFunction>(base + rva)(
-        manager, static_cast<int>(button), 0);
+        manager, static_cast<int>(button), static_cast<int>(keyboard_modifiers_));
     return true;
 }
 
