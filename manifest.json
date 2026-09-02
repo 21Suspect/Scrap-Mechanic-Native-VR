@@ -1,8 +1,8 @@
 {
   "formatVersion": 1,
   "patchId": "scrap-mechanic-native-vr-chapter2",
-  "patchVersion": "1.3.6-chapter2-20260902",
-  "description": "Scrap Mechanic Chapter 2 native OpenXR VR with OpenXR 1.1 Meta Touch, legacy Oculus Touch, Valve Index, and generic controller profiles, optional Quest optical hands, Custom Game content bridging, complete held-item geometry, grouped live pose calibration, hand-aimed world actions with a laser-free target marker, barrel-aimed weapons, lift and inventory shortcuts, spatial live game menus, native queued keyboard and pointer input, transparent composition, and restrained haptics",
+  "patchVersion": "1.3.7-chapter2-20260902",
+  "description": "Scrap Mechanic Chapter 2 native OpenXR VR with OpenXR 1.1 Meta Touch, legacy Oculus Touch, Valve Index, and generic controller profiles, optional Quest optical hands, Custom Game content bridging, complete held-item geometry, grouped live pose calibration, hand-aimed world actions with a laser-free target marker, barrel-aimed weapons, binding-aware lift and inventory shortcuts, spatial live game menus, native queued keyboard and pointer input, transparent composition, and restrained haptics",
   "game": {
     "appId": "387990",
     "buildId": "24529696",
@@ -17,10 +17,13 @@
   "files": [
     {
       "path": "Cache\\Bundle\\core_data.cbo",
-      "patchedSha256": "DE9FA6FFB77C9CD531F958FE7E287C2B41B820220B19D5954407135FDE65C021",
+      "patchedSha256": "1510D7B8F4C97F6C8C2316373D435296175F8F3EDEEAF70B70FBDD9D1D0A6F55",
       "originalMayBeMissing": true,
       "runtimeMutable": true,
-      "module": "chapter2-prebuilt-game-data-cache"
+      "module": "chapter2-prebuilt-game-data-cache",
+      "historicalPatchedSha256": [
+        "DE9FA6FFB77C9CD531F958FE7E287C2B41B820220B19D5954407135FDE65C021"
+      ]
     },
     {
       "path": "Release\\dxgi.dll",
@@ -55,19 +58,20 @@
     },
     {
       "path": "Release\\ScrapMechanicVR.ini",
-      "patchedSha256": "0E915E2854A0CCE817CB9499A22527F3E14CF921EBCEFF4C812B357E4E027C74",
+      "patchedSha256": "0873D3D8E408BED763F8BCB015379D00AC0A577E1A5E142E201EC8E9788FF8B0",
       "originalMayBeMissing": true,
       "runtimeMutable": true,
       "module": "chapter2-vr-config",
       "historicalPatchedSha256": [
         "04EAE168F3D5F71BF819C5A6F18421B5D69B808F2DF98B298780F6A9D767DC50",
+        "0E915E2854A0CCE817CB9499A22527F3E14CF921EBCEFF4C812B357E4E027C74",
         "2C7EB5FE1CEED68B3CCBEAB98E35550B7BDB84E09DA49455D00626A2B6C14BE3",
         "844190C4EF4CAF3BC17F1F84E861F936DF21496E32324337EC6EC01CAE553D7F"
       ]
     },
     {
       "path": "Release\\smvr_native_vr_v1.addon64",
-      "patchedSha256": "949F3CA23025C8383B1DD38C92573DFBB16C5C0D95F46136D137B3118CFD97D7",
+      "patchedSha256": "05D0E61FFCCBCA6CAA70E309D6DDCD52331EAE55171EA7A530DF4CB86989937A",
       "originalMayBeMissing": true,
       "module": "chapter2-native-openxr",
       "historicalPatchedSha256": [
@@ -90,8 +94,10 @@
         "8C5744E65EC66492BA437A384A89A6F18A77CE2F9D95A2713EE7A1F6C53F1AF1",
         "8C654685A6DAB31D33A1D63B66423EDF24D84579B274B04217CCFA9A737ED052",
         "8FDAEF6FD3D97E51352CA3ED249F7E1EC39D15600FAB6FF97DCE20B593F1DCA0",
+        "949F3CA23025C8383B1DD38C92573DFBB16C5C0D95F46136D137B3118CFD97D7",
         "C52AE1EBBB7308EFADAC050EE14C5A189DAB5CA0AB06DBC01D2AB115C6C1CBE1",
         "C750B8DA83FC7ABAB6227B5FAC39ED22F1A7313492BE5CBD92F11E40E93D12CD",
+        "CA39F915C53BF6E73A3D7C5C30F37365E23DC7FC9E4B283B8912503F14E40164",
         "CBDD5FC0BE29910F70CDD26A420D613E9F00B55C8C68D8367096B3BCE38C2911",
         "D159E830D15841843D86794D14041311C4D7BB78D9F298AF006A6F4595B09A68",
         "D8E6D070BEE66A7626944FC82291558445EEAA8BDD0B2A1DC2A2D86CF187747F",
@@ -160,7 +166,7 @@
     },
     {
       "path": "Survival\\Scripts\\game\\Chapter2VR.lua",
-      "patchedSha256": "D8A31D8BFF1F17FF4A57585F8453B2AD551F9FD2B478A549F7859C70846C3A80",
+      "patchedSha256": "D466A960120E54127EC9443A0A9AE04AB59ED77D5BC81A271C0607405943002B",
       "originalMayBeMissing": true,
       "module": "chapter2-gameplay-bridge",
       "historicalPatchedSha256": [
@@ -181,6 +187,7 @@
         "C39115B5E83D8D4E04DDB9FC4F8D933A3935DEA148BE8F93F8517DDF7A0D968D",
         "CDF41B427C1C598113DB1BA788359D8518B08C8EEF75F95FF1110632690E5B97",
         "D58F6D407D01DF578A51DC3607018CA50F8AD5717472A1FC360029B88E5F0C16",
+        "D8A31D8BFF1F17FF4A57585F8453B2AD551F9FD2B478A549F7859C70846C3A80",
         "DE8918DB540BDB32042A79078A5A78AA5613D0B960F47C9A369E0B5304181452"
       ]
     },

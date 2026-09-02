@@ -17,23 +17,23 @@ using Microsoft.Win32;
 [assembly: AssemblyDescription("Installer, verifier, repair manager, and restorer for Scrap Mechanic Chapter 2 VR")]
 [assembly: AssemblyCompany("Scrap Mechanic VR Community Project")]
 [assembly: AssemblyProduct("Scrap Mechanic VR Chapter 2")]
-[assembly: AssemblyVersion("1.3.6.0")]
-[assembly: AssemblyFileVersion("1.3.6.0")]
+[assembly: AssemblyVersion("1.3.7.0")]
+[assembly: AssemblyFileVersion("1.3.7.0")]
 
 namespace ScrapMechanicVRPatcher
 {
     internal static class BuildInfo
     {
-        internal const string Version = "1.3.6-chapter2-20260902";
+        internal const string Version = "1.3.7-chapter2-20260902";
         internal const string GameBuild = "24529696";
         internal const string GameExeHash = "5D663BA2EC5DC8C7ABEFCC5C9344AE86F0A066C4069A91F54833524AC9A5B4F5";
-        internal const string AddonHash = "949F3CA23025C8383B1DD38C92573DFBB16C5C0D95F46136D137B3118CFD97D7";
+        internal const string AddonHash = "05D0E61FFCCBCA6CAA70E309D6DDCD52331EAE55171EA7A530DF4CB86989937A";
         internal const string DxgiHash = "EC9245D05C11751F2AC0D2256E6921AD8FB36BE9172EF6D587856591EB729A25";
         internal const string LoaderHash = "018C6519AFBDEADE6DA9E7D59C406068DD58674D87A65AE27353484A05E6674A";
         internal const string MusicHash = "02E8E98721A899C2731ED8AFDF6378DB98DC09BB87FA5896FBA911CE5D875660";
         internal const string LogoHash = "C692A16C8CB01B94618951C09F64A156D7DD6A71D349B91E023B018165504C34";
-        internal const string ManifestHash = "5908931BCF68AC07AA29E3F1D49D547FD667965A91A96926DA4A6D1EBEA1DC97";
-        internal const string PatcherHash = "7DA69B2FB835E7166C2E58A4FD4CF4D758BC8BF56EA3D3BEE212CB0A3A2CD911";
+        internal const string ManifestHash = "F916FF5863176EDAFFF6D7DA230706394663CB6F195377104AD9940297050B60";
+        internal const string PatcherHash = "5BB08B616A7FC9F2FB55A55BBD262F5895670DBAF0C70DA62387B4F966242060";
         internal const int ManagedFileCount = 47;
         internal const string ResourceName = "ScrapMechanicVR.Payload.zip";
     }

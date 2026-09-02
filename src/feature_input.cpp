@@ -3,7 +3,11 @@
 #include "vr_tools.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstdlib>
+#include <string>
+#include <vector>
 
 namespace smvr
 {
@@ -17,6 +21,122 @@ namespace
 constexpr uint32_t kHandCount = 2;
 constexpr uint64_t kInventoryHoldMilliseconds = 420;
 constexpr float kTurnReferenceRateHz = 72.0f;
+constexpr uint64_t kKeybindRefreshMilliseconds = 2000;
+
+struct LiftBindings
+{
+    WORD up = VK_UP;
+    WORD down = VK_DOWN;
+    bool loaded = false;
+};
+
+uint64_t file_time_value(const FILETIME &time)
+{
+    ULARGE_INTEGER value{};
+    value.LowPart = time.dwLowDateTime;
+    value.HighPart = time.dwHighDateTime;
+    return value.QuadPart;
+}
+
+bool latest_keybind_file(std::wstring &path)
+{
+    wchar_t app_data[MAX_PATH]{};
+    const DWORD length = GetEnvironmentVariableW(L"APPDATA", app_data, MAX_PATH);
+    if (length == 0 || length >= MAX_PATH) return false;
+    const std::wstring user_root = std::wstring(app_data) +
+        L"\\Axolot Games\\Scrap Mechanic\\User";
+    WIN32_FIND_DATAW user_data{};
+    const std::wstring pattern = user_root + L"\\User_*";
+    HANDLE search = FindFirstFileW(pattern.c_str(), &user_data);
+    if (search == INVALID_HANDLE_VALUE) return false;
+
+    uint64_t newest = 0;
+    do
+    {
+        if ((user_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) continue;
+        const std::wstring candidate = user_root + L"\\" + user_data.cFileName +
+            L"\\keybinds.json";
+        WIN32_FILE_ATTRIBUTE_DATA attributes{};
+        if (!GetFileAttributesExW(candidate.c_str(), GetFileExInfoStandard, &attributes) ||
+            (attributes.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) continue;
+        const uint64_t modified = file_time_value(attributes.ftLastWriteTime);
+        if (path.empty() || modified > newest)
+        {
+            path = candidate;
+            newest = modified;
+        }
+    }
+    while (FindNextFileW(search, &user_data));
+    FindClose(search);
+    return !path.empty();
+}
+
+bool read_small_text_file(const std::wstring &path, std::string &text)
+{
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return false;
+    LARGE_INTEGER size{};
+    const bool valid_size = GetFileSizeEx(file, &size) && size.QuadPart > 0 &&
+        size.QuadPart <= 4 * 1024 * 1024;
+    if (!valid_size)
+    {
+        CloseHandle(file);
+        return false;
+    }
+    text.resize(static_cast<size_t>(size.QuadPart));
+    DWORD read = 0;
+    const bool success = ReadFile(file, text.data(), static_cast<DWORD>(text.size()),
+        &read, nullptr) && read == text.size();
+    CloseHandle(file);
+    if (!success) text.clear();
+    return success;
+}
+
+bool parse_action_key(const std::string &json, const char *action, WORD &key)
+{
+    const std::string token = std::string("\"") + action + "\"";
+    const size_t action_at = json.find(token);
+    if (action_at == std::string::npos) return false;
+    const size_t array_begin = json.find('[', action_at + token.size());
+    if (array_begin == std::string::npos) return false;
+    size_t array_end = array_begin;
+    unsigned depth = 0;
+    for (; array_end < json.size(); ++array_end)
+    {
+        if (json[array_end] == '[') ++depth;
+        else if (json[array_end] == ']' && --depth == 0) break;
+    }
+    if (array_end >= json.size()) return false;
+    const size_t key_at = json.find("\"K\"", array_begin);
+    if (key_at == std::string::npos || key_at >= array_end) return false;
+    const size_t colon = json.find(':', key_at + 3);
+    if (colon == std::string::npos || colon >= array_end) return false;
+    const char *number = json.c_str() + colon + 1;
+    while (number < json.c_str() + array_end &&
+        std::isspace(static_cast<unsigned char>(*number))) ++number;
+    char *end = nullptr;
+    const unsigned long parsed = std::strtoul(number, &end, 10);
+    if (end == number || parsed == 0 || parsed > 0xffffu) return false;
+    key = static_cast<WORD>(parsed);
+    return true;
+}
+
+LiftBindings load_lift_bindings()
+{
+    LiftBindings result{};
+    std::wstring path;
+    std::string json;
+    if (!latest_keybind_file(path) || !read_small_text_file(path, json)) return result;
+    WORD up = result.up, down = result.down;
+    const bool up_found = parse_action_key(json, "LiftUp", up);
+    const bool down_found = parse_action_key(json, "LiftDown", down);
+    if (up_found) result.up = up;
+    if (down_found) result.down = down;
+    result.loaded = up_found || down_found;
+    return result;
+}
 
 BOOL CALLBACK find_game_window(HWND window, LPARAM parameter)
 {
@@ -154,12 +274,31 @@ bool InputBridge::initialize(XrInstance instance, XrSession session, XrSpace bas
         return false;
     }
     create_optical_trackers(hand_tracking_extension_enabled && config_.optical_hand_tracking);
+    refresh_game_bindings(GetTickCount64(), true);
     initialized_ = true;
-    log_line("VR_FEATURE_INPUT_READY controllers=oculus_touch,meta_touch_1_1,valve_index,khr_generic poses=1 locomotion=1 turn=1 buttons=1 recenter=1 haptics=%u strength=%.2f optical_hands=%u openxr_1_1=%u generic_controller=%u",
+    log_line("VR_FEATURE_INPUT_READY controllers=oculus_touch,meta_touch_1_1,valve_index,khr_generic poses=1 locomotion=1 turn=1 vertical_turn=%u buttons=1 recenter=1 haptics=%u strength=%.2f optical_hands=%u openxr_1_1=%u generic_controller=%u",
+        config_.vertical_turn ? 1u : 0u,
         config_.haptics ? 1u : 0u, config_.haptic_strength,
         optical_trackers_[0] != XR_NULL_HANDLE && optical_trackers_[1] != XR_NULL_HANDLE ? 1u : 0u,
         openxr_11_enabled_ ? 1u : 0u, generic_controller_enabled_ ? 1u : 0u);
     return true;
+}
+
+void InputBridge::refresh_game_bindings(uint64_t now, bool force)
+{
+    if (!force && now < lift_bindings_refresh_after_ms_) return;
+    lift_bindings_refresh_after_ms_ = now + kKeybindRefreshMilliseconds;
+    const LiftBindings bindings = load_lift_bindings();
+    if (!bindings.loaded) return;
+    if (bindings.up == lift_up_virtual_key_ && bindings.down == lift_down_virtual_key_) return;
+
+    send_key(lift_up_virtual_key_, false, key_lift_up_);
+    send_key(lift_down_virtual_key_, false, key_lift_down_);
+    lift_up_virtual_key_ = bindings.up;
+    lift_down_virtual_key_ = bindings.down;
+    log_line("VR_LIFT_BINDINGS source=keybinds_json up_vk=%u down_vk=%u",
+        static_cast<unsigned>(lift_up_virtual_key_),
+        static_cast<unsigned>(lift_down_virtual_key_));
 }
 
 bool InputBridge::create_actions()
@@ -802,6 +941,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
 
     const bool recenter_down = left_click && right_click;
     const uint64_t now = GetTickCount64();
+    refresh_game_bindings(now);
     if (input_rearm_required_)
     {
         const bool neutral = !a && !b && !x && !y && !left_click && !right_click && !menu &&
@@ -899,8 +1039,8 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         send_key('X', false, key_zoom_in_);
         send_key('C', false, key_zoom_out_);
         send_key('I', false, key_inventory_);
-        send_key(VK_UP, false, key_lift_up_);
-        send_key(VK_DOWN, false, key_lift_down_);
+        send_key(lift_up_virtual_key_, false, key_lift_up_);
+        send_key(lift_down_virtual_key_, false, key_lift_down_);
         send_key(VK_ESCAPE, menu, key_menu_);
         // UI selection must react to the current controller trigger sample. Waiting
         // for the gameplay-oriented debouncer made controller clicks dependent
@@ -981,8 +1121,8 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     const scrapvr::tools::ContextAction context_action = scrapvr::tools::active_context_action();
     const bool contextual_b = b && context_action != scrapvr::tools::ContextAction::none;
     send_key('Q', contextual_b, key_context_);
-    send_key(VK_UP, lift_axis_active && turn.y > 0.0f, key_lift_up_);
-    send_key(VK_DOWN, lift_axis_active && turn.y < 0.0f, key_lift_down_);
+    send_key(lift_up_virtual_key_, lift_axis_active && turn.y > 0.0f, key_lift_up_);
+    send_key(lift_down_virtual_key_, lift_axis_active && turn.y < 0.0f, key_lift_down_);
     send_key(VK_ESCAPE, menu, key_menu_);
     if (lift_axis_active && !lift_axis_was_active_)
     {
@@ -1092,7 +1232,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         return std::copysign(normalized * normalized, value);
     };
     float horizontal = shaped_stick(turn.x);
-    float vertical = shaped_stick(turn.y);
+    float vertical = config_.vertical_turn ? shaped_stick(turn.y) : 0.0f;
     if (lift_axis_active) vertical = 0.0f;
     if (std::fabs(horizontal) >= std::fabs(vertical)) vertical = 0.0f;
     else horizontal = 0.0f;
@@ -1143,8 +1283,8 @@ void InputBridge::release_injected_input()
     send_key('X', false, key_zoom_in_);
     send_key('C', false, key_zoom_out_);
     send_key('I', false, key_inventory_);
-    send_key(VK_UP, false, key_lift_up_);
-    send_key(VK_DOWN, false, key_lift_down_);
+    send_key(lift_up_virtual_key_, false, key_lift_up_);
+    send_key(lift_down_virtual_key_, false, key_lift_down_);
     send_key(VK_ESCAPE, false, key_menu_);
     send_mouse_button(0,false,mouse_attack_);
     send_mouse_button(1,false,mouse_secondary_);

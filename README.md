@@ -59,9 +59,11 @@ The installer has four clear actions: **Install VR Mod**, **Uninstall VR Mod**, 
 | Hold Quest Y / Index left B, or press Quest X + Y / Index left A + B while standing | Open backpack |
 | Quest X / Y or Index left A / B while seated | Zoom in / out |
 | Quest left menu / Index left trackpad press | Pause / resume |
-| Right grip + right stick up / down while standing | Raise / lower the lift while building a vehicle |
+| Right grip + right stick up / down while standing | Raise / lower the lift using your current Scrap Mechanic Lift Up / Lift Down bindings |
 | Hold both thumbsticks for one second | Recenter view and floor |
 | Optical pinch | Primary tool or menu interaction |
+
+Set `VerticalStickLook=0` in `Release\ScrapMechanicVR.ini` if you want the right stick to turn horizontally only; headset pitch remains unchanged.
 
 ## Requirements
 

@@ -112,6 +112,7 @@ using LuaSetFieldFn = void (__cdecl *)(lua_State *, int, const char *);
 constexpr int kLuaGlobalsIndex = -10002;
 constexpr int kLuaTypeTable = 5;
 constexpr char kLuaProjectilePoseFunction[] = "ScrapVRProjectilePoseNative";
+constexpr char kLuaActionPoseFunction[] = "ScrapVRActionPoseNative";
 
 HMODULE g_module = nullptr;
 HMODULE g_game = nullptr;
@@ -153,7 +154,10 @@ std::atomic<bool> g_hook_reached{false};
 std::atomic<bool> g_target_found{false};
 std::atomic<bool> g_failed{false};
 constexpr uint64_t kOpenXrRetryDelayMs = 5000;
+constexpr uint64_t kExplicitVrLaunchRetryWindowMs = 180000;
+constexpr uint64_t kVrLaunchMarkerMaximumAge100ns = 300ull * 10000000ull;
 std::atomic<uint64_t> g_openxr_retry_after_ms{0};
+std::atomic<uint64_t> g_explicit_vr_launch_retry_deadline_ms{0};
 std::atomic<bool> g_desktop_fallback_logged{false};
 std::atomic<bool> g_openxr_runtime_logged{false};
 std::atomic<bool> g_openxr_unavailable_logged{false};
@@ -220,11 +224,23 @@ struct NativeProjectilePose
 };
 std::mutex g_native_projectile_mutex;
 NativeProjectilePose g_native_projectile_pose;
+struct NativeActionPose
+{
+    bool authoritative = false;
+    bool active = false;
+    XrVector3f position{};
+    XrVector3f direction{0.0f, 0.0f, -1.0f};
+    XrVector3f up{0.0f, 0.0f, 1.0f};
+    uint64_t sequence = 0;
+};
+std::mutex g_native_action_mutex;
+NativeActionPose g_native_action_pose;
 std::mutex g_lua_state_mutex;
 std::vector<lua_State *> g_lua_registered_states;
 std::vector<const void *> g_lua_registered_environments;
 std::atomic<bool> g_lua_projectile_registration_logged{false};
 std::atomic<bool> g_lua_projectile_call_logged{false};
+std::atomic<bool> g_lua_action_call_logged{false};
 std::atomic<bool> g_tool_raycast_logged{false};
 std::atomic<bool> g_use_raycast_logged{false};
 thread_local int g_active_eye = -1;
@@ -258,6 +274,37 @@ void log_matrix(const char *name, const float *m)
     log_line("%s=[%.6f,%.6f,%.6f,%.6f;%.6f,%.6f,%.6f,%.6f;%.6f,%.6f,%.6f,%.6f;%.6f,%.6f,%.6f,%.6f]",
         name, m[0],m[1],m[2],m[3], m[4],m[5],m[6],m[7],
         m[8],m[9],m[10],m[11], m[12],m[13],m[14],m[15]);
+}
+
+void consume_vr_launch_request()
+{
+    wchar_t local_app_data[MAX_PATH]{};
+    const DWORD length = GetEnvironmentVariableW(L"LOCALAPPDATA", local_app_data, MAX_PATH);
+    if (length == 0 || length >= MAX_PATH) return;
+    const std::wstring marker = std::wstring(local_app_data) +
+        L"\\ScrapMechanicVR-Chapter2\\vr-launch-request.marker";
+    WIN32_FILE_ATTRIBUTE_DATA attributes{};
+    if (!GetFileAttributesExW(marker.c_str(), GetFileExInfoStandard, &attributes)) return;
+
+    FILETIME current_time{};
+    GetSystemTimeAsFileTime(&current_time);
+    ULARGE_INTEGER current{}, modified{};
+    current.LowPart = current_time.dwLowDateTime;
+    current.HighPart = current_time.dwHighDateTime;
+    modified.LowPart = attributes.ftLastWriteTime.dwLowDateTime;
+    modified.HighPart = attributes.ftLastWriteTime.dwHighDateTime;
+    const bool fresh = current.QuadPart >= modified.QuadPart &&
+        current.QuadPart - modified.QuadPart <= kVrLaunchMarkerMaximumAge100ns;
+    DeleteFileW(marker.c_str());
+    if (!fresh)
+    {
+        log_line("VR_LAUNCH_HANDOFF ignored=1 reason=stale_marker");
+        return;
+    }
+    g_explicit_vr_launch_retry_deadline_ms.store(
+        GetTickCount64() + kExplicitVrLaunchRetryWindowMs, std::memory_order_release);
+    log_line("VR_LAUNCH_HANDOFF active=1 retry_window_ms=%llu marker_consumed=1",
+        static_cast<unsigned long long>(kExplicitVrLaunchRetryWindowMs));
 }
 
 bool readable(const void *pointer, size_t size)
@@ -490,6 +537,19 @@ void set_native_projectile_pose(bool authoritative, bool active,
     ++g_native_projectile_pose.sequence;
 }
 
+void set_native_action_pose(bool authoritative, bool active,
+    const XrVector3f &position = {}, const XrVector3f &direction = {0.0f, 0.0f, -1.0f},
+    const XrVector3f &up = {0.0f, 0.0f, 1.0f})
+{
+    std::lock_guard lock(g_native_action_mutex);
+    g_native_action_pose.authoritative = authoritative;
+    g_native_action_pose.active = active;
+    g_native_action_pose.position = position;
+    g_native_action_pose.direction = direction;
+    g_native_action_pose.up = up;
+    ++g_native_action_pose.sequence;
+}
+
 void update_native_projectile_pose(bool right_active, bool projectile_tool_active,
     const XrVector3f &hand_position, XrVector3f forward, XrVector3f up,
     const XrVector3f &local_offset, const XrVector3f &local_direction, const char *item)
@@ -566,6 +626,31 @@ int __cdecl lua_native_projectile_pose(lua_State *state)
     return 10;
 }
 
+int __cdecl lua_native_action_pose(lua_State *state)
+{
+    NativeActionPose pose;
+    {
+        std::lock_guard lock(g_native_action_mutex);
+        pose = g_native_action_pose;
+    }
+    g_lua_pushboolean(state, pose.authoritative ? 1 : 0);
+    g_lua_pushboolean(state, pose.active ? 1 : 0);
+    g_lua_pushnumber(state, pose.position.x);
+    g_lua_pushnumber(state, pose.position.y);
+    g_lua_pushnumber(state, pose.position.z);
+    g_lua_pushnumber(state, pose.direction.x);
+    g_lua_pushnumber(state, pose.direction.y);
+    g_lua_pushnumber(state, pose.direction.z);
+    g_lua_pushnumber(state, pose.up.x);
+    g_lua_pushnumber(state, pose.up.y);
+    g_lua_pushnumber(state, pose.up.z);
+    g_lua_pushnumber(state, static_cast<double>(pose.sequence));
+    if (!g_lua_action_call_logged.exchange(true))
+        log_line("VR_LUA_ACTION_BRIDGE_CALLED authoritative=%u active=%u",
+            pose.authoritative ? 1u : 0u, pose.active ? 1u : 0u);
+    return 12;
+}
+
 bool resolve_lua_projectile_api()
 {
     HMODULE lua = GetModuleHandleW(L"lua51.dll");
@@ -610,6 +695,8 @@ void ensure_lua_projectile_api(lua_State *state, int argument_count)
     {
         g_lua_pushcclosure(state, lua_native_projectile_pose, 0);
         g_lua_setfield(state, kLuaGlobalsIndex, kLuaProjectilePoseFunction);
+        g_lua_pushcclosure(state, lua_native_action_pose, 0);
+        g_lua_setfield(state, kLuaGlobalsIndex, kLuaActionPoseFunction);
     }
 
     // Scrap Mechanic normally shares one global environment per Logic Task,
@@ -636,12 +723,14 @@ void ensure_lua_projectile_api(lua_State *state, int argument_count)
             {
                 g_lua_pushcclosure(state, lua_native_projectile_pose, 0);
                 g_lua_setfield(state, -2, kLuaProjectilePoseFunction);
+                g_lua_pushcclosure(state, lua_native_action_pose, 0);
+                g_lua_setfield(state, -2, kLuaActionPoseFunction);
             }
         }
         g_lua_settop(state, top);
     }
     if ((register_global || argument_count >= 0) && !g_lua_projectile_registration_logged.exchange(true))
-        log_line("VR_LUA_NATIVE_API_REGISTERED transport=native_logic_task projectile_pose=1");
+        log_line("VR_LUA_NATIVE_API_REGISTERED transport=native_logic_task projectile_pose=1 action_pose=1");
 }
 
 int __cdecl hk_lua_pcall(lua_State *state, int argument_count, int result_count, int error_function)
@@ -760,6 +849,7 @@ void reset_hand_bridge(bool reset_session = false)
     g_right_action_target_distance.store(0.0f, std::memory_order_release);
     g_right_action_target_ms.store(0, std::memory_order_release);
     set_native_projectile_pose(false, false);
+    set_native_action_pose(false, false);
 }
 
 void deactivate_hand_bridge(bool vr_authoritative = false)
@@ -776,6 +866,7 @@ void deactivate_hand_bridge(bool vr_authoritative = false)
     g_right_action_target_distance.store(0.0f, std::memory_order_release);
     g_right_action_target_ms.store(0, std::memory_order_release);
     set_native_projectile_pose(vr_authoritative, false);
+    set_native_action_pose(vr_authoritative, false);
 
     // A static inactive file is sufficient until tracking becomes active. Do not
     // rewrite it on every OpenXR cleanup/retry: Scrap Mechanic treats each change
@@ -885,6 +976,21 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
         g_right_aim_up = view_vector_to_world(game_world_to_view,
             rotate_vector(aim_relative, {0.0f, 1.0f, 0.0f}));
         g_right_aim_world_ms = now;
+    }
+    if (g_right_aim_world_active)
+    {
+        XrVector3f direction = g_right_aim_forward;
+        XrVector3f up = g_right_aim_up;
+        const float projection = up.x * direction.x + up.y * direction.y + up.z * direction.z;
+        up.x -= direction.x * projection;
+        up.y -= direction.y * projection;
+        up.z -= direction.z * projection;
+        const bool valid = normalize_vector(direction) && normalize_vector(up);
+        set_native_action_pose(true, valid, g_right_aim_world, direction, up);
+    }
+    else
+    {
+        set_native_action_pose(true, false);
     }
 
     XrVector3f gun_muzzle_offset{};
@@ -1103,7 +1209,10 @@ struct StandingCameraState
     bool orbit_distance_valid = false;
     float orbit_distance = 0.0f;
     float height_bias = 0.0f;
+    float orbit_candidate = 0.0f;
+    uint32_t orbit_candidate_samples = 0;
     bool orbit_logged = false;
+    bool outlier_logged = false;
 
     void reset()
     {
@@ -1114,7 +1223,10 @@ struct StandingCameraState
         orbit_distance_valid = false;
         orbit_distance = 0.0f;
         height_bias = 0.0f;
+        orbit_candidate = 0.0f;
+        orbit_candidate_samples = 0;
         orbit_logged = false;
+        outlier_logged = false;
     }
 };
 
@@ -1167,31 +1279,60 @@ bool build_upright_world_to_view(const float *source, StandingCameraState &state
                 residual.y * residual.y + residual.z * residual.z);
             const float orbit_motion = std::fabs(candidate) * std::sqrt(forward_delta_squared);
             const float residual_limit = std::max(0.008f, orbit_motion * 0.25f);
-            if (std::isfinite(candidate) && candidate >= -0.05f && candidate <= 12.0f &&
+            if (std::isfinite(candidate) && candidate >= -0.05f && candidate <= 3.0f &&
                 std::isfinite(residual_length) && residual_length <= residual_limit)
             {
                 const float clamped_candidate = std::max(0.0f, candidate);
                 if (!state.orbit_distance_valid)
                 {
-                    state.orbit_distance = clamped_candidate;
-                    state.orbit_distance_valid = true;
-                    // Preserve the exact height visible before learning the
-                    // radius, so enabling the correction cannot cause a jump.
-                    state.height_bias = state.previous_output_height -
-                        (state.previous_camera_position.z +
-                            state.orbit_distance * state.previous_forward.z);
+                    const float tolerance = std::max(0.08f,
+                        std::max(state.orbit_candidate, clamped_candidate) * 0.20f);
+                    if (state.orbit_candidate_samples == 0 ||
+                        std::fabs(clamped_candidate - state.orbit_candidate) > tolerance)
+                    {
+                        state.orbit_candidate = clamped_candidate;
+                        state.orbit_candidate_samples = 1;
+                    }
+                    else
+                    {
+                        state.orbit_candidate =
+                            (state.orbit_candidate * state.orbit_candidate_samples +
+                                clamped_candidate) /
+                            static_cast<float>(state.orbit_candidate_samples + 1);
+                        ++state.orbit_candidate_samples;
+                    }
+                    // Do not lock from a single combined move/look frame. Three
+                    // agreeing samples identify the camera's rigid pitch orbit
+                    // without mistaking player translation for a huge radius.
+                    if (state.orbit_candidate_samples >= 3)
+                    {
+                        state.orbit_distance = state.orbit_candidate;
+                        state.orbit_distance_valid = true;
+                        state.height_bias = state.previous_output_height -
+                            (state.previous_camera_position.z +
+                                state.orbit_distance * state.previous_forward.z);
+                    }
                 }
                 else
                 {
-                    const float output_before_update = camera_position.z +
-                        state.orbit_distance * source_forward.z + state.height_bias;
-                    state.orbit_distance = state.orbit_distance * 0.85f +
-                        clamped_candidate * 0.15f;
-                    // Radius refinement must also be visually continuous.
-                    state.height_bias = output_before_update -
-                        (camera_position.z + state.orbit_distance * source_forward.z);
+                    const float tolerance = std::max(0.10f, state.orbit_distance * 0.25f);
+                    if (std::fabs(clamped_candidate - state.orbit_distance) <= tolerance)
+                    {
+                        const float output_before_update = camera_position.z +
+                            state.orbit_distance * source_forward.z + state.height_bias;
+                        state.orbit_distance = state.orbit_distance * 0.97f +
+                            clamped_candidate * 0.03f;
+                        state.height_bias = output_before_update -
+                            (camera_position.z + state.orbit_distance * source_forward.z);
+                    }
+                    else if (!state.outlier_logged)
+                    {
+                        state.outlier_logged = true;
+                        log_line("VR_CAMERA_STANDING_HEIGHT_OUTLIER rejected=%.5f locked=%.5f",
+                            clamped_candidate, state.orbit_distance);
+                    }
                 }
-                if (!state.orbit_logged)
+                if (state.orbit_distance_valid && !state.orbit_logged)
                 {
                     state.orbit_logged = true;
                     log_line("VR_CAMERA_STANDING_HEIGHT_LOCK orbit_radius=%.5f "
@@ -2310,12 +2451,23 @@ struct OpenXrState
         result = xrGetSystem(instance, &system_info, &system);
         if (result == XR_ERROR_FORM_FACTOR_UNAVAILABLE)
         {
+            const uint64_t now = GetTickCount64();
+            const uint64_t retry_deadline =
+                g_explicit_vr_launch_retry_deadline_ms.load(std::memory_order_acquire);
+            const bool retry = retry_deadline != 0 && now < retry_deadline;
             if (!g_openxr_unavailable_logged.exchange(true, std::memory_order_acq_rel))
-                log_line("XR_UNAVAILABLE reason=no_hmd desktop_fallback=1 auto_retry=0 restart_after_connect=1");
-            mark_openxr_failed(false);
+                log_line("XR_UNAVAILABLE reason=no_hmd desktop_fallback=1 auto_retry=%u "
+                    "explicit_start_vr=%u retry_window_remaining_ms=%llu",
+                    retry ? 1u : 0u, retry_deadline != 0 ? 1u : 0u,
+                    static_cast<unsigned long long>(retry ? retry_deadline - now : 0));
+            mark_openxr_failed(retry);
             return false;
         }
         if (XR_FAILED(result)) return fail("xrGetSystem", result);
+        const uint64_t launch_retry_deadline =
+            g_explicit_vr_launch_retry_deadline_ms.exchange(0, std::memory_order_acq_rel);
+        if (launch_retry_deadline != 0)
+            log_line("VR_LAUNCH_HANDOFF completed=1 xr_system_ready=1");
         result = xrGetInstanceProcAddr(instance, "xrGetD3D11GraphicsRequirementsKHR", reinterpret_cast<PFN_xrVoidFunction *>(&get_requirements));
         if (XR_FAILED(result) || !get_requirements) return fail("xrGetD3D11GraphicsRequirementsKHR.address", result);
         XrGraphicsRequirementsD3D11KHR requirements{XR_TYPE_GRAPHICS_REQUIREMENTS_D3D11_KHR};
@@ -2362,6 +2514,8 @@ struct OpenXrState
             GetPrivateProfileIntW(L"Features", L"HorizontalTurnSpeed", 36, g_ini_path.c_str()));
         input_config.vertical_turn_speed = static_cast<float>(
             GetPrivateProfileIntW(L"Features", L"VerticalTurnSpeed", 28, g_ini_path.c_str()));
+        input_config.vertical_turn =
+            GetPrivateProfileIntW(L"Features", L"VerticalStickLook", 1, g_ini_path.c_str()) == 1;
         if (!g_input.initialize(instance, session, space, input_config,
                 hand_tracking_supported && g_feature_optical_hands_enabled,
                 openxr_11_enabled, generic_controller_supported))
@@ -3635,6 +3789,7 @@ void initialize_paths()
     g_ini_path = directory + L"ScrapMechanicVR.ini";
     const std::wstring log_path = directory + L"ScrapMechanicVR-v1.log";
     g_log = CreateFileW(log_path.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    consume_vr_launch_request();
     g_enabled.store(config_enabled(), std::memory_order_release);
     g_highres_pc_probe_requested.store(
         GetPrivateProfileIntW(L"Diagnostic", L"HighResolutionProbe", 0, g_ini_path.c_str()) == 1,

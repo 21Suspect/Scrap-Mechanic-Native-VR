@@ -91,6 +91,7 @@ function Assert-Payload($Manifest) {
         $chapter2Bridge = [IO.File]::ReadAllText($chapter2BridgePath)
         foreach ($requiredMarker in @(
             'ScrapVRProjectilePoseNative',
+            'ScrapVRActionPoseNative',
             'tracked_barrel_native_logic_task',
             'source = firePos and "vr_barrel"',
             'authoritative and "blocked" or "pc_fallback"'
@@ -134,6 +135,9 @@ function Assert-Payload($Manifest) {
         $nativeAddonStrings = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($nativeAddonPath))
         if (-not $nativeAddonStrings.Contains('ScrapVRProjectilePoseNative')) {
             $failures += 'VR barrel regression: native addon does not export the direct Logic Task projectile-pose bridge'
+        }
+        if (-not $nativeAddonStrings.Contains('ScrapVRActionPoseNative')) {
+            $failures += 'VR action regression: native addon does not export the direct Logic Task hand-aim bridge'
         }
     }
 
@@ -1071,6 +1075,16 @@ switch ($Action) {
     'Repair' { Repair-PatchTargets $root $manifest }
     'Uninstall' { Uninstall-AnyPatch $root $manifest }
     'Start' {
+        # Hand the user's explicit Start VR intent to the native add-on. Some
+        # runtimes (notably VDXR) briefly release their HMD system between this
+        # process's successful probe and the game process creating its own
+        # OpenXR instance. The marker permits only that launch to retry; normal
+        # desktop starts without a headset remain a quiet one-shot fallback.
+        [IO.Directory]::CreateDirectory($StateRoot) | Out-Null
+        $launchMarker = Join-FileSystemPath $StateRoot 'vr-launch-request.marker'
+        [IO.File]::WriteAllText($launchMarker, [DateTimeOffset]::UtcNow.ToUnixTimeSeconds().ToString(
+            [Globalization.CultureInfo]::InvariantCulture), [Text.Encoding]::ASCII)
+        Write-Host 'VR launch handoff created. Starting Scrap Mechanic through Steam.' -ForegroundColor Green
         Start-Process 'steam://rungameid/387990'
     }
 }

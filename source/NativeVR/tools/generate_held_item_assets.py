@@ -3,13 +3,14 @@
 
 The installed game remains the source of truth.  This script extracts the
 shipping Collada meshes and diffuse texture paths into a deterministic C++
-header.  Small proxy meshes are generated only where the game ships an FBX
-without an equivalent Collada source (seed, key, residue and arbitrary carry).
+header.  The game's ASCII FBX seed mesh is read directly; small proxy meshes
+remain only for key, residue and arbitrary carry objects without Collada data.
 """
 
 from dataclasses import dataclass
 import json
 from pathlib import Path
+import re
 import sys
 
 from generate_chapter2_weapons import cpp_float, extract, identifier
@@ -106,6 +107,57 @@ def diffuse_entries(game_root: Path, relative: str):
 
 def vertex(position, normal, uv):
     return (*position, *normal, *uv)
+
+
+def ascii_fbx_array(text: str, name: str, cast=float):
+    match = re.search(
+        rf"\b{re.escape(name)}:\s*\*\d+\s*\{{\s*a:\s*(.*?)\s*\}}",
+        text,
+        re.DOTALL,
+    )
+    if match is None:
+        raise RuntimeError(f"ASCII FBX array '{name}' was not found")
+    return [cast(value.strip()) for value in match.group(1).split(",") if value.strip()]
+
+
+def extract_ascii_fbx(path: Path):
+    text = path.read_text(encoding="utf-8-sig")
+    positions_flat = ascii_fbx_array(text, "Vertices")
+    polygon_indices = ascii_fbx_array(text, "PolygonVertexIndex", int)
+    normals_flat = ascii_fbx_array(text, "Normals")
+    uvs_flat = ascii_fbx_array(text, "UV")
+    uv_indices = ascii_fbx_array(text, "UVIndex", int)
+    if len(positions_flat) % 3 or len(normals_flat) != len(polygon_indices) * 3 or \
+            len(uvs_flat) % 2 or len(uv_indices) != len(polygon_indices):
+        raise RuntimeError(f"unsupported ASCII FBX vertex layout in {path}")
+    positions = [tuple(positions_flat[i:i + 3]) for i in range(0, len(positions_flat), 3)]
+    normals = [tuple(normals_flat[i:i + 3]) for i in range(0, len(normals_flat), 3)]
+    uvs = [tuple(uvs_flat[i:i + 2]) for i in range(0, len(uvs_flat), 2)]
+
+    corners = []
+    polygons = []
+    for corner_index, packed_position in enumerate(polygon_indices):
+        polygon_end = packed_position < 0
+        position_index = -packed_position - 1 if polygon_end else packed_position
+        uv_index = uv_indices[corner_index]
+        if position_index < 0 or position_index >= len(positions) or \
+                uv_index < 0 or uv_index >= len(uvs):
+            raise RuntimeError(f"ASCII FBX index outside source arrays in {path}")
+        uv = uvs[uv_index]
+        corners.append(vertex(positions[position_index], normals[corner_index], (uv[0], 1.0 - uv[1])))
+        if polygon_end:
+            if len(corners) < 3:
+                raise RuntimeError(f"degenerate ASCII FBX polygon in {path}")
+            polygons.append(corners)
+            corners = []
+    if corners:
+        raise RuntimeError(f"unterminated ASCII FBX polygon in {path}")
+
+    result = []
+    for polygon in polygons:
+        for index in range(1, len(polygon) - 1):
+            result.extend((polygon[0], polygon[index], polygon[index + 1]))
+    return result
 
 
 def box(size=(1.0, 1.0, 1.0), center=(0.0, 0.0, 0.0)):
@@ -233,8 +285,15 @@ def main():
             ranges[asset.name] = (first, len(sources) - first)
         print(f"{asset.name}: {len(groups)} submeshes")
 
+    seed_vertices = extract_ascii_fbx(
+        game_root / "Survival/Character/Char_Tools/Char_seed/char_seed.fbx")
+    first = len(sources)
+    add_source("planter", seed_vertices,
+               "Survival/Character/Char_Tools/Char_seed/char_seed_dif.tga")
+    ranges["planter"] = (first, 1)
+    print(f"planter: {len(seed_vertices)} vertices from shipping ASCII FBX")
+
     proxies = (
-        ("planter", box((1.05, 0.26, 0.82)), "Survival/Character/Char_Tools/Char_seed/char_seed_dif.tga", 0xffffffff),
         ("keycard", box((1.22, 0.12, 0.76)), "Survival/Objects/Textures/survivalobject/obj_survivalobject_keycard_dif.tga", 0xffffffff),
         ("powercore", cylinder(0.48, 1.15, 18), "Survival/Objects/Textures/survivalobject/obj_survivalobject_powercore_dif.tga", 0xffffffff),
         ("resource", rock(), None, 0xff795148),

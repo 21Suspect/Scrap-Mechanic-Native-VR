@@ -27,6 +27,7 @@ struct InputConfig
     // Runtime input is time-normalized so behavior remains stable at other rates.
     float horizontal_turn_speed = 36.0f;
     float vertical_turn_speed = 28.0f;
+    bool vertical_turn = true;
 };
 
 struct HandState
@@ -85,6 +86,7 @@ private:
     bool get_boolean(XrAction action, uint32_t hand, bool &value);
     bool get_float(XrAction action, uint32_t hand, float &value, bool *active = nullptr);
     bool get_vector(XrAction action, uint32_t hand, XrVector2f &value);
+    void refresh_game_bindings(uint64_t now, bool force = false);
     void reset_runtime_state();
 
     XrInstance instance_ = XR_NULL_HANDLE;
@@ -146,6 +148,9 @@ private:
     bool key_menu_ = false;
     bool key_lift_up_ = false;
     bool key_lift_down_ = false;
+    WORD lift_up_virtual_key_ = VK_UP;
+    WORD lift_down_virtual_key_ = VK_DOWN;
+    uint64_t lift_bindings_refresh_after_ms_ = 0;
     bool mouse_attack_ = false;
     bool mouse_secondary_ = false;
     bool startup_menu_visible_ = false;

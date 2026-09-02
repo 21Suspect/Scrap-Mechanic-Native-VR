@@ -521,18 +521,47 @@ function Chapter2VR.markAdapter( name )
 end
 
 function Chapter2VR.actionPose()
+	-- Tool scripts run on separate Lua Logic Tasks. Read the frame-current
+	-- OpenXR aim pose directly from the native add-on first; sm.json.open can
+	-- otherwise keep an old inactive packet cached after a world/game restart.
+	local nativePose = ScrapVRActionPoseNative
+	if type( nativePose ) == "function" then
+		local ok, authoritative, active, px, py, pz, dx, dy, dz, ux, uy, uz = pcall( nativePose )
+		if ok and authoritative == true then
+			if active ~= true or not validNumber( px ) or not validNumber( py ) or
+				not validNumber( pz ) or not validNumber( dx ) or not validNumber( dy ) or
+				not validNumber( dz ) or not validNumber( ux ) or not validNumber( uy ) or
+				not validNumber( uz ) then return nil, false, true end
+			local direction = sm.vec3.new( dx, dy, dz )
+			if direction:length() < 0.5 then return nil, false, true end
+			direction = direction:normalize()
+			local up = sm.vec3.new( ux, uy, uz )
+			up = up - direction * up:dot( direction )
+			if up:length() < 0.25 then up = sm.vec3.new( 0, 0, 1 ) - direction * direction.z end
+			if up:length() < 0.25 then return nil, false, true end
+			up = up:normalize()
+			local right = direction:cross( up )
+			if right:length() < 0.25 then return nil, false, true end
+			return {
+				position = sm.vec3.new( px, py, pz ),
+				direction = direction,
+				up = up,
+				right = right:normalize()
+			}, true, true
+		end
+	end
 	local tick = sm.game.getCurrentTick()
 	local bridgeAge = type( g_vrBridgeLastTick ) == "number" and tick - g_vrBridgeLastTick or nil
 	local fresh = g_vrBridgeActive == true and g_vrActionActive == true and
 		bridgeAge ~= nil and bridgeAge >= 0 and bridgeAge <= VrPrimaryBridgeFreshTicks and
 		g_vrActionOrigin ~= nil and g_vrActionDirection ~= nil
-	if not fresh then return nil, false end
+	if not fresh then return nil, false, false end
 	return {
 		position = g_vrActionOrigin,
 		direction = g_vrActionDirection,
 		up = g_vrActionUp or sm.vec3.new( 0, 0, 1 ),
 		right = g_vrActionRight or sm.vec3.new( 1, 0, 0 )
-	}, true
+	}, true, false
 end
 
 -- Use the tracked right hand for an item's world-space action ray while a live

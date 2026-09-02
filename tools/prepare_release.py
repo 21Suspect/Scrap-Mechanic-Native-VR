@@ -124,7 +124,7 @@ def collect_manifest_history(root: Path, current: dict[str, object]) -> dict[str
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("game_root", type=Path)
-    parser.add_argument("--version", default="1.3.6-chapter2-20260902")
+    parser.add_argument("--version", default="1.3.7-chapter2-20260902")
     parser.add_argument(
         "--headset-confirmed",
         action="store_true",
@@ -149,7 +149,7 @@ def main() -> None:
         "Oculus Touch, Valve Index, and generic controller profiles, optional Quest optical "
         "hands, Custom Game content bridging, complete held-item geometry, grouped live pose "
         "calibration, hand-aimed world actions with a laser-free target marker, barrel-aimed "
-        "weapons, lift and inventory shortcuts, spatial live game menus, native queued "
+        "weapons, binding-aware lift and inventory shortcuts, spatial live game menus, native queued "
         "keyboard and pointer input, transparent composition, and restrained haptics"
     )
 
