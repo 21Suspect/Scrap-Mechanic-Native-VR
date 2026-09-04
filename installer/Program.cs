@@ -17,22 +17,22 @@ using Microsoft.Win32;
 [assembly: AssemblyDescription("Installer, verifier, repair manager, and restorer for Scrap Mechanic Chapter 2 VR")]
 [assembly: AssemblyCompany("Scrap Mechanic VR Community Project")]
 [assembly: AssemblyProduct("Scrap Mechanic VR Chapter 2")]
-[assembly: AssemblyVersion("1.3.7.0")]
-[assembly: AssemblyFileVersion("1.3.7.0")]
+[assembly: AssemblyVersion("1.3.11.0")]
+[assembly: AssemblyFileVersion("1.3.11.0")]
 
 namespace ScrapMechanicVRPatcher
 {
     internal static class BuildInfo
     {
-        internal const string Version = "1.3.7-chapter2-20260902";
+        internal const string Version = "1.3.11-chapter2-20260904";
         internal const string GameBuild = "24529696";
         internal const string GameExeHash = "5D663BA2EC5DC8C7ABEFCC5C9344AE86F0A066C4069A91F54833524AC9A5B4F5";
-        internal const string AddonHash = "05D0E61FFCCBCA6CAA70E309D6DDCD52331EAE55171EA7A530DF4CB86989937A";
+        internal const string AddonHash = "D069C545CD1D0527CD1E4798B2364FCED7775285B61AE83D555FF553F79FC29F";
         internal const string DxgiHash = "EC9245D05C11751F2AC0D2256E6921AD8FB36BE9172EF6D587856591EB729A25";
         internal const string LoaderHash = "018C6519AFBDEADE6DA9E7D59C406068DD58674D87A65AE27353484A05E6674A";
         internal const string MusicHash = "02E8E98721A899C2731ED8AFDF6378DB98DC09BB87FA5896FBA911CE5D875660";
         internal const string LogoHash = "C692A16C8CB01B94618951C09F64A156D7DD6A71D349B91E023B018165504C34";
-        internal const string ManifestHash = "F916FF5863176EDAFFF6D7DA230706394663CB6F195377104AD9940297050B60";
+        internal const string ManifestHash = "85FF5EE496C6607AAAD16CAFA0D68F5854EBC01A263081E749FB3C3463FEB0C1";
         internal const string PatcherHash = "5BB08B616A7FC9F2FB55A55BBD262F5895670DBAF0C70DA62387B4F966242060";
         internal const int ManagedFileCount = 47;
         internal const string ResourceName = "ScrapMechanicVR.Payload.zip";
@@ -857,6 +857,7 @@ namespace ScrapMechanicVRPatcher
         private readonly Button startButton;
         private readonly Button uninstallButton;
         private readonly Button logsButton;
+        private readonly Button bindingsButton;
         private readonly RichTextBox details;
         private readonly TrackBar musicVolume;
         private readonly Label musicVolumeLabel;
@@ -988,17 +989,20 @@ namespace ScrapMechanicVRPatcher
             actionsCard.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             Controls.Add(actionsCard);
 
-            installButton = CreateActionButton(actionsCard, "INSTALL VR MOD", 18, 17, 190, ButtonKind.Primary);
+            installButton = CreateActionButton(actionsCard, "INSTALL VR MOD", 18, 17, 150, ButtonKind.Primary);
             installButton.Click += InstallClicked;
 
-            uninstallButton = CreateActionButton(actionsCard, "UNINSTALL VR MOD", 218, 17, 190, ButtonKind.Danger);
+            uninstallButton = CreateActionButton(actionsCard, "UNINSTALL VR MOD", 176, 17, 150, ButtonKind.Danger);
             uninstallButton.Click += UninstallClicked;
 
-            startButton = CreateActionButton(actionsCard, "START VR", 418, 17, 170, ButtonKind.Success);
+            startButton = CreateActionButton(actionsCard, "START VR", 334, 17, 140, ButtonKind.Success);
             startButton.Click += StartClicked;
 
-            logsButton = CreateActionButton(actionsCard, "OPEN LOGS", 598, 17, 234, ButtonKind.Neutral);
+            logsButton = CreateActionButton(actionsCard, "OPEN LOGS", 482, 17, 150, ButtonKind.Neutral);
             logsButton.Click += LogsClicked;
+
+            bindingsButton = CreateActionButton(actionsCard, "OPEN BINDINGS", 650, 17, 168, ButtonKind.Neutral);
+            bindingsButton.Click += OpenBindingsClicked;
 
             Label safety = new Label();
             safety.Text = "GUARDED INSTALL  •  AUTOMATIC VERIFICATION  •  GAME EXE & SAVES UNTOUCHED";
@@ -1138,6 +1142,7 @@ namespace ScrapMechanicVRPatcher
             startButton.Enabled = !busy && startButton.Enabled;
             uninstallButton.Enabled = !busy && uninstallButton.Enabled;
             logsButton.Enabled = !busy && logsButton.Enabled;
+            bindingsButton.Enabled = !busy && bindingsButton.Enabled;
             Application.DoEvents();
         }
 
@@ -1209,6 +1214,7 @@ namespace ScrapMechanicVRPatcher
             startButton.Enabled = installed;
             uninstallButton.Enabled = compatible && (managedInstall || traces);
             logsButton.Enabled = valid || Directory.Exists(Path.Combine(PackageManager.StateRoot, "logs"));
+            bindingsButton.Enabled = valid && File.Exists(Path.Combine(root, "Release", "ScrapMechanicVR.ini"));
         }
 
         private void AutomaticStartupVerification()
@@ -1447,6 +1453,35 @@ namespace ScrapMechanicVRPatcher
             string release = Path.Combine(gamePath.Text.Trim(), "Release");
             if (Directory.Exists(release))
                 Process.Start("explorer.exe", QuoteForExplorer(release));
+        }
+
+        private void OpenBindingsClicked(object sender, EventArgs e)
+        {
+            string root = gamePath.Text.Trim();
+            string bindingsPath = Path.Combine(root, "Release", "ScrapMechanicVR.ini");
+            if (!File.Exists(bindingsPath))
+            {
+                Append("Controller bindings file was not found. Install the VR mod first.");
+                MessageBox.Show(this,
+                    "The controller bindings file is created with the VR installation. Install the VR mod first, then use Open Bindings.",
+                    "Bindings file not found", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = bindingsPath,
+                    UseShellExecute = true,
+                });
+                Append("Opened controller bindings: " + bindingsPath + ". Restart Scrap Mechanic/VR after saving changes.");
+            }
+            catch (Exception ex)
+            {
+                Append("Could not open controller bindings: " + ex.Message);
+                MessageBox.Show(this, ex.Message, "Open bindings failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private static string QuoteForExplorer(string path)

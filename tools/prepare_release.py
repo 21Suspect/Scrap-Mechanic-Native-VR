@@ -147,10 +147,12 @@ def main() -> None:
     manifest["description"] = (
         "Scrap Mechanic Chapter 2 native OpenXR VR with OpenXR 1.1 Meta Touch, legacy "
         "Oculus Touch, Valve Index, and generic controller profiles, optional Quest optical "
-        "hands, Custom Game content bridging, complete held-item geometry, grouped live pose "
+        "hands, Custom Game content bridging, complete held-item geometry, grouped held-item pose "
         "calibration, hand-aimed world actions with a laser-free target marker, barrel-aimed "
         "weapons, binding-aware lift and inventory shortcuts, spatial live game menus, native queued "
-        "keyboard and pointer input, transparent composition, and restrained haptics"
+        "keyboard and pointer input, transparent composition, restrained haptics, guarded right-trigger-plus-grip "
+        "force-build, and always-visible fixed smartwatch-style wrist vitals, underwater oxygen, time, and "
+        "world-space compass HUDs with live waypoint markers"
     )
 
     managed_script_paths = {

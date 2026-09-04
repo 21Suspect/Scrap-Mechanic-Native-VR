@@ -339,6 +339,8 @@ bool InputBridge::create_actions()
         !create(XR_ACTION_TYPE_BOOLEAN_INPUT, "secondary_button", "Secondary Button", 2, hand_paths_, secondary_button_action_) ||
         !create(XR_ACTION_TYPE_BOOLEAN_INPUT, "stick_click", "Thumbstick Click", 2, hand_paths_, stick_click_action_) ||
         !create(XR_ACTION_TYPE_BOOLEAN_INPUT, "menu_button", "Menu Button", 1, &hand_paths_[0], menu_button_action_) ||
+        !create(XR_ACTION_TYPE_BOOLEAN_INPUT, "trackpad_button", "Trackpad Click", 1, &hand_paths_[0], trackpad_button_action_) ||
+        !create(XR_ACTION_TYPE_BOOLEAN_INPUT, "system_button", "System Button", 1, &hand_paths_[0], system_button_action_) ||
         !create(XR_ACTION_TYPE_FLOAT_INPUT, "index_menu_force", "Index Trackpad Menu Press", 1,
             &hand_paths_[0], index_menu_force_action_) ||
         !create(XR_ACTION_TYPE_VIBRATION_OUTPUT, "haptic_output", "Subtle Haptic Feedback", 2,
@@ -388,11 +390,12 @@ bool InputBridge::create_actions()
         !path("/user/hand/right/input/b/click", touch[3]) ||
         !path("/user/hand/left/input/menu/click", touch[4])) return false;
 
-    XrPath index[4]{};
+    XrPath index[5]{};
     if (!path("/user/hand/right/input/a/click", index[0]) ||
         !path("/user/hand/right/input/b/click", index[1]) ||
         !path("/user/hand/left/input/system/click", index[2]) ||
-        !path("/user/hand/left/input/trackpad/force", index[3])) return false;
+        !path("/user/hand/left/input/trackpad/force", index[3]) ||
+        !path("/user/hand/left/input/trackpad/click", index[4])) return false;
 
     XrPath generic[4]{};
     if (generic_controller_enabled_ &&
@@ -414,7 +417,7 @@ bool InputBridge::create_actions()
         {menu_button_action_, touch[4]},
         {haptic_action_, common[12]}, {haptic_action_, common[13]}
     };
-    const XrActionSuggestedBinding index_bindings[20]{
+    const XrActionSuggestedBinding index_bindings[21]{
         {grip_pose_action_, common[0]}, {grip_pose_action_, common[1]},
         {aim_pose_action_, common[2]}, {aim_pose_action_, common[3]},
         {trigger_action_, common[4]}, {trigger_action_, common[5]},
@@ -423,7 +426,11 @@ bool InputBridge::create_actions()
         {primary_button_action_, common[14]}, {primary_button_action_, index[0]},
         {secondary_button_action_, common[15]}, {secondary_button_action_, index[1]},
         {stick_click_action_, common[10]}, {stick_click_action_, common[11]},
-        {menu_button_action_, index[2]}, {index_menu_force_action_, index[3]},
+        // Use the left trackpad click for the in-game menu. The Index system
+        // button is reserved by SteamVR for its dashboard and must not be the
+        // only way to send Scrap Mechanic's Esc input.
+        {trackpad_button_action_, index[4]}, {system_button_action_, index[2]},
+        {index_menu_force_action_, index[3]},
         {haptic_action_, common[12]}, {haptic_action_, common[13]}
     };
     const XrActionSuggestedBinding generic_bindings[18]{
@@ -904,7 +911,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
 {
     XrVector2f move{}, turn{};
     bool a = false, b = false, x = false, y = false, left_click = false, right_click = false;
-    bool menu = false;
+    bool menu_button = false, trackpad_button = false, system_button = false;
     float trigger[2]{}, squeeze[2]{}, index_menu_force = 0.0f;
     bool trigger_active[2]{};
     bool index_menu_force_active = false;
@@ -912,7 +919,9 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         !get_boolean(primary_button_action_, 1, a) || !get_boolean(secondary_button_action_, 1, b) ||
         !get_boolean(primary_button_action_, 0, x) || !get_boolean(secondary_button_action_, 0, y) ||
         !get_boolean(stick_click_action_, 0, left_click) || !get_boolean(stick_click_action_, 1, right_click) ||
-        !get_boolean(menu_button_action_, 0, menu) ||
+        !get_boolean(menu_button_action_, 0, menu_button) ||
+        !get_boolean(trackpad_button_action_, 0, trackpad_button) ||
+        !get_boolean(system_button_action_, 0, system_button) ||
         !get_float(index_menu_force_action_, 0, index_menu_force, &index_menu_force_active) ||
         !get_float(trigger_action_, 0, trigger[0], &trigger_active[0]) ||
         !get_float(trigger_action_, 1, trigger[1], &trigger_active[1]) ||
@@ -921,10 +930,47 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         release_injected_input();
         return;
     }
-    // SteamVR commonly reserves the Index system button for its dashboard.
-    // Keep that standard binding, but also make a deliberate left trackpad
-    // press a reliable application-level Menu input.
-    menu = menu || (index_menu_force_active && index_menu_force > 0.55f);
+    // Only the Valve Index interaction profile receives the SteamVR defaults.
+    // Some SteamVR runtimes expose a Quest controller as the KHR generic
+    // profile; treating that as SteamVR would silently change Quest 3's
+    // established menu/sprint controls.
+    const bool steamvr_profile = active_profile_paths_[0] == index_profile_path_ ||
+        active_profile_paths_[1] == index_profile_path_;
+    const ControllerBindings &bindings = steamvr_profile
+        ? config_.steamvr_bindings : config_.quest_bindings;
+    const bool left_trigger = hands_[0].optical ? optical_pinch_down_[0] : trigger[0] > 0.55f;
+    const bool right_trigger = hands_[1].optical ? optical_pinch_down_[1] : trigger[1] > 0.55f;
+    const bool left_grip = squeeze[0] > 0.55f;
+    const bool right_grip = squeeze[1] > 0.55f;
+    auto binding_down = [&](BindingInput binding) -> bool {
+        switch (binding)
+        {
+        case BindingInput::left_primary: return x;
+        case BindingInput::right_primary: return a;
+        case BindingInput::left_secondary: return y;
+        case BindingInput::right_secondary: return b;
+        case BindingInput::left_stick_click: return left_click;
+        case BindingInput::right_stick_click: return right_click;
+        case BindingInput::left_grip: return left_grip;
+        case BindingInput::right_grip: return right_grip;
+        case BindingInput::left_trigger: return left_trigger;
+        case BindingInput::right_trigger: return right_trigger;
+        case BindingInput::left_menu: return menu_button;
+        case BindingInput::right_menu: return false;
+        case BindingInput::left_trackpad_click: return trackpad_button;
+        case BindingInput::right_trackpad_click: return false;
+        case BindingInput::left_system: return system_button;
+        case BindingInput::right_system: return false;
+        case BindingInput::none: default: return false;
+        }
+    };
+    bool menu = binding_down(bindings.menu);
+    // Some SteamVR runtimes expose the Index trackpad's force value but not
+    // its click state. Retain that non-system-button fallback only for the
+    // default trackpad menu binding; a user selecting System can opt into it.
+    if (steamvr_profile && bindings.menu == BindingInput::left_trackpad_click &&
+        index_menu_force_active && index_menu_force > 0.55f)
+        menu = true;
 
     for (uint32_t hand = 0; hand < kHandCount; ++hand)
     {
@@ -944,7 +990,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     refresh_game_bindings(now);
     if (input_rearm_required_)
     {
-        const bool neutral = !a && !b && !x && !y && !left_click && !right_click && !menu &&
+        const bool neutral = !a && !b && !x && !y && !left_click && !right_click && !menu && !system_button &&
             trigger[0] < 0.20f && trigger[1] < 0.20f && !optical_pinch_down_[0] &&
             !optical_pinch_down_[1] && std::fabs(move.x) < 0.20f && std::fabs(move.y) < 0.20f &&
             std::fabs(turn.x) < 0.20f && std::fabs(turn.y) < 0.20f;
@@ -1010,14 +1056,25 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
             controller_trigger_candidate_since_[hand] = now;
         }
     }
-    const bool right_trigger = hands_[1].optical ? optical_pinch_down_[1] : trigger[1] > 0.55f;
-    const bool left_trigger = hands_[0].optical ? optical_pinch_down_[0] : trigger[0] > 0.55f;
     const bool right_trigger_pressed=right_trigger && !right_primary_was_down_;
     const bool left_trigger_pressed=left_trigger && !left_primary_was_down_;
-    const bool right_grip = squeeze[1] > 0.55f;
-    const bool either_grip = right_grip || squeeze[0] > 0.55f;
+    const bool either_grip = right_grip || left_grip;
     const bool quick_transfer = startup_menu_visible_ && a && either_grip;
-    right_use_down_ = !startup_menu_visible_ && b;
+    const bool logical_sprint = binding_down(bindings.sprint);
+    const bool logical_crouch = binding_down(bindings.crouch);
+    const bool logical_jump = binding_down(bindings.jump);
+    const bool logical_use = binding_down(bindings.use);
+    const bool logical_context = binding_down(bindings.context);
+    const bool logical_hotbar_previous = binding_down(bindings.hotbar_previous);
+    const bool logical_hotbar_next = binding_down(bindings.hotbar_next);
+    const bool logical_inventory = binding_down(bindings.inventory);
+    // Scrap Mechanic's native force-build action is the keyboard F key. On a
+    // physical controller, require both right-hand inputs together (index
+    // trigger + middle-finger grip) so an accidental trigger pull can never
+    // toggle force-build by itself. Optical hand tracking keeps its existing
+    // pinch semantics and does not synthesize this controller-only chord.
+    const bool force_build_active = !hands_[1].optical && right_trigger && right_grip;
+    right_use_down_ = !startup_menu_visible_ && logical_use;
     if (startup_menu_visible_)
     {
         // While the dedicated startup panel is present, controller input belongs
@@ -1039,6 +1096,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         send_key('X', false, key_zoom_in_);
         send_key('C', false, key_zoom_out_);
         send_key('I', false, key_inventory_);
+        send_key('F', false, key_force_build_);
         send_key(lift_up_virtual_key_, false, key_lift_up_);
         send_key(lift_down_virtual_key_, false, key_lift_down_);
         send_key(VK_ESCAPE, menu, key_menu_);
@@ -1068,6 +1126,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         hands_[0].interaction = hands_[0].firing = false;
         hands_[1].interaction = hands_[1].firing = false;
         x_was_down_ = y_was_down_ = xy_chord_latched_ = false;
+        inventory_was_down_ = false;
         y_inventory_latched_ = false;
         y_hold_start_ms_ = 0;
         last_turn_update_ms_ = now;
@@ -1075,7 +1134,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         right_primary_was_down_=right_trigger;
         left_primary_was_down_=left_trigger;
         menu_was_down_=menu;
-        b_was_down_=b;
+        b_was_down_=logical_use;
         quick_transfer_was_down_=quick_transfer;
         lift_axis_was_active_=false;
         return;
@@ -1109,18 +1168,22 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     const bool player_seated = scrapvr::tools::is_player_seated();
     const bool player_first_person = scrapvr::tools::is_player_first_person();
     const bool lift_axis_active = !player_seated && right_grip &&
-        std::fabs(turn.y) > deadzone && std::fabs(turn.y) >= std::fabs(turn.x);
+        !force_build_active && std::fabs(turn.y) > deadzone && std::fabs(turn.y) >= std::fabs(turn.x);
     send_key('W', stable_move.y > deadzone, key_forward_);
     send_key('S', stable_move.y < -deadzone, key_backward_);
     send_key('A', stable_move.x < -deadzone, key_left_);
     send_key('D', stable_move.x > deadzone, key_right_);
-    send_key(VK_SHIFT, left_click && !recenter_down, key_sprint_);
-    send_key(VK_CONTROL, right_click && !recenter_down, key_crouch_);
-    send_key(VK_SPACE, a, key_jump_);
-    send_key('E', b, key_use_);
+    send_key(VK_SHIFT, logical_sprint && !recenter_down, key_sprint_);
+    send_key(VK_CONTROL, logical_crouch && !recenter_down, key_crouch_);
+    send_key(VK_SPACE, logical_jump, key_jump_);
+    send_key('E', logical_use, key_use_);
     const scrapvr::tools::ContextAction context_action = scrapvr::tools::active_context_action();
-    const bool contextual_b = b && context_action != scrapvr::tools::ContextAction::none;
+    const bool contextual_b = logical_context && context_action != scrapvr::tools::ContextAction::none;
     send_key('Q', contextual_b, key_context_);
+    const bool force_build_changed = force_build_active != key_force_build_;
+    if (send_key('F', force_build_active, key_force_build_) && force_build_changed)
+        log_line("VR_FORCE_BUILD source=right_index_trigger+right_grip state=%u key=F",
+            force_build_active ? 1u : 0u);
     send_key(lift_up_virtual_key_, lift_axis_active && turn.y > 0.0f, key_lift_up_);
     send_key(lift_down_virtual_key_, lift_axis_active && turn.y < 0.0f, key_lift_down_);
     send_key(VK_ESCAPE, menu, key_menu_);
@@ -1132,7 +1195,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     }
     lift_axis_was_active_ = lift_axis_active;
     quick_transfer_was_down_ = false;
-    if (b && !b_was_down_)
+    if (logical_use && !b_was_down_)
     {
         pulse_haptic(1,0.08f,14,70.0f);
         if (context_action == scrapvr::tools::ContextAction::rotate_placement)
@@ -1166,18 +1229,18 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     // Lua reports first-person, so entering a seat cannot repeatedly cycle the
     // game's camera modes. X/Y become the game's X/C vehicle zoom bindings.
     send_key('V', player_seated && !player_first_person, key_camera_);
-    send_key('X', player_seated && x, key_zoom_in_);
-    send_key('C', player_seated && y, key_zoom_out_);
+    send_key('X', player_seated && logical_hotbar_previous, key_zoom_in_);
+    send_key('C', player_seated && logical_hotbar_next, key_zoom_out_);
     if (!player_seated)
     {
-        if (y && !y_was_down_)
+        if (logical_inventory && !inventory_was_down_)
             y_hold_start_ms_ = now;
-        else if (!y)
+        else if (!logical_inventory)
             y_hold_start_ms_ = 0;
 
-        const bool inventory_chord_pressed = x && y && !xy_chord_latched_ &&
+        const bool inventory_chord_pressed = logical_hotbar_previous && logical_hotbar_next && !xy_chord_latched_ &&
             !y_inventory_latched_;
-        const bool inventory_hold_pressed = y && !x && !y_inventory_latched_ &&
+        const bool inventory_hold_pressed = logical_inventory && !logical_hotbar_previous && !y_inventory_latched_ &&
             !xy_chord_latched_ && y_hold_start_ms_ != 0 &&
             now - y_hold_start_ms_ >= kInventoryHoldMilliseconds;
         if (inventory_chord_pressed || inventory_hold_pressed)
@@ -1187,13 +1250,13 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
             log_line("VR_INVENTORY_REQUEST source=%s key=I pulse=1",
                 inventory_hold_pressed ? "left_Y_hold" : "left_X+Y");
         }
-        if (x && y) xy_chord_latched_ = true;
+        if (logical_hotbar_previous && logical_hotbar_next) xy_chord_latched_ = true;
         if (inventory_hold_pressed) y_inventory_latched_ = true;
         // A one-update key pulse is sufficient for Scrap Mechanic's toggle and
         // cannot leave the inventory action held across a menu/focus transition.
         send_key('I', inventory_chord_pressed || inventory_hold_pressed, key_inventory_);
-        if (!x && x_was_down_ && !xy_chord_latched_) send_mouse_wheel(WHEEL_DELTA);
-        if (!y && y_was_down_ && !xy_chord_latched_ && !y_inventory_latched_)
+        if (!logical_hotbar_previous && x_was_down_ && !xy_chord_latched_) send_mouse_wheel(WHEEL_DELTA);
+        if (!logical_hotbar_next && y_was_down_ && !xy_chord_latched_ && !y_inventory_latched_)
             send_mouse_wheel(-WHEEL_DELTA);
     }
     else
@@ -1203,9 +1266,10 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         y_hold_start_ms_ = 0;
         send_key('I', false, key_inventory_);
     }
-    x_was_down_ = x;
-    y_was_down_ = y;
-    if (!x && !y)
+    x_was_down_ = logical_hotbar_previous;
+    y_was_down_ = logical_hotbar_next;
+    inventory_was_down_ = logical_inventory;
+    if (!logical_hotbar_previous && !logical_hotbar_next)
     {
         xy_chord_latched_ = false;
         y_inventory_latched_ = false;
@@ -1214,7 +1278,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     right_primary_was_down_=right_trigger;
     left_primary_was_down_=left_trigger;
     menu_was_down_=menu;
-    b_was_down_=b;
+    b_was_down_=logical_use;
 
     send_mouse_button(0,right_trigger,mouse_attack_);
     send_mouse_button(1,left_trigger,mouse_secondary_);
@@ -1262,7 +1326,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     if (!input_active_logged_)
     {
         input_active_logged_ = true;
-        log_line("VR_INPUT_ACTIVE mapping=openxr_controller left_profile=%s right_profile=%s locomotion=hmd_relative turn=right_stick_smooth_time_normalized triggers=mouse buttons=right_A_jump,right_B_use+context_Q,left_X_Y_hotbar_or_seated_zoom,left_Y_hold_or_X+Y_inventory,right_grip+stick_lift,grip+A_quick_transfer menu=dedicated_or_index_trackpad recenter=dual_stick_1s route=private_input_event_queue",
+        log_line("VR_INPUT_ACTIVE mapping=openxr_controller left_profile=%s right_profile=%s locomotion=hmd_relative turn=right_stick_smooth_time_normalized triggers=mouse buttons=right_A_jump,right_B_use+context_Q,left_X_Y_hotbar_or_seated_zoom,left_Y_hold_or_X+Y_inventory,right_grip+stick_lift,grip+A_quick_transfer,right_trigger+right_grip_force_build_F menu=dedicated_or_index_trackpad recenter=dual_stick_1s route=private_input_event_queue",
             interaction_profile_name(active_profile_paths_[0]),
             interaction_profile_name(active_profile_paths_[1]));
     }
@@ -1283,6 +1347,7 @@ void InputBridge::release_injected_input()
     send_key('X', false, key_zoom_in_);
     send_key('C', false, key_zoom_out_);
     send_key('I', false, key_inventory_);
+    send_key('F', false, key_force_build_);
     send_key(lift_up_virtual_key_, false, key_lift_up_);
     send_key(lift_down_virtual_key_, false, key_lift_down_);
     send_key(VK_ESCAPE, false, key_menu_);
@@ -1293,6 +1358,7 @@ void InputBridge::release_injected_input()
     right_use_down_ = false;
     ui_scroll_axis_ = 0.0f;
     x_was_down_ = y_was_down_ = xy_chord_latched_ = false;
+    inventory_was_down_ = false;
     y_inventory_latched_ = false;
     y_hold_start_ms_ = 0;
     last_turn_update_ms_ = 0;
@@ -1339,6 +1405,7 @@ void InputBridge::reset_runtime_state()
     input_rearm_required_=true;
     last_haptic_ms_[0]=last_haptic_ms_[1]=0;
     right_primary_was_down_=left_primary_was_down_=menu_was_down_=b_was_down_=false;
+    inventory_was_down_ = false;
     haptic_ready_logged_=haptic_failure_logged_=false;
     for (HandState &hand_state : hands_) hand_state = {};
 }
@@ -1378,7 +1445,7 @@ void InputBridge::shutdown()
     action_set_ = XR_NULL_HANDLE;
     grip_pose_action_ = aim_pose_action_ = trigger_action_ = thumbstick_action_ = squeeze_action_ = XR_NULL_HANDLE;
     primary_button_action_ = secondary_button_action_ = stick_click_action_ = menu_button_action_ =
-        index_menu_force_action_ = haptic_action_ = XR_NULL_HANDLE;
+        trackpad_button_action_ = system_button_action_ = index_menu_force_action_ = haptic_action_ = XR_NULL_HANDLE;
     hand_paths_[0] = hand_paths_[1] = XR_NULL_PATH;
     touch_profile_path_ = index_profile_path_ = generic_profile_path_ = XR_NULL_PATH;
     meta_touch_profile_paths_.fill(XR_NULL_PATH);

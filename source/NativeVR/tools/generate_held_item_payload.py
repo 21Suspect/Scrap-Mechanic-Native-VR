@@ -442,8 +442,11 @@ def patch_carry(text: str) -> str:
         text,
         "\tlocal worldPosition, worldRotation = sm.localPlayer.getConstructionPlacement()\n"
         "\tif worldPosition ~= nil and worldRotation ~= nil then",
-        "\tlocal worldPosition, worldRotation = nil, nil\n"
-        "\tif not vrActive then worldPosition, worldRotation = sm.localPlayer.getConstructionPlacement() end\n"
+        "\t-- The native VR ray hook feeds the current action pose into the engine's\n"
+        "\t-- latest player ray.  Keep using the stock construction-placement helper\n"
+        "\t-- for VR as well so carried bodies (including multi-shape/large items) get\n"
+        "\t-- the same grid snapping and collision validation as desktop placement.\n"
+        "\tlocal worldPosition, worldRotation = sm.localPlayer.getConstructionPlacement()\n"
         "\tif worldPosition ~= nil and worldRotation ~= nil then",
         "Carry desktop construction placement",
     )

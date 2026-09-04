@@ -3,6 +3,7 @@
 #include "mechanic_hands_asset.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cmath>
 #include <cstring>
@@ -33,6 +34,9 @@ namespace scrapvr::hands
 			bool precise_fingers = false;
 		};
 		struct HandConstants { Matrix mvp; Matrix model; Matrix bones[kHandBoneCount]; float eye_position[4]; };
+		struct HudVertex { float position[3]; float uv[2]; };
+		struct HudConstants { Matrix mvp; };
+		struct HudColor { uint8_t r, g, b, a; };
 		struct TgaHeader
 		{
 			uint8_t id_length, color_map_type, image_type;
@@ -57,6 +61,49 @@ namespace scrapvr::hands
 		ID3D11Texture2D *g_depth_texture = nullptr;
 		ID3D11DepthStencilView *g_depth_view = nullptr;
 		uint32_t g_depth_width = 0, g_depth_height = 0;
+		ID3D11Buffer *g_hud_vertex_buffer = nullptr;
+		ID3D11Buffer *g_hud_constant_buffer = nullptr;
+		ID3D11VertexShader *g_hud_vertex_shader = nullptr;
+		ID3D11PixelShader *g_hud_pixel_shader = nullptr;
+		ID3D11InputLayout *g_hud_input_layout = nullptr;
+		ID3D11Texture2D *g_hud_texture_resource = nullptr;
+		ID3D11ShaderResourceView *g_hud_texture = nullptr;
+		ID3D11SamplerState *g_hud_sampler = nullptr;
+		ID3D11BlendState *g_hud_blend_state = nullptr;
+		ID3D11DepthStencilState *g_hud_depth_state = nullptr;
+		std::vector<uint8_t> g_hud_pixels;
+		ULONGLONG g_hud_last_update_ms = 0;
+		float g_hud_last_heading = 100.0f;
+		scrapvr::tools::WristHudState g_hud_last_state{};
+		constexpr uint32_t kHudCurveSegments = 8;
+		constexpr uint32_t kHudVerticesPerPanel = kHudCurveSegments * 6;
+		// A slightly deeper bow keeps the card wrapped to the glove when viewed
+		// from above, without introducing visible faceting or bending the text.
+		constexpr float kHudCurveDepth = 0.023f;
+		constexpr float kHudWidth = 0.144f;
+		constexpr float kHudHeight = 0.072f;
+		// Fixed smartwatch pose. Keep the small dorsal-wrist lift, then move the
+		// display along the controller's local forward axis (negative local Z) so
+		// it sits on the glove instead of floating behind the cuff. The slightly
+		// overturned pitch tips its face away from the player. The same local pose
+		// is used for both mirrored hands.
+		constexpr float kHudWristOffsetX = 0.000f;
+		constexpr float kHudWristOffsetY = 0.055f;
+		constexpr float kHudWristOffsetZ = 0.065f;
+		constexpr float kHudDefaultScale = 0.800f;
+		constexpr float kHudDefaultPitchRadians = -1.83259571459404601923f; // -105 deg
+		struct HudPoseConfig
+		{
+			float position_x;
+			float position_y;
+			float position_z;
+			float pitch_radians;
+			float scale;
+		};
+		constexpr HudPoseConfig kHudPose = {
+			kHudWristOffsetX, kHudWristOffsetY, kHudWristOffsetZ,
+			kHudDefaultPitchRadians, kHudDefaultScale
+		};
 		TrackedPose g_poses[2];
 		bool g_initialized = false;
 		bool g_render_logged = false;
@@ -220,6 +267,465 @@ namespace scrapvr::hands
 		{
 			Matrix result = identity(); const float c = std::cos(angle), s = std::sin(angle);
 			result.m[5] = c; result.m[9] = -s; result.m[6] = s; result.m[10] = c; return result;
+		}
+
+		Matrix scale_xyz(float x, float y, float z)
+		{
+			Matrix result = identity();
+			result.m[0] = x; result.m[5] = y; result.m[10] = z;
+			return result;
+		}
+
+		void put_hud_pixel(std::vector<uint8_t> &pixels, uint32_t width, uint32_t height,
+			int x, int y, HudColor color)
+		{
+			if (x < 0 || y < 0 || static_cast<uint32_t>(x) >= width || static_cast<uint32_t>(y) >= height ||
+				color.a == 0) return;
+			uint8_t *destination = pixels.data() + (static_cast<size_t>(y) * width + static_cast<size_t>(x)) * 4;
+			const float alpha = static_cast<float>(color.a) / 255.0f;
+			const float inverse = 1.0f - alpha;
+			destination[0] = static_cast<uint8_t>(std::clamp(alpha * color.r + inverse * destination[0], 0.0f, 255.0f));
+			destination[1] = static_cast<uint8_t>(std::clamp(alpha * color.g + inverse * destination[1], 0.0f, 255.0f));
+			destination[2] = static_cast<uint8_t>(std::clamp(alpha * color.b + inverse * destination[2], 0.0f, 255.0f));
+			destination[3] = static_cast<uint8_t>(std::clamp(static_cast<float>(color.a) + inverse * destination[3], 0.0f, 255.0f));
+		}
+
+		void fill_hud_rect(std::vector<uint8_t> &pixels, uint32_t width, uint32_t height,
+			int left, int top, int right, int bottom, HudColor color)
+		{
+			for (int y = std::max(0, top); y < std::min(static_cast<int>(height), bottom); ++y)
+				for (int x = std::max(0, left); x < std::min(static_cast<int>(width), right); ++x)
+					put_hud_pixel(pixels, width, height, x, y, color);
+		}
+
+		void fill_hud_round_rect(std::vector<uint8_t> &pixels, uint32_t width, uint32_t height,
+			int left, int top, int right, int bottom, int radius, HudColor color)
+		{
+			if (right <= left || bottom <= top) return;
+			radius = std::max(0, std::min(radius, std::min((right - left) / 2, (bottom - top) / 2)));
+			const float radius_squared = static_cast<float>(radius * radius);
+			for (int y = std::max(0, top); y < std::min(static_cast<int>(height), bottom); ++y)
+				for (int x = std::max(0, left); x < std::min(static_cast<int>(width), right); ++x)
+				{
+					int cx = x, cy = y;
+					if (x < left + radius) cx = left + radius;
+					else if (x >= right - radius) cx = right - radius - 1;
+					if (y < top + radius) cy = top + radius;
+					else if (y >= bottom - radius) cy = bottom - radius - 1;
+					const float dx = static_cast<float>(x - cx), dy = static_cast<float>(y - cy);
+					if ((x >= left + radius && x < right - radius) ||
+						(y >= top + radius && y < bottom - radius) || dx * dx + dy * dy <= radius_squared)
+						put_hud_pixel(pixels, width, height, x, y, color);
+				}
+		}
+
+		void draw_hud_line(std::vector<uint8_t> &pixels, uint32_t width, uint32_t height,
+			int x0, int y0, int x1, int y1, int thickness, HudColor color)
+		{
+			const int dx = std::abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+			const int dy = -std::abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+			int error = dx + dy, x = x0, y = y0;
+			const int radius = std::max(0, thickness / 2);
+			for (;;)
+			{
+				fill_hud_rect(pixels, width, height, x - radius, y - radius,
+					x + radius + 1, y + radius + 1, color);
+				if (x == x1 && y == y1) break;
+				const int twice = 2 * error;
+				if (twice >= dy) { error += dy; x += sx; }
+				if (twice <= dx) { error += dx; y += sy; }
+			}
+		}
+
+		void draw_hud_diamond(std::vector<uint8_t> &pixels, uint32_t width, uint32_t height,
+			int center_x, int center_y, int radius, HudColor color)
+		{
+			radius = std::max(1, radius);
+			for (int row = -radius; row <= radius; ++row)
+			{
+				const int half_width = radius - std::abs(row);
+				fill_hud_rect(pixels, width, height,
+					center_x - half_width, center_y + row,
+					center_x + half_width + 1, center_y + row + 1, color);
+			}
+		}
+
+		std::array<uint8_t, 7> hud_glyph(char value)
+		{
+			if (value >= 'a' && value <= 'z') value = static_cast<char>(value - 'a' + 'A');
+			switch (value)
+			{
+			case 'A': return {0x0e,0x11,0x11,0x1f,0x11,0x11,0x11};
+			case 'B': return {0x1e,0x11,0x11,0x1e,0x11,0x11,0x1e};
+			case 'C': return {0x0f,0x10,0x10,0x10,0x10,0x10,0x0f};
+			case 'D': return {0x1e,0x11,0x11,0x11,0x11,0x11,0x1e};
+			case 'E': return {0x1f,0x10,0x10,0x1e,0x10,0x10,0x1f};
+			case 'F': return {0x1f,0x10,0x10,0x1e,0x10,0x10,0x10};
+			case 'G': return {0x0f,0x10,0x10,0x17,0x11,0x11,0x0f};
+			case 'H': return {0x11,0x11,0x11,0x1f,0x11,0x11,0x11};
+			case 'I': return {0x1f,0x04,0x04,0x04,0x04,0x04,0x1f};
+			case 'J': return {0x01,0x01,0x01,0x01,0x11,0x11,0x0e};
+			case 'K': return {0x11,0x12,0x14,0x18,0x14,0x12,0x11};
+			case 'L': return {0x10,0x10,0x10,0x10,0x10,0x10,0x1f};
+			case 'M': return {0x11,0x1b,0x15,0x15,0x11,0x11,0x11};
+			case 'N': return {0x11,0x19,0x15,0x13,0x11,0x11,0x11};
+			case 'O': return {0x0e,0x11,0x11,0x11,0x11,0x11,0x0e};
+			case 'P': return {0x1e,0x11,0x11,0x1e,0x10,0x10,0x10};
+			case 'Q': return {0x0e,0x11,0x11,0x11,0x15,0x12,0x0d};
+			case 'R': return {0x1e,0x11,0x11,0x1e,0x14,0x12,0x11};
+			case 'S': return {0x0f,0x10,0x10,0x0e,0x01,0x01,0x1e};
+			case 'T': return {0x1f,0x04,0x04,0x04,0x04,0x04,0x04};
+			case 'U': return {0x11,0x11,0x11,0x11,0x11,0x11,0x0e};
+			case 'V': return {0x11,0x11,0x11,0x11,0x11,0x0a,0x04};
+			case 'W': return {0x11,0x11,0x11,0x15,0x15,0x1b,0x11};
+			case 'X': return {0x11,0x11,0x0a,0x04,0x0a,0x11,0x11};
+			case 'Y': return {0x11,0x11,0x0a,0x04,0x04,0x04,0x04};
+			case 'Z': return {0x1f,0x01,0x02,0x04,0x08,0x10,0x1f};
+			case '0': return {0x0e,0x11,0x13,0x15,0x19,0x11,0x0e};
+			case '1': return {0x04,0x0c,0x04,0x04,0x04,0x04,0x0e};
+			case '2': return {0x0e,0x11,0x01,0x02,0x04,0x08,0x1f};
+			case '3': return {0x1e,0x01,0x01,0x0e,0x01,0x01,0x1e};
+			case '4': return {0x02,0x06,0x0a,0x12,0x1f,0x02,0x02};
+			case '5': return {0x1f,0x10,0x10,0x1e,0x01,0x01,0x1e};
+			case '6': return {0x0e,0x10,0x10,0x1e,0x11,0x11,0x0e};
+			case '7': return {0x1f,0x01,0x02,0x04,0x08,0x08,0x08};
+			case '8': return {0x0e,0x11,0x11,0x0e,0x11,0x11,0x0e};
+			case '9': return {0x0e,0x11,0x11,0x0f,0x01,0x01,0x0e};
+			case ':': return {0x00,0x04,0x04,0x00,0x04,0x04,0x00};
+			case '.': return {0x00,0x00,0x00,0x00,0x00,0x0c,0x0c};
+			case '-': return {0x00,0x00,0x00,0x1f,0x00,0x00,0x00};
+			case '/': return {0x01,0x02,0x02,0x04,0x08,0x08,0x10};
+			case '%': return {0x19,0x19,0x02,0x04,0x08,0x13,0x13};
+			default: return {0,0,0,0,0,0,0};
+			}
+		}
+
+		int hud_text_width(const std::string &text, int scale, int spacing = 2)
+		{
+			if (text.empty()) return 0;
+			return static_cast<int>(text.size()) * (5 * scale + spacing) - spacing;
+		}
+
+		void draw_hud_text(std::vector<uint8_t> &pixels, uint32_t width, uint32_t height,
+			int x, int y, const std::string &text, int scale, HudColor color, int spacing = 2)
+		{
+			if (scale <= 0) return;
+			for (char value : text)
+			{
+				const std::array<uint8_t, 7> rows = hud_glyph(value);
+				for (int row = 0; row < 7; ++row)
+					for (int column = 0; column < 5; ++column)
+						if (rows[static_cast<size_t>(row)] & (1u << (4 - column)))
+							fill_hud_rect(pixels, width, height, x + column * scale,
+								y + row * scale, x + (column + 1) * scale,
+								y + (row + 1) * scale, color);
+				x += 5 * scale + spacing;
+			}
+		}
+
+		void draw_hud_text_center(std::vector<uint8_t> &pixels, uint32_t width, uint32_t height,
+			int center_x, int y, const std::string &text, int scale, HudColor color, int spacing = 2)
+		{
+			draw_hud_text(pixels, width, height, center_x - hud_text_width(text, scale, spacing) / 2,
+				y, text, scale, color, spacing);
+		}
+
+		void draw_hud_text_right(std::vector<uint8_t> &pixels, uint32_t width, uint32_t height,
+			int right_x, int y, const std::string &text, int scale, HudColor color, int spacing = 2)
+		{
+			draw_hud_text(pixels, width, height, right_x - hud_text_width(text, scale, spacing),
+				y, text, scale, color, spacing);
+		}
+
+		std::string hud_two_digits(uint32_t value)
+		{
+			value %= 100;
+			std::string result(2, '0');
+			result[0] = static_cast<char>('0' + value / 10);
+			result[1] = static_cast<char>('0' + value % 10);
+			return result;
+		}
+
+		std::string hud_clock(uint32_t minutes)
+		{
+			minutes %= 1440;
+			return hud_two_digits(minutes / 60) + ":" + hud_two_digits(minutes % 60);
+		}
+
+		float hud_normalize_angle(float angle)
+		{
+			constexpr float two_pi = 6.28318530717958647692f;
+			while (angle > 3.14159265358979323846f) angle -= two_pi;
+			while (angle < -3.14159265358979323846f) angle += two_pi;
+			return angle;
+		}
+
+		void draw_hud_heart(std::vector<uint8_t> &pixels, uint32_t width, uint32_t height,
+			int left, int top, int scale, HudColor color)
+		{
+			static constexpr uint8_t rows[] = { 0x0a, 0x1f, 0x1f, 0x1f, 0x0e, 0x04 };
+			for (size_t row = 0; row < sizeof(rows); ++row)
+				for (int column = 0; column < 5; ++column)
+					if (rows[row] & (1u << (4 - column)))
+						fill_hud_rect(pixels, width, height, left + column * scale,
+							top + static_cast<int>(row) * scale,
+							left + (column + 1) * scale, top + (static_cast<int>(row) + 1) * scale, color);
+		}
+
+		void draw_wrist_hud_bitmap(std::vector<uint8_t> &pixels,
+			const scrapvr::tools::WristHudState &state, float heading)
+		{
+			constexpr uint32_t width = 512, height = 512;
+			pixels.assign(static_cast<size_t>(width) * height * 4, 0);
+			const uint32_t clock_minutes = state.time_minutes % 1440;
+			const bool night_mode = state.active &&
+				(clock_minutes < 360 || clock_minutes >= 1080);
+			const HudColor outline = night_mode
+				? HudColor{145, 150, 154, 215} : HudColor{255, 204, 63, 235};
+			const HudColor panel = night_mode
+				? HudColor{3, 8, 14, 224} : HudColor{10, 24, 36, 218};
+			const HudColor white = night_mode
+				? HudColor{196, 207, 211, 238} : HudColor{232, 241, 242, 245};
+			const HudColor muted = night_mode
+				? HudColor{116, 128, 134, 218} : HudColor{154, 174, 181, 225};
+			const HudColor yellow = night_mode
+				? HudColor{196, 166, 67, 245} : HudColor{255, 204, 63, 255};
+			const HudColor oxygen_blue = night_mode
+				? HudColor{55, 136, 202, 245} : HudColor{67, 174, 244, 255};
+
+			// Each wrist is a compact single-face display. The transparent canvas
+			// outside these two faces keeps the glove and scene visible around them.
+			fill_hud_round_rect(pixels, width, height, 52, 38, 460, 214, 20, outline);
+			fill_hud_round_rect(pixels, width, height, 57, 43, 455, 209, 16, panel);
+			draw_hud_text(pixels, width, height, 73, 61, "HP", 2, white, 3);
+			draw_hud_heart(pixels, width, height, 111, 61, 2, yellow);
+			const bool has_values = state.active && state.max_health > 0.0f;
+			const float ratio = has_values ? std::clamp(state.health / state.max_health, 0.0f, 1.0f) : 0.0f;
+			std::string health_text = has_values
+				? std::to_string(static_cast<int>(std::lround(std::max(0.0f, state.health)))) + "/" +
+					std::to_string(static_cast<int>(std::lround(std::max(1.0f, state.max_health))))
+				: "--/--";
+			draw_hud_text_right(pixels, width, height, 438, 61, health_text, 2, white, 2);
+			fill_hud_round_rect(pixels, width, height, 73, 99, 439, 119, 8, HudColor{3, 10, 16, 235});
+			if (has_values)
+			{
+				const HudColor health_color = ratio <= 0.25f ? HudColor{231, 82, 67, 255} :
+					ratio <= 0.55f ? HudColor{255, 180, 45, 255} : HudColor{95, 206, 119, 255};
+				fill_hud_round_rect(pixels, width, height, 76, 102,
+					76 + static_cast<int>(360.0f * ratio), 116, 6, health_color);
+			}
+			else
+				fill_hud_round_rect(pixels, width, height, 76, 102, 436, 116, 6, HudColor{77, 98, 106, 180});
+
+			// Survival exposes breath only while the player is submerged. Keep the
+			// compact card unchanged at the surface, and insert an oxygen row directly
+			// below HP as soon as breath starts falling. The blue fill mirrors the
+			// game's oxygen bar and the numeric value remains readable in low light.
+			const bool has_oxygen = state.active && state.max_breath > 0.0f;
+			const bool oxygen_depleted = has_oxygen && state.breath < state.max_breath - 0.05f;
+			int time_y = 149;
+			if (oxygen_depleted)
+			{
+				draw_hud_text(pixels, width, height, 73, 128, "O2", 2, muted, 3);
+				draw_hud_text_right(pixels, width, height, 438, 128,
+					std::to_string(static_cast<int>(std::lround(std::max(0.0f, state.breath)))) + "/" +
+					std::to_string(static_cast<int>(std::lround(std::max(1.0f, state.max_breath)))),
+					2, white, 2);
+				fill_hud_round_rect(pixels, width, height, 73, 153, 439, 173, 8,
+					HudColor{3, 10, 16, 235});
+				const float oxygen_ratio = std::clamp(state.breath / state.max_breath, 0.0f, 1.0f);
+				if (oxygen_ratio > 0.0f)
+					fill_hud_round_rect(pixels, width, height, 76, 156,
+						76 + static_cast<int>(360.0f * oxygen_ratio), 170, 6, oxygen_blue);
+				time_y = 184;
+			}
+			draw_hud_text(pixels, width, height, 73, time_y, "TIME", 2, muted, 3);
+			draw_hud_text(pixels, width, height, 151, time_y - 3,
+				state.active ? hud_clock(state.time_minutes) : "--:--", 2, yellow, 3);
+			draw_hud_text_right(pixels, width, height, 438, time_y,
+				state.active && state.conscious ? "OK" : "DOWN", 2,
+				state.active && state.conscious ? muted : HudColor{231, 82, 67, 255}, 3);
+
+			// Right wrist: a simple compass strip with one fixed index. The labels
+			// slide underneath it as the player turns the in-game camera or headset;
+			// pitch and roll are excluded from the world-space heading.
+			fill_hud_round_rect(pixels, width, height, 52, 298, 460, 474, 20, outline);
+			fill_hud_round_rect(pixels, width, height, 57, 303, 455, 469, 16, panel);
+			draw_hud_text(pixels, width, height, 73, 321, "COMPASS", 2, white, 3);
+			const int degrees = static_cast<int>(std::lround((heading < 0.0f ? heading + 6.28318530718f : heading) *
+				180.0f / 3.14159265359f)) % 360;
+			draw_hud_text_right(pixels, width, height, 438, 321,
+				std::to_string(degrees) + " DEG", 2, muted, 2);
+			fill_hud_round_rect(pixels, width, height, 73, 366, 439, 444, 10, HudColor{3, 10, 16, 235});
+			fill_hud_rect(pixels, width, height, 79, 405, 433, 407, HudColor{67, 93, 102, 180});
+			for (int tick = 0; tick < 24; ++tick)
+			{
+				const float world_angle = static_cast<float>(tick) * (3.14159265359f / 12.0f);
+				const float relative = hud_normalize_angle(world_angle - heading);
+				const int x = static_cast<int>(std::lround(256.0f + relative * 103.0f));
+				if (x < 84 || x > 428) continue;
+				const int tick_height = tick % 6 == 0 ? 19 : (tick % 3 == 0 ? 13 : 8);
+				draw_hud_line(pixels, width, height, x, 405 - tick_height / 2,
+					x, 405 + tick_height / 2, tick % 6 == 0 ? 3 : 2, muted);
+			}
+			static constexpr char cardinal[] = {'N', 'E', 'S', 'W'};
+			for (int index = 0; index < 4; ++index)
+			{
+				const float world_angle = static_cast<float>(index) * (3.14159265359f / 2.0f);
+				const float relative = hud_normalize_angle(world_angle - heading);
+				const int x = static_cast<int>(std::lround(256.0f + relative * 103.0f));
+				if (x < 90 || x > 422) continue;
+				const std::string label(1, cardinal[index]);
+				draw_hud_text_center(pixels, width, height, x, 416, label, 2,
+					std::fabs(relative) < 0.18f ? yellow : white, 2);
+			}
+			// Mirror the game's live compass icons. The Lua bridge supplies a
+			// world bearing and distance for every visible marker (quest/beacon,
+			// raid/event, enemy, and lost-item markers). Clamp off-screen markers to
+			// the strip edges just like the desktop compass rather than dropping them.
+			int last_distance_label_x = -10000;
+			uint32_t distance_labels = 0;
+			const uint32_t waypoint_count = std::min<uint32_t>(
+				state.waypoint_count, static_cast<uint32_t>(scrapvr::tools::kMaxWristHudWaypoints));
+			for (uint32_t index = 0; index < waypoint_count; ++index)
+			{
+				const scrapvr::tools::WristHudWaypoint &waypoint = state.waypoints[index];
+				if (!std::isfinite(waypoint.angle) || !std::isfinite(waypoint.distance) ||
+					waypoint.distance < 0.0f) continue;
+				const float relative = hud_normalize_angle(waypoint.angle - heading);
+				const int raw_x = static_cast<int>(std::lround(256.0f + relative * 103.0f));
+				const int x = std::clamp(raw_x, 86, 426);
+				HudColor marker_color = yellow;
+				switch (waypoint.kind)
+				{
+				case 2: marker_color = night_mode ? HudColor{213, 94, 84, 245} : HudColor{239, 92, 76, 255}; break;
+				case 3: marker_color = night_mode ? HudColor{63, 151, 194, 245} : HudColor{67, 184, 232, 255}; break;
+				case 4: marker_color = night_mode ? HudColor{157, 113, 190, 245} : HudColor{191, 136, 224, 255}; break;
+				default: break;
+				}
+				draw_hud_diamond(pixels, width, height, x, 379, 9, HudColor{3, 10, 16, 240});
+				draw_hud_diamond(pixels, width, height, x, 379, 6, marker_color);
+				if (raw_x < 86)
+					draw_hud_line(pixels, width, height, x + 6, 379, x + 1, 373, 2, marker_color);
+				else if (raw_x > 426)
+					draw_hud_line(pixels, width, height, x - 6, 379, x - 1, 373, 2, marker_color);
+				if (distance_labels < 6 && x >= 101 && x <= 411 &&
+					std::abs(x - last_distance_label_x) >= 30)
+				{
+					const uint32_t metres = static_cast<uint32_t>(std::clamp(
+						std::lround(waypoint.distance), 0l, 99999l));
+					draw_hud_text_center(pixels, width, height, x, 389,
+						std::to_string(metres) + "M", 1, white, 1);
+					last_distance_label_x = x;
+					++distance_labels;
+				}
+			}
+			// Fixed index and a small chevron keep the current heading unambiguous.
+			draw_hud_line(pixels, width, height, 256, 374, 256, 437, 3, yellow);
+			draw_hud_line(pixels, width, height, 250, 380, 256, 371, 3, yellow);
+			draw_hud_line(pixels, width, height, 262, 380, 256, 371, 3, yellow);
+		}
+
+		bool hud_waypoints_changed(const scrapvr::tools::WristHudState &left,
+			const scrapvr::tools::WristHudState &right)
+		{
+			if (left.waypoint_count != right.waypoint_count) return true;
+			const uint32_t count = std::min<uint32_t>(left.waypoint_count,
+				static_cast<uint32_t>(scrapvr::tools::kMaxWristHudWaypoints));
+			for (uint32_t index = 0; index < count; ++index)
+			{
+				const auto &a = left.waypoints[index];
+				const auto &b = right.waypoints[index];
+				if (a.kind != b.kind || std::fabs(a.angle - b.angle) >= 0.004f ||
+					std::fabs(a.distance - b.distance) >= 0.25f) return true;
+			}
+			return false;
+		}
+
+		void update_hud_texture(ID3D11DeviceContext *context,
+			const scrapvr::tools::WristHudState &state, float heading)
+		{
+			if (!context || !g_hud_texture_resource) return;
+			const ULONGLONG now = GetTickCount64();
+			const bool state_changed = state.active != g_hud_last_state.active ||
+				state.conscious != g_hud_last_state.conscious ||
+				std::fabs(state.health - g_hud_last_state.health) >= 0.05f ||
+				std::fabs(state.max_health - g_hud_last_state.max_health) >= 0.05f ||
+				std::fabs(state.breath - g_hud_last_state.breath) >= 0.05f ||
+				std::fabs(state.max_breath - g_hud_last_state.max_breath) >= 0.05f ||
+				state.time_minutes != g_hud_last_state.time_minutes ||
+				hud_waypoints_changed(state, g_hud_last_state);
+			// The compass is intentionally refreshed at most 20 Hz. This keeps the
+			// VR render thread free of per-frame CPU bitmap work while remaining
+			// visually smooth on a moving wrist; vitals still update immediately.
+			if (!state_changed && now - g_hud_last_update_ms < 50) return;
+			if (!state_changed && std::fabs(heading - g_hud_last_heading) < 0.01f &&
+				now - g_hud_last_update_ms < 250) return;
+			draw_wrist_hud_bitmap(g_hud_pixels, state, heading);
+			D3D11_MAPPED_SUBRESOURCE mapped{};
+			if (SUCCEEDED(context->Map(g_hud_texture_resource, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped)))
+			{
+				for (uint32_t row = 0; row < 512; ++row)
+					std::memcpy(static_cast<uint8_t *>(mapped.pData) + static_cast<size_t>(row) * mapped.RowPitch,
+						g_hud_pixels.data() + static_cast<size_t>(row) * 512 * 4, 512 * 4);
+				context->Unmap(g_hud_texture_resource, 0);
+				g_hud_last_update_ms = now;
+				g_hud_last_heading = heading;
+				g_hud_last_state = state;
+			}
+		}
+
+		void render_wrist_hud(ID3D11DeviceContext *context, ID3D11RenderTargetView *target,
+			uint32_t width, uint32_t height, const XrView &eye, float world_heading)
+		{
+			if (!context || !target || !g_hud_texture || !g_hud_vertex_buffer ||
+				!g_hud_constant_buffer || !g_hud_vertex_shader || !g_hud_pixel_shader ||
+				!g_hud_input_layout || !g_hud_sampler || !g_hud_blend_state || !g_hud_depth_state)
+				return;
+			const scrapvr::tools::WristHudState state = scrapvr::tools::wrist_hud_state();
+			if (!state.active) return;
+			// Compass labels use the engine's world-space camera heading combined with
+			// the horizontal headset rotation relative to the recentered view. Pitch
+			// and roll are discarded, so looking up/down or tilting the wrist cannot
+			// change the displayed world direction.
+			const float heading = std::isfinite(world_heading) ? world_heading : 0.0f;
+			update_hud_texture(context, state, heading);
+			context->OMSetRenderTargets(1, &target, nullptr);
+			const float blend_factor[4] = {};
+			context->OMSetBlendState(g_hud_blend_state, blend_factor, 0xffffffffu);
+			D3D11_VIEWPORT viewport = {0.0f, 0.0f, static_cast<float>(width),
+				static_cast<float>(height), 0.0f, 1.0f};
+			context->RSSetViewports(1, &viewport);
+			context->RSSetState(g_rasterizer);
+			context->OMSetDepthStencilState(g_hud_depth_state, 0);
+			context->IASetInputLayout(g_hud_input_layout);
+			context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			context->VSSetShader(g_hud_vertex_shader, nullptr, 0);
+			context->VSSetConstantBuffers(0, 1, &g_hud_constant_buffer);
+			context->PSSetShader(g_hud_pixel_shader, nullptr, 0);
+			context->PSSetShaderResources(0, 1, &g_hud_texture);
+			context->PSSetSamplers(0, 1, &g_hud_sampler);
+			const Matrix view_projection = multiply(projection(eye.fov), inverse_pose(eye.pose));
+			UINT stride = sizeof(HudVertex), offset = 0;
+			context->IASetVertexBuffers(0, 1, &g_hud_vertex_buffer, &stride, &offset);
+			for (uint32_t hand = 0; hand < 2; ++hand)
+			{
+				if (!g_poses[hand].active) continue;
+				// The compact card is fixed to the dorsal wrist like a smartwatch.
+				// Both hands use this mirrored controller-local pose; local -Z follows
+				// the fingers, keeping the full card surface on the glove when extended.
+				const HudPoseConfig &pose = kHudPose;
+				const Matrix local = multiply(
+					translation(pose.position_x, pose.position_y, pose.position_z),
+					multiply(rotation_x(pose.pitch_radians),
+						scale_xyz(kHudWidth * pose.scale, kHudHeight * pose.scale, pose.scale)));
+				const Matrix model = multiply(pose_matrix(g_poses[hand].pose), local);
+				HudConstants constants = {multiply(view_projection, model)};
+				context->UpdateSubresource(g_hud_constant_buffer, 0, nullptr, &constants, 0, 0);
+				context->Draw(kHudVerticesPerPanel, hand == 0 ? 0 : kHudVerticesPerPanel);
+			}
+			ID3D11ShaderResourceView *none = nullptr;
+			context->PSSetShaderResources(0, 1, &none);
 		}
 
 		float finger_joint_angle(const TrackedPose &pose, int finger, int segment)
@@ -556,7 +1062,6 @@ namespace scrapvr::hands
 		g_device = device; g_log = log;
 		if (!g_device)
 			return false;
-
 		const char *shader = R"(
 			cbuffer HandConstants : register(b0) { float4x4 mvp; float4x4 model; float4x4 bones[28]; float4 eye_position; };
 			struct VSIn { float3 position : POSITION; float3 normal : NORMAL; float2 uv : TEXCOORD0; uint4 joints : BLENDINDICES; float4 weights : BLENDWEIGHT; };
@@ -584,10 +1089,21 @@ namespace scrapvr::hands
 				return float4(saturate((linear_lit - 0.18) * 1.08 + 0.16), 1.0);
 			}
 		)";
+		const char *hud_shader = R"(
+			cbuffer HudConstants : register(b0) { float4x4 mvp; };
+			struct VSIn { float3 position : POSITION; float2 uv : TEXCOORD0; };
+			struct VSOut { float4 position : SV_POSITION; float2 uv : TEXCOORD0; };
+			VSOut vs_hud(VSIn input) {
+				VSOut output; output.position = mul(mvp, float4(input.position, 1.0));
+				output.uv = input.uv; return output;
+			}
+			Texture2D hud_texture : register(t0); SamplerState hud_sampler : register(s0);
+			float4 ps_hud(VSOut input) : SV_TARGET { return hud_texture.Sample(hud_sampler, input.uv); }
+		)";
 		HMODULE compiler = LoadLibraryW(L"d3dcompiler_47.dll");
 		using Compile = HRESULT (WINAPI *)(LPCVOID, SIZE_T, LPCSTR, const void *, void *, LPCSTR, LPCSTR, UINT, UINT, ID3DBlob **, ID3DBlob **);
 		auto compile = compiler ? reinterpret_cast<Compile>(GetProcAddress(compiler, "D3DCompile")) : nullptr;
-		ID3DBlob *vs_blob = nullptr, *ps_blob = nullptr, *errors = nullptr;
+		ID3DBlob *vs_blob = nullptr, *ps_blob = nullptr, *hud_vs_blob = nullptr, *hud_ps_blob = nullptr, *errors = nullptr;
 		if (!compile || FAILED(compile(shader, std::strlen(shader), "vr_hands", nullptr, nullptr, "vs_main", "vs_5_0", 0, 0, &vs_blob, &errors)))
 		{
 			if (g_log) g_log("VR HAND RENDERER: vertex shader compilation failed%s%s", errors ? ": " : "", errors ? static_cast<const char *>(errors->GetBufferPointer()) : "");
@@ -597,11 +1113,30 @@ namespace scrapvr::hands
 		if (FAILED(compile(shader, std::strlen(shader), "vr_hands", nullptr, nullptr, "ps_main", "ps_5_0", 0, 0, &ps_blob, &errors)))
 		{
 			if (g_log) g_log("VR HAND RENDERER: pixel shader compilation failed%s%s", errors ? ": " : "", errors ? static_cast<const char *>(errors->GetBufferPointer()) : "");
-			release(errors); release(vs_blob); if (compiler) FreeLibrary(compiler); return false;
+			 release(errors); release(vs_blob); if (compiler) FreeLibrary(compiler); return false;
+		}
+		release(errors);
+		if (FAILED(compile(hud_shader, std::strlen(hud_shader), "vr_wrist_hud", nullptr, nullptr,
+			"vs_hud", "vs_5_0", 0, 0, &hud_vs_blob, &errors)))
+		{
+			if (g_log) g_log("VR WRIST HUD: vertex shader compilation failed%s%s", errors ? ": " : "",
+				errors ? static_cast<const char *>(errors->GetBufferPointer()) : "");
+			release(errors); release(vs_blob); release(ps_blob); if (compiler) FreeLibrary(compiler); return false;
+		}
+		release(errors);
+		if (FAILED(compile(hud_shader, std::strlen(hud_shader), "vr_wrist_hud", nullptr, nullptr,
+			"ps_hud", "ps_5_0", 0, 0, &hud_ps_blob, &errors)))
+		{
+			if (g_log) g_log("VR WRIST HUD: pixel shader compilation failed%s%s", errors ? ": " : "",
+				errors ? static_cast<const char *>(errors->GetBufferPointer()) : "");
+			release(errors); release(vs_blob); release(ps_blob); release(hud_vs_blob);
+			if (compiler) FreeLibrary(compiler); return false;
 		}
 		if (compiler) FreeLibrary(compiler);
 		if (FAILED(g_device->CreateVertexShader(vs_blob->GetBufferPointer(), vs_blob->GetBufferSize(), nullptr, &g_vertex_shader)) ||
-			FAILED(g_device->CreatePixelShader(ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), nullptr, &g_pixel_shader)))
+			FAILED(g_device->CreatePixelShader(ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), nullptr, &g_pixel_shader)) ||
+			FAILED(g_device->CreateVertexShader(hud_vs_blob->GetBufferPointer(), hud_vs_blob->GetBufferSize(), nullptr, &g_hud_vertex_shader)) ||
+			FAILED(g_device->CreatePixelShader(hud_ps_blob->GetBufferPointer(), hud_ps_blob->GetBufferSize(), nullptr, &g_hud_pixel_shader)))
 			return false;
 		D3D11_INPUT_ELEMENT_DESC elements[] = {
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -612,7 +1147,13 @@ namespace scrapvr::hands
 		};
 		if (FAILED(g_device->CreateInputLayout(elements, 5, vs_blob->GetBufferPointer(), vs_blob->GetBufferSize(), &g_input_layout)))
 			return false;
-		release(vs_blob); release(ps_blob); release(errors);
+		D3D11_INPUT_ELEMENT_DESC hud_elements[] = {
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+		};
+		if (FAILED(g_device->CreateInputLayout(hud_elements, 2, hud_vs_blob->GetBufferPointer(),
+			hud_vs_blob->GetBufferSize(), &g_hud_input_layout))) return false;
+		release(vs_blob); release(ps_blob); release(hud_vs_blob); release(hud_ps_blob); release(errors);
 		const Vertex *vertices[] = { mechanic_hands_asset::left_vertices, mechanic_hands_asset::right_vertices };
 		const uint32_t counts[] = { mechanic_hands_asset::left_vertex_count, mechanic_hands_asset::right_vertex_count };
 		for (uint32_t hand = 0; hand < 2; ++hand)
@@ -623,6 +1164,77 @@ namespace scrapvr::hands
 		}
 		D3D11_BUFFER_DESC constant_desc = {}; constant_desc.ByteWidth = sizeof(HandConstants); constant_desc.Usage = D3D11_USAGE_DEFAULT; constant_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 		if (FAILED(g_device->CreateBuffer(&constant_desc, nullptr, &g_constant_buffer))) return false;
+		std::array<HudVertex, kHudVerticesPerPanel * 2> hud_vertices{};
+		for (uint32_t panel = 0; panel < 2; ++panel)
+		{
+			const float v_top = panel == 0 ? 0.0f : 0.5f;
+			const float v_bottom = panel == 0 ? 0.5f : 1.0f;
+			for (uint32_t segment = 0; segment < kHudCurveSegments; ++segment)
+			{
+				const float u0 = static_cast<float>(segment) / static_cast<float>(kHudCurveSegments);
+				const float u1 = static_cast<float>(segment + 1) / static_cast<float>(kHudCurveSegments);
+				const float x0 = -0.5f + u0;
+				const float x1 = -0.5f + u1;
+				const float z0 = kHudCurveDepth * (1.0f - 4.0f * x0 * x0);
+				const float z1 = kHudCurveDepth * (1.0f - 4.0f * x1 * x1);
+				const size_t base = static_cast<size_t>(panel) * kHudVerticesPerPanel +
+					static_cast<size_t>(segment) * 6;
+				hud_vertices[base + 0] = {{x0, -0.5f, z0}, {u0, v_bottom}};
+				hud_vertices[base + 1] = {{x1, -0.5f, z1}, {u1, v_bottom}};
+				hud_vertices[base + 2] = {{x1, 0.5f, z1}, {u1, v_top}};
+				hud_vertices[base + 3] = {{x0, -0.5f, z0}, {u0, v_bottom}};
+				hud_vertices[base + 4] = {{x1, 0.5f, z1}, {u1, v_top}};
+				hud_vertices[base + 5] = {{x0, 0.5f, z0}, {u0, v_top}};
+			}
+		}
+		D3D11_BUFFER_DESC hud_vertex_desc = {};
+		hud_vertex_desc.ByteWidth = static_cast<UINT>(sizeof(hud_vertices));
+		hud_vertex_desc.Usage = D3D11_USAGE_IMMUTABLE;
+		hud_vertex_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+		D3D11_SUBRESOURCE_DATA hud_vertex_data = {}; hud_vertex_data.pSysMem = hud_vertices.data();
+		if (FAILED(g_device->CreateBuffer(&hud_vertex_desc, &hud_vertex_data, &g_hud_vertex_buffer))) return false;
+		D3D11_BUFFER_DESC hud_constant_desc = {};
+		hud_constant_desc.ByteWidth = sizeof(HudConstants);
+		hud_constant_desc.Usage = D3D11_USAGE_DEFAULT;
+		hud_constant_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+		if (FAILED(g_device->CreateBuffer(&hud_constant_desc, nullptr, &g_hud_constant_buffer))) return false;
+		g_hud_pixels.assign(static_cast<size_t>(512) * 512 * 4, 0);
+		draw_wrist_hud_bitmap(g_hud_pixels, scrapvr::tools::WristHudState{}, 0.0f);
+		D3D11_TEXTURE2D_DESC hud_texture_desc = {};
+		hud_texture_desc.Width = 512; hud_texture_desc.Height = 512;
+		hud_texture_desc.MipLevels = 1; hud_texture_desc.ArraySize = 1;
+		hud_texture_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		hud_texture_desc.SampleDesc.Count = 1;
+		hud_texture_desc.Usage = D3D11_USAGE_DYNAMIC;
+		hud_texture_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		hud_texture_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		D3D11_SUBRESOURCE_DATA hud_texture_data = {};
+		hud_texture_data.pSysMem = g_hud_pixels.data(); hud_texture_data.SysMemPitch = 512 * 4;
+		if (FAILED(g_device->CreateTexture2D(&hud_texture_desc, &hud_texture_data, &g_hud_texture_resource)) ||
+			FAILED(g_device->CreateShaderResourceView(g_hud_texture_resource, nullptr, &g_hud_texture))) return false;
+		D3D11_SAMPLER_DESC hud_sampler_desc = {};
+		hud_sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+		hud_sampler_desc.AddressU = hud_sampler_desc.AddressV = hud_sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+		hud_sampler_desc.MaxLOD = D3D11_FLOAT32_MAX;
+		if (FAILED(g_device->CreateSamplerState(&hud_sampler_desc, &g_hud_sampler))) return false;
+		D3D11_BLEND_DESC hud_blend_desc = {};
+		hud_blend_desc.RenderTarget[0].BlendEnable = TRUE;
+		// put_hud_pixel builds a premultiplied-alpha bitmap while layering the
+		// panel, text, and markers. Use ONE here so translucent pixels are not
+		// multiplied by alpha a second time when composited into the eye target.
+		hud_blend_desc.RenderTarget[0].SrcBlend = D3D11_BLEND_ONE;
+		hud_blend_desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+		hud_blend_desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+		hud_blend_desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+		hud_blend_desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
+		hud_blend_desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+		hud_blend_desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+		if (FAILED(g_device->CreateBlendState(&hud_blend_desc, &g_hud_blend_state))) return false;
+		D3D11_DEPTH_STENCIL_DESC hud_depth_desc = {};
+		hud_depth_desc.DepthEnable = FALSE;
+		hud_depth_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+		hud_depth_desc.DepthFunc = D3D11_COMPARISON_ALWAYS;
+		if (FAILED(g_device->CreateDepthStencilState(&hud_depth_desc, &g_hud_depth_state))) return false;
 		std::vector<uint8_t> pixels; uint32_t texture_width = 0, texture_height = 0;
 		if (load_tga(pixels, texture_width, texture_height))
 		{
@@ -713,8 +1325,10 @@ namespace scrapvr::hands
 	}
 
 	bool render(ID3D11DeviceContext *context, ID3D11RenderTargetView *target, uint32_t width,
-		uint32_t height, const XrView &eye, const XrPosef &right_aim_pose,
-		bool right_aim_active, float right_target_distance, bool right_target_active)
+			uint32_t height, const XrView &eye, const XrPosef &right_aim_pose,
+			bool right_aim_active, float right_target_distance, bool right_target_active,
+			float interaction_target_distance, bool interaction_target_active,
+			float world_heading)
 	{
 		if (!g_initialized || !context || !target || (!g_poses[0].active && !g_poses[1].active) || !create_depth(width, height)) return false;
 		ContextStateGuard preserved_state(context);
@@ -747,7 +1361,9 @@ namespace scrapvr::hands
 		scrapvr::tools::render(context, target, g_depth_view, width, height, eye,
 			g_poses[1].pose, g_poses[1].active, g_poses[1].firing,
 			right_aim_pose, right_aim_active, right_target_distance,
-			right_target_active);
+			right_target_active, interaction_target_distance,
+			interaction_target_active);
+		render_wrist_hud(context, target, width, height, eye, world_heading);
 		ID3D11ShaderResourceView *none = nullptr; context->PSSetShaderResources(0, 1, &none); context->OMSetRenderTargets(1, &target, nullptr);
 		if (!g_render_logged && g_log) { g_render_logged = true; g_log("VISIBLE TRACKED HANDS ACTIVE: mechanic glove geometry rendered independently into both stereo eyes"); }
 		return true;
@@ -756,9 +1372,15 @@ namespace scrapvr::hands
 	void shutdown()
 	{
 		scrapvr::tools::shutdown();
+		release(g_hud_depth_state); release(g_hud_blend_state); release(g_hud_sampler);
+		release(g_hud_texture); release(g_hud_texture_resource); release(g_hud_input_layout);
+		release(g_hud_pixel_shader); release(g_hud_vertex_shader);
+		release(g_hud_constant_buffer); release(g_hud_vertex_buffer);
 		release(g_depth_view); release(g_depth_texture); release(g_depth_state); release(g_opaque_blend_state); release(g_rasterizer); release(g_sampler); release(g_texture);
 		release(g_input_layout); release(g_pixel_shader); release(g_vertex_shader); release(g_constant_buffer);
 		for (auto &buffer : g_vertex_buffers) release(buffer);
 		g_device = nullptr; g_log = nullptr; g_initialized = false; g_render_logged = false;
+		g_hud_pixels.clear(); g_hud_last_update_ms = 0; g_hud_last_heading = 100.0f;
+		g_hud_last_state = scrapvr::tools::WristHudState{};
 	}
 }

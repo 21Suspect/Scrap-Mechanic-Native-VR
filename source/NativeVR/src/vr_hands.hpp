@@ -30,6 +30,9 @@ namespace scrapvr::hands
 		const XrPosef &right_aim_pose,
 		bool right_aim_active,
 		float right_target_distance,
-		bool right_target_active);
+		bool right_target_active,
+		float interaction_target_distance,
+		bool interaction_target_active,
+		float world_heading);
 	void shutdown();
 }

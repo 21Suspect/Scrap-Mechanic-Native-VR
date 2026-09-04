@@ -66,6 +66,57 @@ local VrToolLaserItems = {
 	["c60b9627-fc2b-4319-97c5-05921cb976c6"] = true,
 	["fdb8b8be-96e7-4de0-85c7-d2f42e4f33ce"] = true
 }
+local VrConnectionToolItem = "8c7efc37-cd7c-4262-976e-39585f8527bf"
+local VrConnectionLaserRange = 8.0
+
+local function publishConnectionTarget( active, distance )
+	local setter = ScrapVRConnectionTargetNative
+	if type( setter ) == "function" then
+		pcall( setter, active == true, distance or 0.0 )
+	end
+end
+
+local function hasConnectionPoint( shape )
+	if shape == nil then return false end
+	local okInteractable, interactable = pcall( shape.getInteractable, shape )
+	if not okInteractable or interactable == nil then return false end
+	local none = sm.interactable.connectionType.none
+	local okInput, inputType = pcall( interactable.getConnectionInputType, interactable )
+	if okInput and type( inputType ) == "number" and inputType ~= none then return true end
+	local okOutput, outputType = pcall( interactable.getConnectionOutputType, interactable )
+	return okOutput and type( outputType ) == "number" and outputType ~= none
+end
+
+-- The connection tool needs different visual semantics than paint/weld. Walk
+-- through ordinary collision surfaces and stop only at a connectable part or a
+-- joint. This keeps the white pointer useful through a creation instead of
+-- falsely ending on whichever decorative block happens to be in front.
+local function findConnectionTargetDistance( origin, direction, ignore )
+	local rayEnd = origin + direction * VrConnectionLaserRange
+	local cursorDistance = 0.0
+	for _ = 1, 16 do
+		local ok, hit, result = pcall( sm.physics.raycast,
+			origin + direction * cursorDistance, rayEnd, ignore )
+		if not ok or hit ~= true or result == nil or result.pointWorld == nil then break end
+		local hitDistance = ( result.pointWorld - origin ):dot( direction )
+		if type( hitDistance ) ~= "number" or hitDistance ~= hitDistance or
+			math.abs( hitDistance ) >= 1000000 then break end
+		if result.type == "joint" then
+			return math.max( 0.05, math.min( VrConnectionLaserRange, hitDistance ) )
+		end
+		if result.type == "body" then
+			local okShape, shape = pcall( result.getShape, result )
+			if okShape and hasConnectionPoint( shape ) then
+				return math.max( 0.05, math.min( VrConnectionLaserRange, hitDistance ) )
+			end
+		end
+		-- Always advance even if the physics query reports the same surface while
+		-- the next ray begins inside a block.
+		cursorDistance = math.max( cursorDistance + 0.08, hitDistance + 0.04 )
+		if cursorDistance >= VrConnectionLaserRange then break end
+	end
+	return nil
+end
 
 local function clearGunAim()
 	g_vrGunAimActive = false
@@ -85,6 +136,7 @@ local function clearTrackedAim()
 	g_vrToolPointerEnabled = false
 	g_vrToolPointerOrigin = nil
 	g_vrToolPointerDirection = nil
+	publishConnectionTarget( false, 0.0 )
 	clearGunAim()
 end
 
@@ -138,7 +190,8 @@ local function publishWorldState( active )
 	end
 end
 
-local function publishPlayerState( active, seated, firstPerson, activeItem, activeAdapter )
+local function publishPlayerState( active, seated, firstPerson, activeItem, activeAdapter,
+	 health, maxHealth, breath, maxBreath, timeMinutes, conscious, waypoints )
 	Chapter2VR.playerStateSequence = ( Chapter2VR.playerStateSequence or 0 ) + 1
 	saveBridgePayload( {
 		version = 1,
@@ -147,12 +200,181 @@ local function publishPlayerState( active, seated, firstPerson, activeItem, acti
 		seated = seated == true,
 		firstPerson = firstPerson == true,
 		activeItem = activeItem or "00000000-0000-0000-0000-000000000000",
-		activeAdapter = activeAdapter or ""
+		activeAdapter = activeAdapter or "",
+		health = type( health ) == "number" and health or -1,
+		maxHealth = type( maxHealth ) == "number" and maxHealth or -1,
+		breath = type( breath ) == "number" and breath or -1,
+		maxBreath = type( maxBreath ) == "number" and maxBreath or -1,
+		timeMinutes = type( timeMinutes ) == "number" and timeMinutes or -1,
+		conscious = conscious ~= false,
+		waypoints = type( waypoints ) == "table" and waypoints or {}
 	}, VrBasePlayerStatePath, VrContentPlayerStatePath, "PLAYER_STATE" )
+end
+
+local function wristHudValues( self )
+	local health, maxHealth, breath, maxBreath = -1, -1, -1, -1
+	local conscious = self.cl and self.cl.isConscious ~= false
+	if self.cl and type( self.cl.stats ) == "table" then
+		health = tonumber( self.cl.stats.hp ) or -1
+		maxHealth = tonumber( self.cl.stats.maxhp ) or -1
+		breath = tonumber( self.cl.stats.breath ) or -1
+		maxBreath = tonumber( self.cl.stats.maxbreath ) or -1
+	end
+	local timeMinutes = -1
+	local ok, timeOfDay = pcall( sm.game.getTimeOfDay )
+	if ok and type( timeOfDay ) == "number" and timeOfDay == timeOfDay then
+		timeOfDay = timeOfDay - math.floor( timeOfDay )
+		if timeOfDay < 0 then timeOfDay = timeOfDay + 1 end
+		timeMinutes = math.floor( timeOfDay * 1440.0 + 0.5 ) % 1440
+	end
+	return health, maxHealth, breath, maxBreath, timeMinutes, conscious
 end
 
 local function validNumber( value )
 	return type( value ) == "number" and value == value and math.abs( value ) < 1000000
+end
+
+-- The desktop compass is populated by several systems. Most quest, beacon,
+-- logbook, lost-item, and portal markers live in WorldMarkerManager, while
+-- raid enemies and drop events are registered directly on g_compassHud. Mirror
+-- their live world positions into the low-rate player-state packet so the
+-- wrist compass follows the same world-space bearings without drawing a VR
+-- laser or depending on the desktop HUD texture.
+local WristHudWaypointLimit = 24
+local WristHudWaypointCollectionLimit = 96
+local function safeVectorPosition( value )
+	if value == nil then return nil end
+	local okX, x = pcall( function() return value.x end )
+	local okY, y = pcall( function() return value.y end )
+	local okZ, z = pcall( function() return value.z end )
+	if not okX or not okY or not okZ then return nil end
+	x, y, z = tonumber( x ), tonumber( y ), tonumber( z )
+	if not validNumber( x ) or not validNumber( y ) or not validNumber( z ) then return nil end
+	return sm.vec3.new( x, y, z )
+end
+
+local function waypointKind( name )
+	local text = string.lower( tostring( name or "" ) )
+	if string.find( text, "enemy", 1, true ) then return 2 end
+	if string.find( text, "drop", 1, true ) or string.find( text, "raid", 1, true ) then return 3 end
+	if string.find( text, "lost", 1, true ) then return 4 end
+	return 1
+end
+
+local function appendWristWaypoint( result, seen, position, name, kind, playerPosition )
+	-- Collect more than the native display cap before sorting so an arbitrary
+	-- Lua table iteration order cannot hide a nearer waypoint behind the first
+	-- 24 entries. The final packet is still bounded to WristHudWaypointLimit.
+	if #result >= WristHudWaypointCollectionLimit then return end
+	position = safeVectorPosition( position )
+	if position == nil or playerPosition == nil then return end
+	local delta = position - playerPosition
+	local distance = math.sqrt( delta.x * delta.x + delta.y * delta.y )
+	if not validNumber( distance ) or distance < 0.25 or distance > 100000 then return end
+	local angle = math.atan2( delta.x, delta.y )
+	if not validNumber( angle ) then return end
+	local markerName = tostring( name or "" )
+	local markerKind = tonumber( kind ) or waypointKind( markerName )
+	local dedupeKey = tostring( markerKind ) .. ":" .. markerName
+	if seen[dedupeKey] then return end
+	seen[dedupeKey] = true
+	result[#result + 1] = { angle = angle, distance = distance, kind = markerKind }
+end
+
+local function collectWristHudWaypoints( self )
+	local result, seen = {}, {}
+	local player = sm.localPlayer.getPlayer()
+	local character = player and player.character or ( self and self.player and self.player:getCharacter() )
+	if character == nil then return result end
+	local playerPosition = safeVectorPosition( character.worldPosition )
+	if playerPosition == nil then
+		local ok, position = pcall( character.getWorldPosition, character )
+		if ok then playerPosition = safeVectorPosition( position ) end
+	end
+	if playerPosition == nil then return result end
+
+	local markerManager = g_worldMarkerManager
+	if markerManager and type( markerManager.cl ) == "table" and
+		type( markerManager.cl.markers ) == "table" then
+		for name, marker in pairs( markerManager.cl.markers ) do
+			if type( marker ) == "table" and marker.hidden ~= true then
+				local position = marker.displayPosition or marker.markerPosition
+				-- Hosted markers (lost items and moving characters) can have a
+				-- fresher position behind the manager's public helper. Fall back to
+				-- the cached display position when the helper is unavailable.
+				if WorldMarkerManager and WorldMarkerManager.Cl_GetMarkerWorldPosition then
+					local ok, livePosition = pcall( WorldMarkerManager.Cl_GetMarkerWorldPosition, name )
+					if ok and livePosition ~= nil then position = livePosition end
+				end
+				appendWristWaypoint( result, seen, position, name, waypointKind( name ), playerPosition )
+			end
+		end
+	end
+
+	-- Raid enemies and the incoming-drop icons are direct g_compassHud users,
+	-- so they are not present in WorldMarkerManager.cl.markers. Only mirror
+	-- markers for the current world/active raid, matching the visibility gate
+	-- used by the stock compass and avoiding stale enemies after a raid ends.
+	local raidManager = g_raidManagerClient
+	if raidManager and type( raidManager.cl ) == "table" then
+		local playerWorldId = nil
+		local okWorld, playerWorld = pcall( character.getWorld, character )
+		if okWorld and playerWorld ~= nil then
+			local okId, worldId = pcall( function() return playerWorld.id end )
+			if okId then playerWorldId = worldId end
+		end
+		local activeRaids = {}
+		if type( raidManager.cl.worldRaids ) == "table" then
+			for worldId, raids in pairs( raidManager.cl.worldRaids ) do
+				if playerWorldId == nil or worldId == playerWorldId or tostring( worldId ) == tostring( playerWorldId ) then
+					if type( raids ) == "table" then
+						for raidId, raid in pairs( raids ) do
+							local raidClient = type( raid ) == "table" and raid.cl or nil
+							local sync = type( raid ) == "table" and raid.raidSync or nil
+							local active = type( raidClient ) == "table" and
+								( raidClient.previousInsideRaidArea == true or raidClient.isClosest == true )
+							if active then
+								activeRaids[tostring( raidId )] = true
+								if type( sync ) == "table" then
+									appendWristWaypoint( result, seen, sync.center, "raid:" .. tostring( raidId ), 3, playerPosition )
+								end
+								if type( raidClient ) == "table" then
+									appendWristWaypoint( result, seen, raidClient.guiWorldPosition,
+										"raid-attack:" .. tostring( raidId ), 3, playerPosition )
+									if type( raidClient.compassMarkers ) == "table" then
+										for markerId, drop in pairs( raidClient.compassMarkers ) do
+											if type( drop ) == "table" and drop.active == true then
+												appendWristWaypoint( result, seen, drop.toPos or drop.fromPos,
+													drop.name or ( "raid-drop:" .. tostring( markerId ) ), 3, playerPosition )
+											end
+										end
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+		if type( raidManager.cl.trackedRaidEnemies ) == "table" then
+			for raidKey, enemies in pairs( raidManager.cl.trackedRaidEnemies ) do
+				if activeRaids[tostring( raidKey )] and type( enemies ) == "table" then
+					for enemyId, enemy in pairs( enemies ) do
+						if enemy ~= nil then
+							local okPosition, position = pcall( function() return enemy.worldPosition end )
+							if okPosition then
+								appendWristWaypoint( result, seen, position, "enemy" .. tostring( enemyId ), 2, playerPosition )
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+	table.sort( result, function( left, right ) return left.distance < right.distance end )
+	while #result > WristHudWaypointLimit do table.remove( result ) end
+	return result
 end
 
 local function resolveHandPose( data )
@@ -236,6 +458,8 @@ function Chapter2VR.clientCreate( self )
 	self.cl.vrSeated = nil
 	self.cl.vrFirstPerson = nil
 	self.cl.vrActiveAdapter = ""
+	self.cl.vrConnectionTargetTick = nil
+	self.cl.vrConnectionTargetActive = false
 	if self.player == sm.localPlayer.getPlayer() then
 		resetContentBridge()
 		publishWorldState( true )
@@ -272,10 +496,38 @@ local function updateToolAim( self, data )
 	g_vrPrimaryActionAvailable = true
 	g_vrPrimaryActionDown = hand.interact == true
 
+	local nativeLaser = data.toolLaser
 	local laserOffset = VrToolLaserItems[activeItem] and VrActionLocalOffsets[activeItem] or nil
+	if laserOffset and type( nativeLaser ) == "table" and nativeLaser.active == true and
+		validNumber( nativeLaser.x ) and validNumber( nativeLaser.y ) and
+		validNumber( nativeLaser.z ) then
+		laserOffset = { nativeLaser.x, nativeLaser.y, nativeLaser.z }
+	end
 	g_vrToolPointerEnabled = laserOffset ~= nil
 	g_vrToolPointerOrigin = laserOffset and handLocalPosition( pose, laserOffset ) or nil
-	g_vrToolPointerDirection = laserOffset and pose.forward or nil
+	if laserOffset and type( nativeLaser ) == "table" and nativeLaser.active == true and
+		validNumber( nativeLaser.dx ) and validNumber( nativeLaser.dy ) and
+		validNumber( nativeLaser.dz ) then
+		g_vrToolPointerDirection = handLocalDirection(
+			pose, { nativeLaser.dx, nativeLaser.dy, nativeLaser.dz } )
+	else
+		g_vrToolPointerDirection = laserOffset and pose.forward or nil
+	end
+	if activeItem == VrConnectionToolItem and g_vrToolPointerOrigin and g_vrToolPointerDirection then
+		local tick = sm.game.getCurrentTick()
+		if self.cl.vrConnectionTargetTick == nil or tick - self.cl.vrConnectionTargetTick >= 3 then
+			self.cl.vrConnectionTargetTick = tick
+			local character = self.player:getCharacter()
+			local distance = findConnectionTargetDistance(
+				g_vrToolPointerOrigin, g_vrToolPointerDirection, character )
+			self.cl.vrConnectionTargetActive = distance ~= nil
+			publishConnectionTarget( distance ~= nil, distance or 0.0 )
+		end
+	elseif self.cl.vrConnectionTargetActive then
+		self.cl.vrConnectionTargetActive = false
+		self.cl.vrConnectionTargetTick = nil
+		publishConnectionTarget( false, 0.0 )
+	end
 
 	local muzzleOffset, muzzleSource = resolveGunMuzzleOffset( activeItem, data.gunMuzzle )
 	if muzzleOffset then
@@ -310,6 +562,7 @@ function Chapter2VR.clientUpdate( self, dt )
 	local seatedChanged = self.cl.vrSeated ~= seated
 	local firstPerson = sm.localPlayer.isInFirstPersonView()
 	local firstPersonChanged = self.cl.vrFirstPerson ~= firstPerson
+	local health, maxHealth, breath, maxBreath, timeMinutes, conscious = wristHudValues( self )
 	-- Keep readable transition markers for diagnostics; the native renderer now
 	-- consumes the authoritative player-state JSON published below.
 	if toolChanged then
@@ -328,7 +581,9 @@ function Chapter2VR.clientUpdate( self, dt )
 	self.cl.vrPlayerStateTimer = ( self.cl.vrPlayerStateTimer or 0.0 ) + dt
 	if toolChanged or adapterChanged or seatedChanged or firstPersonChanged or self.cl.vrPlayerStateTimer >= 0.25 then
 		self.cl.vrPlayerStateTimer = 0.0
-		publishPlayerState( true, seated, firstPerson, activeItem, activeAdapter )
+		local waypoints = collectWristHudWaypoints( self )
+		publishPlayerState( true, seated, firstPerson, activeItem, activeAdapter,
+			health, maxHealth, breath, maxBreath, timeMinutes, conscious, waypoints )
 	end
 
 	self.cl.vrHandFreshTimer = ( self.cl.vrHandFreshTimer or 1.0 ) + dt

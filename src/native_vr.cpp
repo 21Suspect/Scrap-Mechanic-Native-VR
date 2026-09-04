@@ -28,6 +28,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cwchar>
+#include <cwctype>
 #include <cstring>
 #include <mutex>
 #include <string>
@@ -103,6 +104,8 @@ using LuaSetTopFn = void (__cdecl *)(lua_State *, int);
 using LuaGetFenvFn = void (__cdecl *)(lua_State *, int);
 using LuaTypeFn = int (__cdecl *)(lua_State *, int);
 using LuaToPointerFn = const void * (__cdecl *)(lua_State *, int);
+using LuaToBooleanFn = int (__cdecl *)(lua_State *, int);
+using LuaToNumberFn = double (__cdecl *)(lua_State *, int);
 using LuaPushCClosureFn = void (__cdecl *)(lua_State *, LuaCFunction, int);
 using LuaPushNumberFn = void (__cdecl *)(lua_State *, double);
 using LuaPushBooleanFn = void (__cdecl *)(lua_State *, int);
@@ -113,6 +116,7 @@ constexpr int kLuaGlobalsIndex = -10002;
 constexpr int kLuaTypeTable = 5;
 constexpr char kLuaProjectilePoseFunction[] = "ScrapVRProjectilePoseNative";
 constexpr char kLuaActionPoseFunction[] = "ScrapVRActionPoseNative";
+constexpr char kLuaConnectionTargetFunction[] = "ScrapVRConnectionTargetNative";
 
 HMODULE g_module = nullptr;
 HMODULE g_game = nullptr;
@@ -135,6 +139,8 @@ LuaSetTopFn g_lua_settop = nullptr;
 LuaGetFenvFn g_lua_getfenv = nullptr;
 LuaTypeFn g_lua_type = nullptr;
 LuaToPointerFn g_lua_topointer = nullptr;
+LuaToBooleanFn g_lua_toboolean = nullptr;
+LuaToNumberFn g_lua_tonumber = nullptr;
 LuaPushCClosureFn g_lua_pushcclosure = nullptr;
 LuaPushNumberFn g_lua_pushnumber = nullptr;
 LuaPushBooleanFn g_lua_pushboolean = nullptr;
@@ -213,6 +219,9 @@ XrVector3f g_right_aim_up{};
 uint64_t g_right_aim_world_ms = 0;
 std::atomic<float> g_right_action_target_distance{0.0f};
 std::atomic<uint64_t> g_right_action_target_ms{0};
+std::atomic<float> g_interaction_laser_target_distance{0.0f};
+std::atomic<uint64_t> g_interaction_laser_target_ms{0};
+std::atomic<uint32_t> g_interaction_laser_target_kind{0};
 struct NativeProjectilePose
 {
     bool authoritative = false;
@@ -274,6 +283,66 @@ void log_matrix(const char *name, const float *m)
     log_line("%s=[%.6f,%.6f,%.6f,%.6f;%.6f,%.6f,%.6f,%.6f;%.6f,%.6f,%.6f,%.6f;%.6f,%.6f,%.6f,%.6f]",
         name, m[0],m[1],m[2],m[3], m[4],m[5],m[6],m[7],
         m[8],m[9],m[10],m[11], m[12],m[13],m[14],m[15]);
+}
+
+features::BindingInput parse_binding_input(const wchar_t *section, const wchar_t *key,
+                                           features::BindingInput fallback)
+{
+    wchar_t value[64]{};
+    const DWORD length = GetPrivateProfileStringW(section, key, L"", value,
+        static_cast<DWORD>(std::size(value)), g_ini_path.c_str());
+    if (length == 0 || length >= std::size(value)) return fallback;
+
+    std::wstring name(value, length);
+    size_t first = 0;
+    while (first < name.size() && std::iswspace(name[first])) ++first;
+    size_t last = name.size();
+    while (last > first && std::iswspace(name[last - 1])) --last;
+    name = name.substr(first, last - first);
+    for (wchar_t &character : name)
+    {
+        if (character == L'-' || character == L' ' || character == L'.') character = L'_';
+        character = static_cast<wchar_t>(std::towlower(character));
+    }
+
+    using features::BindingInput;
+    if (name == L"none" || name == L"disabled" || name == L"off") return BindingInput::none;
+    if (name == L"left_primary" || name == L"left_a") return BindingInput::left_primary;
+    if (name == L"right_primary" || name == L"right_a") return BindingInput::right_primary;
+    if (name == L"left_secondary" || name == L"left_b") return BindingInput::left_secondary;
+    if (name == L"right_secondary" || name == L"right_b") return BindingInput::right_secondary;
+    if (name == L"left_stick_click" || name == L"left_thumbstick_click") return BindingInput::left_stick_click;
+    if (name == L"right_stick_click" || name == L"right_thumbstick_click") return BindingInput::right_stick_click;
+    if (name == L"left_grip" || name == L"left_squeeze") return BindingInput::left_grip;
+    if (name == L"right_grip" || name == L"right_squeeze") return BindingInput::right_grip;
+    if (name == L"left_trigger") return BindingInput::left_trigger;
+    if (name == L"right_trigger") return BindingInput::right_trigger;
+    if (name == L"left_menu" || name == L"menu") return BindingInput::left_menu;
+    if (name == L"right_menu") return BindingInput::right_menu;
+    if (name == L"left_trackpad" || name == L"left_trackpad_click") return BindingInput::left_trackpad_click;
+    if (name == L"right_trackpad" || name == L"right_trackpad_click") return BindingInput::right_trackpad_click;
+    if (name == L"left_system" || name == L"system") return BindingInput::left_system;
+    if (name == L"right_system") return BindingInput::right_system;
+
+    log_line("VR_INPUT_BINDING_INVALID section=%ls key=%ls value=%ls using_default=1",
+        section, key, value);
+    return fallback;
+}
+
+features::ControllerBindings load_controller_bindings(const wchar_t *section,
+                                                       const features::ControllerBindings &defaults)
+{
+    features::ControllerBindings bindings = defaults;
+    bindings.menu = parse_binding_input(section, L"Menu", bindings.menu);
+    bindings.sprint = parse_binding_input(section, L"Sprint", bindings.sprint);
+    bindings.crouch = parse_binding_input(section, L"Crouch", bindings.crouch);
+    bindings.jump = parse_binding_input(section, L"Jump", bindings.jump);
+    bindings.use = parse_binding_input(section, L"Use", bindings.use);
+    bindings.context = parse_binding_input(section, L"Context", bindings.context);
+    bindings.hotbar_previous = parse_binding_input(section, L"HotbarPrevious", bindings.hotbar_previous);
+    bindings.hotbar_next = parse_binding_input(section, L"HotbarNext", bindings.hotbar_next);
+    bindings.inventory = parse_binding_input(section, L"Inventory", bindings.inventory);
+    return bindings;
 }
 
 void consume_vr_launch_request()
@@ -515,6 +584,46 @@ bool normalize_vector(XrVector3f &vector)
     return true;
 }
 
+float world_heading_from_view(const float *world_to_view)
+{
+    if (!world_to_view_matrix(world_to_view)) return 0.0f;
+    XrVector3f forward = view_vector_to_world(world_to_view, {0.0f, 0.0f, -1.0f});
+    const float horizontal_length = std::sqrt(forward.x * forward.x + forward.y * forward.y);
+    if (!std::isfinite(horizontal_length) || horizontal_length < 0.0001f) return 0.0f;
+    // Scrap Mechanic uses +Z as world up and the X/Y plane for the ground.
+    // Keep north at +Y and east at +X, using the normal clockwise compass
+    // convention. Ignore camera pitch so looking up/down never changes the
+    // displayed direction.
+    forward.x /= horizontal_length;
+    forward.y /= horizontal_length;
+    return std::atan2(forward.x, forward.y);
+}
+
+float world_heading_from_view(const float *world_to_view,
+                              const XrPosef &head_pose,
+                              const XrPosef &reference_head)
+{
+    // The game camera matrix supplies the world-space heading (including mouse
+    // and controller turning). Add only the headset's horizontal rotation since
+    // the OpenXR pose itself is in tracking space, not Scrap Mechanic world
+    // space. Reusing the same reference transform as the hand bridge makes the
+    // recentered headset orientation the zero point and keeps pitch/roll out of
+    // the compass calculation.
+    if (!world_to_view_matrix(world_to_view)) return 0.0f;
+    const XrQuaternionf inverse_reference = conjugate(normalize(reference_head.orientation));
+    const XrQuaternionf relative_orientation = quaternion_multiply(
+        inverse_reference, head_pose.orientation);
+    const XrQuaternionf relative_yaw = yaw_only(relative_orientation);
+    XrVector3f forward = view_vector_to_world(world_to_view,
+        rotate_vector(relative_yaw, {0.0f, 0.0f, -1.0f}));
+    const float horizontal_length = std::sqrt(forward.x * forward.x + forward.y * forward.y);
+    if (!std::isfinite(horizontal_length) || horizontal_length < 0.0001f)
+        return world_heading_from_view(world_to_view);
+    forward.x /= horizontal_length;
+    forward.y /= horizontal_length;
+    return std::atan2(forward.x, forward.y);
+}
+
 XrVector3f cross_vector(const XrVector3f &a, const XrVector3f &b)
 {
     return {
@@ -651,6 +760,27 @@ int __cdecl lua_native_action_pose(lua_State *state)
     return 12;
 }
 
+int __cdecl lua_native_connection_target(lua_State *state)
+{
+    const bool active = g_lua_toboolean(state, 1) != 0;
+    const double distance = g_lua_tonumber(state, 2);
+    if (active && std::isfinite(distance) && distance >= 0.05 && distance <= 8.0)
+    {
+        g_interaction_laser_target_distance.store(
+            static_cast<float>(distance), std::memory_order_release);
+        g_interaction_laser_target_kind.store(
+            static_cast<uint32_t>(scrapvr::tools::InteractionLaserKind::connection),
+            std::memory_order_release);
+        g_interaction_laser_target_ms.store(GetTickCount64(), std::memory_order_release);
+    }
+    else if (g_interaction_laser_target_kind.load(std::memory_order_acquire) ==
+        static_cast<uint32_t>(scrapvr::tools::InteractionLaserKind::connection))
+    {
+        g_interaction_laser_target_ms.store(0, std::memory_order_release);
+    }
+    return 0;
+}
+
 bool resolve_lua_projectile_api()
 {
     HMODULE lua = GetModuleHandleW(L"lua51.dll");
@@ -665,6 +795,8 @@ bool resolve_lua_projectile_api()
     g_lua_getfenv = reinterpret_cast<LuaGetFenvFn>(GetProcAddress(lua, "lua_getfenv"));
     g_lua_type = reinterpret_cast<LuaTypeFn>(GetProcAddress(lua, "lua_type"));
     g_lua_topointer = reinterpret_cast<LuaToPointerFn>(GetProcAddress(lua, "lua_topointer"));
+    g_lua_toboolean = reinterpret_cast<LuaToBooleanFn>(GetProcAddress(lua, "lua_toboolean"));
+    g_lua_tonumber = reinterpret_cast<LuaToNumberFn>(GetProcAddress(lua, "lua_tonumber"));
     g_lua_pushcclosure = reinterpret_cast<LuaPushCClosureFn>(GetProcAddress(lua, "lua_pushcclosure"));
     g_lua_pushnumber = reinterpret_cast<LuaPushNumberFn>(GetProcAddress(lua, "lua_pushnumber"));
     g_lua_pushboolean = reinterpret_cast<LuaPushBooleanFn>(GetProcAddress(lua, "lua_pushboolean"));
@@ -672,7 +804,7 @@ bool resolve_lua_projectile_api()
     g_lua_setfield = reinterpret_cast<LuaSetFieldFn>(GetProcAddress(lua, "lua_setfield"));
     return g_lua_pcall_target && g_lua_call_target && g_lua_getfield_target && g_lua_newstate_target &&
         g_lua_loadbufferx_target && g_lua_gettop && g_lua_settop &&
-        g_lua_getfenv && g_lua_type && g_lua_topointer &&
+        g_lua_getfenv && g_lua_type && g_lua_topointer && g_lua_toboolean && g_lua_tonumber &&
         g_lua_pushcclosure && g_lua_pushnumber && g_lua_pushboolean && g_lua_pushstring && g_lua_setfield;
 }
 
@@ -697,6 +829,8 @@ void ensure_lua_projectile_api(lua_State *state, int argument_count)
         g_lua_setfield(state, kLuaGlobalsIndex, kLuaProjectilePoseFunction);
         g_lua_pushcclosure(state, lua_native_action_pose, 0);
         g_lua_setfield(state, kLuaGlobalsIndex, kLuaActionPoseFunction);
+        g_lua_pushcclosure(state, lua_native_connection_target, 0);
+        g_lua_setfield(state, kLuaGlobalsIndex, kLuaConnectionTargetFunction);
     }
 
     // Scrap Mechanic normally shares one global environment per Logic Task,
@@ -725,12 +859,14 @@ void ensure_lua_projectile_api(lua_State *state, int argument_count)
                 g_lua_setfield(state, -2, kLuaProjectilePoseFunction);
                 g_lua_pushcclosure(state, lua_native_action_pose, 0);
                 g_lua_setfield(state, -2, kLuaActionPoseFunction);
+                g_lua_pushcclosure(state, lua_native_connection_target, 0);
+                g_lua_setfield(state, -2, kLuaConnectionTargetFunction);
             }
         }
         g_lua_settop(state, top);
     }
     if ((register_global || argument_count >= 0) && !g_lua_projectile_registration_logged.exchange(true))
-        log_line("VR_LUA_NATIVE_API_REGISTERED transport=native_logic_task projectile_pose=1 action_pose=1");
+        log_line("VR_LUA_NATIVE_API_REGISTERED transport=native_logic_task projectile_pose=1 action_pose=1 connection_target=1");
 }
 
 int __cdecl hk_lua_pcall(lua_State *state, int argument_count, int result_count, int error_function)
@@ -848,6 +984,9 @@ void reset_hand_bridge(bool reset_session = false)
     g_right_aim_world_ms = 0;
     g_right_action_target_distance.store(0.0f, std::memory_order_release);
     g_right_action_target_ms.store(0, std::memory_order_release);
+    g_interaction_laser_target_distance.store(0.0f, std::memory_order_release);
+    g_interaction_laser_target_ms.store(0, std::memory_order_release);
+    g_interaction_laser_target_kind.store(0, std::memory_order_release);
     set_native_projectile_pose(false, false);
     set_native_action_pose(false, false);
 }
@@ -865,6 +1004,9 @@ void deactivate_hand_bridge(bool vr_authoritative = false)
     g_right_aim_world_ms = 0;
     g_right_action_target_distance.store(0.0f, std::memory_order_release);
     g_right_action_target_ms.store(0, std::memory_order_release);
+    g_interaction_laser_target_distance.store(0.0f, std::memory_order_release);
+    g_interaction_laser_target_ms.store(0, std::memory_order_release);
+    g_interaction_laser_target_kind.store(0, std::memory_order_release);
     set_native_projectile_pose(vr_authoritative, false);
     set_native_action_pose(vr_authoritative, false);
 
@@ -1001,6 +1143,12 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
     const bool gun_muzzle_active = active[1] && gun_tool_active && gun_muzzle_item;
     update_native_projectile_pose(active[1], gun_tool_active, world[1], forward[1], up[1],
         gun_muzzle_offset, gun_muzzle_direction, gun_muzzle_item);
+    XrVector3f interaction_laser_offset{};
+    XrVector3f interaction_laser_direction{0.0f, 0.0f, -1.0f};
+    scrapvr::tools::InteractionLaserKind interaction_laser_kind =
+        scrapvr::tools::InteractionLaserKind::none;
+    const bool interaction_laser_tool_active = scrapvr::tools::get_interaction_laser_offset(
+        interaction_laser_offset, &interaction_laser_direction, &interaction_laser_kind);
     const bool hammer_tool_active = scrapvr::tools::is_hammer_active();
 
     const bool right_interaction_changed = interaction[1] != g_previous_right_interaction;
@@ -1009,7 +1157,8 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
         gun_item != g_previous_gun_muzzle_item;
     // Keep an equipped gun or hammer pose current even before the trigger moves.
     // Hammer Lua samples this ordinary action aim at the stock impact frame.
-    const uint64_t publish_interval_ms = (gun_tool_active || hammer_tool_active)
+    const uint64_t publish_interval_ms =
+        (gun_tool_active || hammer_tool_active || interaction_laser_tool_active)
         ? 20u : (interaction[1] ? 20u : 1000u);
     if (!right_interaction_changed && !gun_muzzle_changed &&
         now - g_last_hand_bridge_publish_ms < publish_interval_ms) return;
@@ -1023,6 +1172,7 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
     const int length = std::snprintf(json, sizeof(json),
         "{\"sequence\":%llu,\"vrActive\":true,\"vrAuthoritative\":true,\"opticalGunTrigger\":%s,"
         "\"gunMuzzle\":{\"active\":%s,\"item\":\"%s\",\"x\":%.5f,\"y\":%.5f,\"z\":%.5f,\"dx\":%.5f,\"dy\":%.5f,\"dz\":%.5f},"
+        "\"toolLaser\":{\"active\":%s,\"kind\":%u,\"x\":%.5f,\"y\":%.5f,\"z\":%.5f,\"dx\":%.5f,\"dy\":%.5f,\"dz\":%.5f},"
         "\"actionAim\":{\"active\":%s,\"x\":%.5f,\"y\":%.5f,\"z\":%.5f,\"fx\":%.5f,\"fy\":%.5f,\"fz\":%.5f,\"ux\":%.5f,\"uy\":%.5f,\"uz\":%.5f},"
         "\"left\":{\"active\":%s,\"interact\":%s,\"optical\":%s,\"x\":%.5f,\"y\":%.5f,\"z\":%.5f,\"fx\":%.5f,\"fy\":%.5f,\"fz\":%.5f,\"ux\":%.5f,\"uy\":%.5f,\"uz\":%.5f},"
         "\"right\":{\"active\":%s,\"interact\":%s,\"optical\":%s,\"x\":%.5f,\"y\":%.5f,\"z\":%.5f,\"fx\":%.5f,\"fy\":%.5f,\"fz\":%.5f,\"ux\":%.5f,\"uy\":%.5f,\"uz\":%.5f}}",
@@ -1031,6 +1181,11 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
         gun_muzzle_active ? "true" : "false", gun_item.c_str(),
         gun_muzzle_offset.x, gun_muzzle_offset.y, gun_muzzle_offset.z,
         gun_muzzle_direction.x, gun_muzzle_direction.y, gun_muzzle_direction.z,
+        interaction_laser_tool_active ? "true" : "false",
+        static_cast<unsigned>(interaction_laser_kind),
+        interaction_laser_offset.x, interaction_laser_offset.y, interaction_laser_offset.z,
+        interaction_laser_direction.x, interaction_laser_direction.y,
+        interaction_laser_direction.z,
         action_aim_active ? "true" : "false",
         g_right_aim_world.x, g_right_aim_world.y, g_right_aim_world.z,
         g_right_aim_forward.x, g_right_aim_forward.y, g_right_aim_forward.z,
@@ -1074,6 +1229,8 @@ uint8_t __fastcall hk_raycast(void *world, void *unused, const float *origin,
     {
         XrVector3f local_offset{0.0f, -0.035f, -0.120f};
         XrVector3f local_direction{0.0f, 0.0f, -1.0f};
+        scrapvr::tools::InteractionLaserKind interaction_laser_kind =
+            scrapvr::tools::InteractionLaserKind::none;
         const bool runtime_aim_fresh = g_right_aim_world_active &&
             now - g_right_aim_world_ms <= 250;
         const bool glove_pose_fresh = g_right_hand_world_active &&
@@ -1084,7 +1241,8 @@ uint8_t __fastcall hk_raycast(void *world, void *unused, const float *origin,
         // pointed-at log while retaining its normal hold timing and server path.
         const bool use_hand_aim = g_input.right_use_down() && runtime_aim_fresh;
         const bool calibrated_laser = !use_hand_aim &&
-            scrapvr::tools::get_interaction_laser_offset(local_offset, &local_direction);
+            scrapvr::tools::get_interaction_laser_offset(
+                local_offset, &local_direction, &interaction_laser_kind);
         if (!calibrated_laser && runtime_aim_fresh)
             local_offset = {0.0f, 0.0f, 0.0f};
         const XrVector3f ray_origin = !calibrated_laser && runtime_aim_fresh
@@ -1138,24 +1296,46 @@ uint8_t __fastcall hk_raycast(void *world, void *unused, const float *origin,
                 // selected surface instead of floating at an arbitrary depth.
                 uint8_t result_valid = 0;
                 float fraction = 0.0f;
-                if (!calibrated_laser && hit != 0 && result)
+                if (hit != 0 && result)
                 {
                     std::memcpy(&result_valid, result, sizeof(result_valid));
                     std::memcpy(&fraction,
                         reinterpret_cast<const uint8_t *>(result) + 0xF0,
                         sizeof(fraction));
                 }
-                if (!calibrated_laser && hit != 0 && result_valid != 0 &&
+                const bool valid_target = hit != 0 && result_valid != 0 &&
                     std::isfinite(fraction) &&
-                    fraction >= 0.0f && fraction <= 1.0f)
+                    fraction >= 0.0f && fraction <= 1.0f;
+                if (calibrated_laser &&
+                    interaction_laser_kind == scrapvr::tools::InteractionLaserKind::surface)
                 {
-                    g_right_action_target_distance.store(
-                        std::max(0.05f, range * fraction), std::memory_order_release);
-                    g_right_action_target_ms.store(now, std::memory_order_release);
+                    if (valid_target)
+                    {
+                        g_interaction_laser_target_distance.store(
+                            std::clamp(range * fraction, 0.05f, 8.0f),
+                            std::memory_order_release);
+                        g_interaction_laser_target_kind.store(
+                            static_cast<uint32_t>(interaction_laser_kind),
+                            std::memory_order_release);
+                        g_interaction_laser_target_ms.store(now, std::memory_order_release);
+                    }
+                    else
+                    {
+                        g_interaction_laser_target_ms.store(0, std::memory_order_release);
+                    }
                 }
                 else if (!calibrated_laser)
                 {
-                    g_right_action_target_ms.store(0, std::memory_order_release);
+                    if (valid_target)
+                    {
+                        g_right_action_target_distance.store(
+                            std::max(0.05f, range * fraction), std::memory_order_release);
+                        g_right_action_target_ms.store(now, std::memory_order_release);
+                    }
+                    else
+                    {
+                        g_right_action_target_ms.store(0, std::memory_order_release);
+                    }
                 }
                 return hit;
             }
@@ -2516,6 +2696,17 @@ struct OpenXrState
             GetPrivateProfileIntW(L"Features", L"VerticalTurnSpeed", 28, g_ini_path.c_str()));
         input_config.vertical_turn =
             GetPrivateProfileIntW(L"Features", L"VerticalStickLook", 1, g_ini_path.c_str()) == 1;
+        // Quest 3 keeps the established layout. SteamVR/Index gets a safe
+        // default that avoids the Steam system/Esc binding and avoids using
+        // thumbstick-click for sprint; both profiles can be edited in the
+        // [Bindings.Quest] and [Bindings.SteamVR] sections of the INI.
+        features::ControllerBindings steamvr_defaults{};
+        steamvr_defaults.menu = features::BindingInput::left_trackpad_click;
+        steamvr_defaults.sprint = features::BindingInput::left_grip;
+        input_config.quest_bindings = load_controller_bindings(L"Bindings.Quest",
+            features::ControllerBindings{});
+        input_config.steamvr_bindings = load_controller_bindings(L"Bindings.SteamVR",
+            steamvr_defaults);
         if (!g_input.initialize(instance, session, space, input_config,
                 hand_tracking_supported && g_feature_optical_hands_enabled,
                 openxr_11_enabled, generic_controller_supported))
@@ -2596,7 +2787,7 @@ struct OpenXrState
                 }
             }
         }
-        if (g_feature_hands_enabled && !scrapvr::hands::initialize(device, log_line))
+		if (g_feature_hands_enabled && !scrapvr::hands::initialize(device, log_line))
         {
             scrapvr::hands::shutdown();
             g_feature_hands_enabled = false;
@@ -2865,6 +3056,8 @@ struct OpenXrState
                 anchor_game.m[12], anchor_game.m[13], anchor_game.m[14], anchor_head.orientation.x,
                 anchor_head.orientation.y, anchor_head.orientation.z, anchor_head.orientation.w);
         }
+        const float world_heading = world_heading_from_view(
+            vr_world_to_view, head_pose, anchor_head);
         if (state == XR_SESSION_STATE_FOCUSED)
             publish_hand_bridge(anchor_head, vr_world_to_view);
         if (g_feature_startup_menu_enabled)
@@ -3011,13 +3204,30 @@ struct OpenXrState
                 target_now_ms >= target_sample_ms &&
                 target_now_ms - target_sample_ms <= 250 &&
                 std::isfinite(target_distance) && target_distance >= 0.05f;
+            XrVector3f interaction_offset{};
+            scrapvr::tools::InteractionLaserKind active_interaction_kind =
+                scrapvr::tools::InteractionLaserKind::none;
+            const bool interaction_tool_active = scrapvr::tools::get_interaction_laser_offset(
+                interaction_offset, nullptr, &active_interaction_kind);
+            const uint64_t interaction_sample_ms =
+                g_interaction_laser_target_ms.load(std::memory_order_acquire);
+            const float interaction_distance =
+                g_interaction_laser_target_distance.load(std::memory_order_acquire);
+            const uint32_t interaction_sample_kind =
+                g_interaction_laser_target_kind.load(std::memory_order_acquire);
+            const bool interaction_target_active = interaction_tool_active &&
+                interaction_sample_kind == static_cast<uint32_t>(active_interaction_kind) &&
+                interaction_sample_ms != 0 && target_now_ms >= interaction_sample_ms &&
+                target_now_ms - interaction_sample_ms <= 250 &&
+                std::isfinite(interaction_distance) && interaction_distance >= 0.05f;
             for (uint32_t i = 0; i < 2; ++i)
             {
                 if (indices[i] >= eyes[i].render_targets.size() ||
                     !scrapvr::hands::render(context, eyes[i].render_targets[indices[i]],
                         eyes[i].width, eyes[i].height, views[i],
                         g_input.pointer_pose(1), g_input.pointer_pose_active(1),
-                        target_distance, target_active))
+                        target_distance, target_active, interaction_distance,
+                        interaction_target_active, world_heading))
                 {
                     if (!g_hands_render_failure_logged.exchange(true))
                         log_line("VR_FEATURE_HANDS_RENDER_FAILED eye=%u visual_stereo_continues=1", i);

@@ -1,6 +1,6 @@
 # Chapter 2 release status
 
-Release candidate: `1.3.6-chapter2-20260902`
+Release candidate: `1.3.11-chapter2-20260904`
 
 Branch: `main`
 
@@ -12,6 +12,7 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 - Exact runtime FOV, correct depth and perspective, VR seam correction, and normal Scrap Mechanic color and contrast.
 - Standing VR keeps the world upright, preserves smooth desktop/controller pitch, and removes only pitch-orbit height movement; seated VR uses the original game camera behavior.
 - OpenXR 1.1 Meta Touch, legacy Oculus Touch, Valve Index, and generic OpenXR controller profiles, plus optional Meta optical hand tracking with tracked mechanic gloves.
+- Profile-aware controller bindings keep Quest 3 defaults intact while giving SteamVR/Valve Index a trackpad menu path and grip sprint default.
 - Tracked tools and Chapter 2 weapons, including stock trigger-driven hammer attacks aimed from the right OpenXR hand, OpenXR tool targeting, and gunfire from the separately calibrated VR barrel pose.
 - Complete grouped held-item geometry with a live position/rotation calibration helper, including blocks, parts, buckets, glowsticks, cornades, loose clay, extinguisher, planting, fertilizer, food and drink, feeder food, soil, keys and power cores, resources, arbitrary carried objects, and the logbook.
 - Held-item actions use the right-hand VR pose for throwing, spraying, placing, targeting, inserting, dropping, and use interactions.
@@ -20,6 +21,8 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 - World-locked startup and in-game spatial UI with the live native game menus, transparent composition, hover, click, hold, and drag.
 - Keyboard and pointer events are queued directly into Scrap Mechanic's input manager without Windows input simulation or a foreground-window dependency.
 - Restrained native OpenXR haptics for controller interaction.
+- Always-visible compact curved smartwatch-style wrist HUD: left glove vitals/health, a dynamic blue underwater oxygen bar, and in-game time; right glove a world-space compass with cardinal markers and live quest, beacon, raid, enemy, and event waypoints. The pose is fixed in the native renderer for consistent placement.
+- Right index trigger plus right middle-finger grip queues Scrap Mechanic's native **F** force-build action as a guarded chord; existing Quest 3 mappings remain unchanged.
 - Normal PC mode retains its standard viewmodel; VR mode removes it.
 - Seat, headset-focus, tool-switching, primary-action, and lift-placement state recover automatically after transitions.
 - Survival, Creative, and Custom Game content contexts use the same tracked-hand and spatial-UI bridge.
@@ -37,6 +40,6 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 
 ## Installer
 
-`dist/ScrapMechanicVR-Installer.exe` embeds and validates all 47 managed payload files, the branded installer artwork, its soundtrack, and a verified first-launch game-data cache. It starts music at 50% with a compact volume control and presents only Install VR Mod, Uninstall VR Mod, Start VR, and Open Logs. Install and uninstall detect current/older managed versions, explain the exact operation before asking for approval, migrate or restore safely, and verify automatically. Known prior-release payloads are migrated by exact path and SHA-256, same-version metadata refreshes retain their verified restore authority, and open calibration helpers are reported before any transaction begins. Start VR requires a connected headset reported by the active OpenXR runtime.
+`dist/ScrapMechanicVR-Installer.exe` embeds and validates the managed payload, branded installer artwork, soundtrack, and a verified first-launch game-data cache. It starts music at 50% with a compact volume control and presents Install VR Mod, Uninstall VR Mod, Start VR, Open Logs, and Open Bindings. Install and uninstall detect current/older managed versions, explain the exact operation before asking for approval, migrate or restore safely, and verify automatically. Known prior-release payloads are migrated by exact path and SHA-256, same-version metadata refreshes retain their verified restore authority, and active calibration helpers are reported before any transaction begins. The wrist HUD is fixed in the native renderer, so no HUD calibration helper is installed. Start VR requires a connected headset reported by the active OpenXR runtime.
 
-Installer SHA-256: `721C708913E64AA90FE63D4455799AA3C1E7151402E4EBA2E07AA5C2D50A4B42`. Installer and payload hashes are recorded in `SHA256SUMS.txt`.
+Installer SHA-256: `4E9068749267B5DF47648F9907E863704F422B458BD0A05173AC29066D30CE43`. Installer and payload hashes are recorded in `SHA256SUMS.txt`.

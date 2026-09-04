@@ -16,6 +16,44 @@
 
 namespace smvr::features
 {
+// A logical controller input used by the configurable bindings file. The
+// physical OpenXR actions remain unchanged; this enum only selects which
+// already-sampled action drives a game command. Keeping the defaults in the
+// profile-specific structs below preserves the established Quest layout.
+enum class BindingInput : uint8_t
+{
+    none = 0,
+    left_primary,
+    right_primary,
+    left_secondary,
+    right_secondary,
+    left_stick_click,
+    right_stick_click,
+    left_grip,
+    right_grip,
+    left_trigger,
+    right_trigger,
+    left_menu,
+    right_menu,
+    left_trackpad_click,
+    right_trackpad_click,
+    left_system,
+    right_system,
+};
+
+struct ControllerBindings
+{
+    BindingInput menu = BindingInput::left_menu;
+    BindingInput sprint = BindingInput::left_stick_click;
+    BindingInput crouch = BindingInput::right_stick_click;
+    BindingInput jump = BindingInput::right_primary;
+    BindingInput use = BindingInput::right_secondary;
+    BindingInput context = BindingInput::right_secondary;
+    BindingInput hotbar_previous = BindingInput::left_primary;
+    BindingInput hotbar_next = BindingInput::left_secondary;
+    BindingInput inventory = BindingInput::left_secondary;
+};
+
 struct InputConfig
 {
     bool enabled = true;
@@ -28,6 +66,8 @@ struct InputConfig
     float horizontal_turn_speed = 36.0f;
     float vertical_turn_speed = 28.0f;
     bool vertical_turn = true;
+    ControllerBindings quest_bindings{};
+    ControllerBindings steamvr_bindings{};
 };
 
 struct HandState
@@ -108,6 +148,8 @@ private:
     XrAction secondary_button_action_ = XR_NULL_HANDLE;
     XrAction stick_click_action_ = XR_NULL_HANDLE;
     XrAction menu_button_action_ = XR_NULL_HANDLE;
+    XrAction trackpad_button_action_ = XR_NULL_HANDLE;
+    XrAction system_button_action_ = XR_NULL_HANDLE;
     XrAction index_menu_force_action_ = XR_NULL_HANDLE;
     XrAction haptic_action_ = XR_NULL_HANDLE;
     XrPath hand_paths_[2]{XR_NULL_PATH, XR_NULL_PATH};
@@ -145,6 +187,7 @@ private:
     bool key_zoom_in_ = false;
     bool key_zoom_out_ = false;
     bool key_inventory_ = false;
+    bool key_force_build_ = false;
     bool key_menu_ = false;
     bool key_lift_up_ = false;
     bool key_lift_down_ = false;
@@ -160,6 +203,7 @@ private:
     uint64_t startup_menu_scroll_last_ms_ = 0;
     bool x_was_down_ = false;
     bool y_was_down_ = false;
+    bool inventory_was_down_ = false;
     bool xy_chord_latched_ = false;
     bool y_inventory_latched_ = false;
     uint64_t y_hold_start_ms_ = 0;

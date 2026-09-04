@@ -917,8 +917,11 @@ function CarryTool.cl_tryDrop( self, primaryState, secondaryState, playerCarry, 
 			params.checkCollision = true
 		end
 	end
-	local worldPosition, worldRotation = nil, nil
-	if not vrActive then worldPosition, worldRotation = sm.localPlayer.getConstructionPlacement() end
+	-- The native VR ray hook feeds the current action pose into the engine's
+	-- latest player ray.  Keep using the stock construction-placement helper
+	-- for VR as well so carried bodies (including multi-shape/large items) get
+	-- the same grid snapping and collision validation as desktop placement.
+	local worldPosition, worldRotation = sm.localPlayer.getConstructionPlacement()
 	if worldPosition ~= nil and worldRotation ~= nil then
 		params.shapePlacement = {}
 		params.shapePlacement.worldPosition = worldPosition

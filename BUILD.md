@@ -23,8 +23,9 @@ Important runtime files:
 - `Release/smvr_native_vr_v1.addon64`: Chapter 2 native OpenXR renderer and interaction add-on.
 - `Release/libopenxr_loader.dll`: Khronos OpenXR loader 1.1.60.
 - `Release/libc++.dll` and `Release/libunwind.dll`: LLVM-MinGW dependencies.
-- `Release/ScrapMechanicVR.ini`: VR configuration.
+- `Release/ScrapMechanicVR.ini`: VR configuration and profile-aware controller bindings. The installer exposes it through **Open Bindings**. The right index trigger plus middle-finger grip also queues the game's **F** force-build action.
 - `Release/ScrapMechanicVR-ClayCalibration.exe` and `.ini`: live clay-gun pose/pivot/axis calibration helper.
+- The wrist HUD uses a fixed compact smartwatch pose built into the native renderer; no calibration helper or extra runtime files are required.
 
 Only use the payload with the exact executable hash documented in `README.md`. Do not mix it with the legacy branch's native add-on, OpenXR loader, Lua scripts, or installer.
 
@@ -36,11 +37,11 @@ Only use the payload with the exact executable hash documented in `README.md`. D
 .\Build-OneFileInstaller.ps1
 ```
 
-The public artifact is `dist/ScrapMechanicVR-Installer.exe`. It validates its embedded patcher, manifest, native add-on, branded UI assets, soundtrack, and all 47 managed payload files before installation. Its four user actions are Install VR Mod, Uninstall VR Mod, Start VR, and Open Logs. Install automatically migrates a managed older/current build and verifies the completed installation. Uninstall removes managed current/older builds, restores backups, and verifies the result. Start VR requires the active OpenXR runtime to report a connected headset.
+The public artifact is `dist/ScrapMechanicVR-Installer.exe`. It validates its embedded patcher, manifest, native add-on, branded UI assets, soundtrack, and the managed payload before installation. Its five user actions are Install VR Mod, Uninstall VR Mod, Start VR, Open Logs, and Open Bindings. Install automatically migrates a managed older/current build and verifies the completed installation. Uninstall removes managed current/older builds, restores backups, and verifies the result. Start VR requires the active OpenXR runtime to report a connected headset.
 
-Current version: `1.3.6-chapter2-20260902`
+Current version: `1.3.11-chapter2-20260904`
 
-Installer SHA-256: `721C708913E64AA90FE63D4455799AA3C1E7151402E4EBA2E07AA5C2D50A4B42` (also recorded in `SHA256SUMS.txt`).
+Installer SHA-256: `4E9068749267B5DF47648F9907E863704F422B458BD0A05173AC29066D30CE43` (also recorded in `SHA256SUMS.txt`).
 
 The payload includes a verified `Cache/Bundle/core_data.cbo` seed for the supported game build. This avoids Scrap Mechanic's unstable cold-cache compiler path on the first VR launch; the cache remains runtime-mutable and is backed up/restored like every other managed file.
 

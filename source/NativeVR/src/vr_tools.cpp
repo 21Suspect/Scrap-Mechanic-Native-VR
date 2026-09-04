@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cwchar>
 #include <cstring>
+#include <cstdlib>
 #include <fstream>
 #include <iterator>
 #include <limits>
@@ -130,6 +131,7 @@ namespace scrapvr::tools
 		std::string g_active_item_uuid;
 		bool g_player_seated = false;
 		bool g_player_first_person = false;
+		WristHudState g_wrist_hud_state{};
 		bool g_render_suppressed = false;
 		ULONGLONG g_last_poll = 0;
 		ULONGLONG g_player_state_last_valid_ms = 0;
@@ -1147,6 +1149,75 @@ namespace scrapvr::tools
 			return true;
 		}
 
+		bool json_number(const std::string &text, const char *name, double &value)
+		{
+			const std::string marker = std::string("\"") + name + "\"";
+			auto position = text.find(marker);
+			if (position == std::string::npos) return false;
+			position = text.find(':', position + marker.size());
+			if (position == std::string::npos) return false;
+			do { ++position; } while (position < text.size() &&
+				(text[position] == ' ' || text[position] == '\t' || text[position] == '\r' || text[position] == '\n'));
+			if (position >= text.size()) return false;
+			const char *begin = text.c_str() + position;
+			char *end = nullptr;
+			const double parsed = std::strtod(begin, &end);
+			if (end == begin || !std::isfinite(parsed)) return false;
+			value = parsed;
+			return true;
+		}
+
+		bool json_waypoints(const std::string &text,
+			std::array<WristHudWaypoint, kMaxWristHudWaypoints> &waypoints,
+			uint32_t &count)
+		{
+			waypoints = {};
+			count = 0;
+			const std::string marker = "\"waypoints\"";
+			size_t position = text.find(marker);
+			if (position == std::string::npos) return false;
+			position = text.find('[', position + marker.size());
+			if (position == std::string::npos) return false;
+			const size_t array_begin = position;
+			unsigned depth = 0;
+			size_t array_end = std::string::npos;
+			for (; position < text.size(); ++position)
+			{
+				if (text[position] == '[') ++depth;
+				else if (text[position] == ']' && depth > 0 && --depth == 0)
+				{
+					array_end = position;
+					break;
+				}
+			}
+			if (array_end == std::string::npos) return false;
+
+			position = array_begin + 1;
+			while (position < array_end && count < kMaxWristHudWaypoints)
+			{
+				const size_t object_begin = text.find('{', position);
+				if (object_begin == std::string::npos || object_begin >= array_end) break;
+				const size_t object_end = text.find('}', object_begin + 1);
+				if (object_end == std::string::npos || object_end > array_end) break;
+				const std::string object = text.substr(object_begin, object_end - object_begin + 1);
+				double angle = 0.0, distance = 0.0, kind = 1.0;
+				const bool angle_ok = json_number(object, "angle", angle);
+				const bool distance_ok = json_number(object, "distance", distance);
+				json_number(object, "kind", kind);
+				if (angle_ok && distance_ok && std::isfinite(angle) && std::isfinite(distance) &&
+					distance >= 0.0 && distance <= 100000.0 && angle >= -6.28318530718 && angle <= 6.28318530718)
+				{
+					WristHudWaypoint &waypoint = waypoints[count++];
+					waypoint.angle = static_cast<float>(angle);
+					waypoint.distance = static_cast<float>(distance);
+					waypoint.kind = (std::isfinite(kind) && kind >= 1.0 && kind <= 4.0)
+						? static_cast<uint32_t>(kind + 0.5) : 1u;
+				}
+				position = object_end + 1;
+			}
+			return true;
+		}
+
 		std::string json_escape(const char *value)
 		{
 			std::string result;
@@ -1238,7 +1309,10 @@ namespace scrapvr::tools
 			bool new_packet = false;
 			if (file != INVALID_HANDLE_VALUE)
 			{
-				char bytes[2048]{}; DWORD read = 0;
+				// Waypoint-bearing packets are still tiny, but a raid can expose many
+				// markers. Read a bounded 8 KiB packet so the JSON cannot be truncated
+				// before the native parser reaches the final markers.
+				char bytes[8192]{}; DWORD read = 0;
 				const bool read_ok = ReadFile(file, bytes, sizeof(bytes) - 1, &read, nullptr) != FALSE;
 				CloseHandle(file);
 				if (read_ok && read > 0)
@@ -1255,6 +1329,7 @@ namespace scrapvr::tools
 						if (!active)
 						{
 							apply_player_state(Tool::none, ItemVariant::none, -1, {}, false, false);
+							g_wrist_hud_state = WristHudState{};
 							new_packet = true;
 						}
 						else if (json_bool(text, "seated", seated) && json_bool(text, "firstPerson", first_person) &&
@@ -1271,6 +1346,45 @@ namespace scrapvr::tools
 								else tool = parse_tool(item, adapter, variant);
 							}
 							apply_player_state(tool, variant, catalog_item, item, seated, first_person);
+							// The fields are optional for compatibility with older worlds and
+							// custom modes.  A packet without them simply hides the wrist
+							// panels instead of showing stale values from a previous world.
+							double health = -1.0, max_health = -1.0, breath = -1.0, max_breath = -1.0, time_minutes = -1.0;
+							std::array<WristHudWaypoint, kMaxWristHudWaypoints> waypoints{};
+							uint32_t waypoint_count = 0;
+							json_waypoints(text, waypoints, waypoint_count);
+							bool conscious = true;
+							const bool health_valid = json_number(text, "health", health) &&
+								json_number(text, "maxHealth", max_health) &&
+								std::isfinite(health) && std::isfinite(max_health) &&
+								max_health > 0.0 &&
+								health >= -1.0 && health <= max_health + 1.0;
+							const bool time_valid = json_number(text, "timeMinutes", time_minutes) &&
+								std::isfinite(time_minutes) && time_minutes >= 0.0 && time_minutes < 1440.0;
+							const bool breath_valid = json_number(text, "breath", breath) &&
+								json_number(text, "maxBreath", max_breath) &&
+								std::isfinite(breath) && std::isfinite(max_breath) &&
+								max_breath > 0.0 && breath >= -1.0 && breath <= max_breath + 1.0;
+							const bool has_conscious = json_bool(text, "conscious", conscious);
+							if (has_conscious && (health_valid || time_valid))
+							{
+								g_wrist_hud_state.active = true;
+								g_wrist_hud_state.conscious = conscious;
+								g_wrist_hud_state.health = health_valid
+									? static_cast<float>(std::max(0.0, health)) : 0.0f;
+								g_wrist_hud_state.max_health = health_valid
+									? static_cast<float>(max_health) : 0.0f;
+								g_wrist_hud_state.breath = breath_valid
+									? static_cast<float>(std::max(0.0, breath)) : 0.0f;
+								g_wrist_hud_state.max_breath = breath_valid
+									? static_cast<float>(max_breath) : 0.0f;
+								g_wrist_hud_state.time_minutes = time_valid
+									? static_cast<uint32_t>(time_minutes + 0.5) : 0;
+								g_wrist_hud_state.waypoints = waypoints;
+								g_wrist_hud_state.waypoint_count = waypoint_count;
+							}
+							else
+								g_wrist_hud_state = WristHudState{};
 							new_packet = true;
 						}
 						if (new_packet)
@@ -1288,6 +1402,7 @@ namespace scrapvr::tools
 			if (g_player_state_last_valid_ms == 0 || now - g_player_state_last_valid_ms > 1000)
 			{
 				apply_player_state(Tool::none, ItemVariant::none, -1, {}, false, false);
+				g_wrist_hud_state = WristHudState{};
 				if (g_player_state_source_custom)
 				{
 					custom_content_bridge::mirror_world_state(false);
@@ -1496,7 +1611,8 @@ namespace scrapvr::tools
 	bool render(ID3D11DeviceContext *context, ID3D11RenderTargetView *target, ID3D11DepthStencilView *depth,
 		uint32_t width, uint32_t height, const XrView &eye, const XrPosef &right_hand_pose,
 		bool right_hand_active, bool right_firing, const XrPosef &right_aim_pose,
-		bool right_aim_active, float right_target_distance, bool right_target_active)
+		bool right_aim_active, float right_target_distance, bool right_target_active,
+		float interaction_target_distance, bool interaction_target_active)
 	{
 		if (!g_initialized || !context || !target || !depth) return false;
 		poll_active_tool();
@@ -1622,10 +1738,15 @@ namespace scrapvr::tools
 			const XrVector3f laser_origin = adjusted_pointer_offset(g_active_tool,
 				{ calibration.laser_x, calibration.laser_y, calibration.laser_z });
 			const XrVector3f laser_direction = transform_direction(orientation_for_pose(pose), { 0.0f, 0.0f, -1.0f });
+			const float laser_length = interaction_target_active &&
+				std::isfinite(interaction_target_distance)
+				? std::clamp(interaction_target_distance, 0.05f, 8.0f)
+				: 8.0f;
 			Vertex laser[2] = {
 				{ laser_origin.x, laser_origin.y, laser_origin.z, 0, 0, 1, 0, 0 },
-				{ laser_origin.x + laser_direction.x * 8.0f, laser_origin.y + laser_direction.y * 8.0f,
-					laser_origin.z + laser_direction.z * 8.0f, 0, 0, 1, 0, 0 }
+				{ laser_origin.x + laser_direction.x * laser_length,
+					laser_origin.y + laser_direction.y * laser_length,
+					laser_origin.z + laser_direction.z * laser_length, 0, 0, 1, 0, 0 }
 			};
 			D3D11_MAPPED_SUBRESOURCE mapped = {};
 			if (SUCCEEDED(context->Map(g_laser_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped))) { std::memcpy(mapped.pData, laser, sizeof(laser)); context->Unmap(g_laser_buffer, 0); }
@@ -1688,18 +1809,24 @@ namespace scrapvr::tools
 		return true;
 	}
 
-	bool get_interaction_laser_offset(XrVector3f &offset, XrVector3f *local_direction)
+	bool get_interaction_laser_offset(XrVector3f &offset, XrVector3f *local_direction,
+		InteractionLaserKind *kind)
 	{
 		poll_active_tool();
 		poll_held_calibration();
 		if (g_active_tool != Tool::connect && g_active_tool != Tool::paint &&
 			g_active_tool != Tool::weld)
+		{
+			if (kind) *kind = InteractionLaserKind::none;
 			return false;
+		}
 		const auto &calibration = calibration_for(g_active_tool);
 		offset = adjusted_pointer_offset(g_active_tool,
 			{ calibration.laser_x, calibration.laser_y, calibration.laser_z });
 		if (local_direction) *local_direction = transform_direction(
 			orientation_for_pose(pose_for_active()), { 0.0f, 0.0f, -1.0f });
+		if (kind) *kind = g_active_tool == Tool::connect
+			? InteractionLaserKind::connection : InteractionLaserKind::surface;
 		return true;
 	}
 
@@ -1767,6 +1894,12 @@ namespace scrapvr::tools
 		return g_player_first_person;
 	}
 
+	WristHudState wrist_hud_state()
+	{
+		poll_active_tool();
+		return g_wrist_hud_state;
+	}
+
 	void set_render_suppressed(bool suppressed)
 	{
 		g_render_suppressed = suppressed;
@@ -1788,6 +1921,7 @@ namespace scrapvr::tools
 		reset_pose_defaults(); g_held_calibration_path.clear(); g_held_catalog_path.clear(); g_held_status_path.clear();
 		g_held_calibration_poll_ms = 0; g_held_calibration_write_time = {}; g_held_calibration_loaded = false;
 		g_player_seated = false; g_player_first_person = false;
+		g_wrist_hud_state = WristHudState{};
 		g_render_suppressed = false; g_last_poll = 0; g_player_state_last_valid_ms = 0;
 		g_player_state_sequence = 0; g_player_state_sequence_valid = false;
 		g_player_state_source_path.clear(); g_player_state_source_custom = false;
