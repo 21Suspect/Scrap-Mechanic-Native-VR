@@ -1,0 +1,65 @@
+name: Bug report
+description: Report a reproducible problem with Scrap Mechanic Native VR
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please complete every setup field. Reports without exact PC, VR runtime, headset, and controller details may not be actionable.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the problem and the exact steps that reproduce it.
+      placeholder: Steps, expected result, and actual result
+    validations:
+      required: true
+  - type: input
+    id: game_version
+    attributes:
+      label: Scrap Mechanic and mod version
+      placeholder: "Game build 24529696, mod v1.3.15"
+    validations:
+      required: true
+  - type: textarea
+    id: pc_setup
+    attributes:
+      label: Exact PC setup
+      description: Include CPU, GPU and driver version, RAM, Windows version, and whether HAGS is enabled.
+      placeholder: "Ryzen 7 5800X3D; RTX 5070 Ti driver 610.88; 32 GB RAM; Windows 11 24H2; HAGS off"
+    validations:
+      required: true
+  - type: input
+    id: headset
+    attributes:
+      label: Headset and connection
+      description: Headset model and connection method.
+      placeholder: "Meta Quest 3 via Virtual Desktop / Quest Link / cable"
+    validations:
+      required: true
+  - type: input
+    id: controllers
+    attributes:
+      label: Controllers
+      description: Controller model and tracking setup.
+      placeholder: "Quest Touch Plus / Valve Index Knuckles; Lighthouse or inside-out"
+    validations:
+      required: true
+  - type: input
+    id: vr_runtime
+    attributes:
+      label: VR software and OpenXR runtime
+      description: Include Virtual Desktop/VDXR, SteamVR, Meta Link, and runtime version where applicable.
+      placeholder: "Virtual Desktop 1.34.22; VDXR runtime (or SteamVR OpenXR)"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Attach ScrapMechanicVR-v1.log and ReShade.log from the failing launch.
+      placeholder: Drag and drop the log files here.
+    validations:
+      required: true
