@@ -25,6 +25,7 @@ Important runtime files:
 - `Release/libc++.dll` and `Release/libunwind.dll`: LLVM-MinGW dependencies.
 - `Release/ScrapMechanicVR.ini`: VR configuration and profile-aware controller bindings. The installer exposes it through **Open Bindings**. The right index trigger plus middle-finger grip also queues the game's **F** force-build action.
 - `Release/ScrapMechanicVR-ClayCalibration.exe` and `.ini`: live clay-gun pose/pivot/axis calibration helper.
+- `Release/ScrapMechanicVR-HeldCalibration.exe` and `.ini`: live grouped held-item position/rotation/scale calibration helper. It can be copied to another PC, auto-connects to a running game installation (including when the game starts after the helper), and exports a shareable plain-text pose file.
 - The wrist HUD uses a fixed compact smartwatch pose built into the native renderer; no calibration helper or extra runtime files are required.
 
 Only use the payload with the exact executable hash documented in `README.md`. Do not mix it with the legacy branch's native add-on, OpenXR loader, Lua scripts, or installer.
@@ -39,9 +40,21 @@ Only use the payload with the exact executable hash documented in `README.md`. D
 
 The public artifact is `dist/ScrapMechanicVR-Installer.exe`. It validates its embedded patcher, manifest, native add-on, branded UI assets, soundtrack, and the managed payload before installation. Its five user actions are Install VR Mod, Uninstall VR Mod, Start VR, Open Logs, and Open Bindings. Install automatically migrates a managed older/current build and verifies the completed installation. Uninstall removes managed current/older builds, restores backups, and verifies the result. Start VR requires the active OpenXR runtime to report a connected headset.
 
-Current version: `1.3.11-chapter2-20260904`
+Current version: `1.3.15-chapter2-20260905`
 
-Installer SHA-256: `4E9068749267B5DF47648F9907E863704F422B458BD0A05173AC29066D30CE43` (also recorded in `SHA256SUMS.txt`).
+Installer SHA-256: `42D0B8CC7AA0B35542FF59B376FA67B3C1639FAC5A99FDD2DF1C94ADCEC2791D` (also recorded in `SHA256SUMS.txt`).
+
+Focused regression checks for palette input, fertilizer ownership, and startup retries:
+
+```powershell
+c++.exe -std=c++20 tools/tests/ui_trigger_gate.cpp -o build/ui_trigger_gate_test.exe
+.\build\ui_trigger_gate_test.exe
+c++.exe -std=c++20 tools/tests/launch_retry.cpp -o build/launch_retry_test.exe
+.\build\launch_retry_test.exe
+python tools/tests/test_fertilizer_effect.py --lua-dll '<game directory>/Release/lua51.dll'
+```
+
+The Lua test executes the shipped fertilizer script with mocked tool owners. The C++ tests exercise the production input gate and launch retry policy. These checks do not replace an in-headset multiplayer or VDXR test.
 
 The payload includes a verified `Cache/Bundle/core_data.cbo` seed for the supported game build. This avoids Scrap Mechanic's unstable cold-cache compiler path on the first VR launch; the cache remains runtime-mutable and is backed up/restored like every other managed file.
 

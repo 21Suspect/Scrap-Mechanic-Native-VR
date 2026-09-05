@@ -36,6 +36,7 @@ The installer has five clear actions: **Install VR Mod**, **Uninstall VR Mod**, 
 - Aim the right hand and use B for Scrap Mechanic's normal interactions, including holding B to refine loose wood, stone, or metal; a small amber surface marker shows the exact target without drawing a laser.
 - Right-trigger hammer attacks follow the right-hand aim, and tracked weapons fire from their calibrated VR barrels.
 - Calibrated Chapter 2 clay-gun grip and moving parts, with the included clay-gun calibration helper.
+- Included held-item calibration helper: run `ScrapMechanicVR-HeldCalibration.exe` before or after Scrap Mechanic to tune grouped poses live; it attaches when the game starts. Use **Export text...** to save a shareable plain-text configuration for review or hardcoding.
 - World-locked startup and in-game spatial menus using Scrap Mechanic's live native UI.
 - Right-hand menu laser, native hover/click/hold/drag input, and smooth transparent menu presentation.
 - Controller keyboard and pointer events are queued inside Scrap Mechanic, so gameplay remains responsive through Meta, VDXR, and SteamVR even when the desktop window is not foreground.
@@ -72,6 +73,8 @@ Set `VerticalStickLook=0` in `Release\ScrapMechanicVR.ini` if you want the right
 ### Controller bindings
 
 Use **Open Bindings** in the installer to open `Release\ScrapMechanicVR.ini`. Edit the `[Bindings.Quest]` section for Quest 3 or `[Bindings.SteamVR]` for Valve Index (SteamVR's Index profile), then restart Scrap Mechanic/VR. Each command accepts `none`, `left/right_primary`, `left/right_secondary`, `left/right_stick_click`, `left/right_grip`, `left/right_trigger`, `left_menu`, `left_trackpad_click`, or `left_system`. The shipped Quest section preserves the established Quest 3 controls; the SteamVR section uses the left trackpad for the in-game menu and left grip for sprint.
+
+For held-item tuning, the helper automatically connects to a running Scrap Mechanic installation even when it is copied to another folder, and keeps checking if the game is launched afterward. If the game is closed, keep the helper beside its `.ini`; the helper will attach as soon as the game starts. **Export text...** writes all grouped position, rotation, and scale values without embedding a personal path.
 
 ## Requirements
 

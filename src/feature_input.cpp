@@ -938,8 +938,21 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         active_profile_paths_[1] == index_profile_path_;
     const ControllerBindings &bindings = steamvr_profile
         ? config_.steamvr_bindings : config_.quest_bindings;
-    const bool left_trigger = hands_[0].optical ? optical_pinch_down_[0] : trigger[0] > 0.55f;
-    const bool right_trigger = hands_[1].optical ? optical_pinch_down_[1] : trigger[1] > 0.55f;
+    const bool raw_left_trigger = hands_[0].optical ? optical_pinch_down_[0] : trigger[0] > 0.55f;
+    const bool raw_right_trigger = hands_[1].optical ? optical_pinch_down_[1] : trigger[1] > 0.55f;
+    bool gameplay_trigger[2]{};
+    for (uint32_t hand = 0; hand < kHandCount; ++hand)
+    {
+        // A selection may close a modal while its trigger remains held. Keep
+        // that press owned by UI until a real release, including the Lua hand
+        // bridge and force-build chord, not just the injected mouse button.
+        const bool released = hands_[hand].optical ? !optical_pinch_down_[hand] :
+            (trigger_active[hand] && trigger[hand] < 0.20f);
+        gameplay_trigger[hand] = ui_trigger_gate_[hand].gameplay_down(startup_menu_visible_,
+            hand == 0 ? raw_left_trigger : raw_right_trigger, released);
+    }
+    const bool left_trigger = gameplay_trigger[0];
+    const bool right_trigger = gameplay_trigger[1];
     const bool left_grip = squeeze[0] > 0.55f;
     const bool right_grip = squeeze[1] > 0.55f;
     auto binding_down = [&](BindingInput binding) -> bool {
@@ -953,8 +966,8 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         case BindingInput::right_stick_click: return right_click;
         case BindingInput::left_grip: return left_grip;
         case BindingInput::right_grip: return right_grip;
-        case BindingInput::left_trigger: return left_trigger;
-        case BindingInput::right_trigger: return right_trigger;
+        case BindingInput::left_trigger: return startup_menu_visible_ ? raw_left_trigger : left_trigger;
+        case BindingInput::right_trigger: return startup_menu_visible_ ? raw_right_trigger : right_trigger;
         case BindingInput::left_menu: return menu_button;
         case BindingInput::right_menu: return false;
         case BindingInput::left_trackpad_click: return trackpad_button;
@@ -980,9 +993,9 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         {
             hands_[hand].finger_curls = {0.0f, trigger[hand], squeeze[hand], squeeze[hand], squeeze[hand]};
             hands_[hand].precise_fingers = false;
-            hands_[hand].interaction = trigger[hand] > 0.55f;
-            hands_[hand].firing = hand == 1 && trigger[hand] > 0.55f;
         }
+        hands_[hand].interaction = hand == 0 ? left_trigger : right_trigger;
+        hands_[hand].firing = hand == 1 && right_trigger;
     }
 
     const bool recenter_down = left_click && right_click;
@@ -1105,7 +1118,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
         // on several subsequent action-sync frames, while optical pinch used
         // its live state. Preserve the same private game-input queue downstream;
         // this does not synthesize any Windows mouse input.
-        const bool controller_ui_trigger = !hands_[1].optical && trigger_active[1] && right_trigger;
+        const bool controller_ui_trigger = !hands_[1].optical && trigger_active[1] && raw_right_trigger;
         ui_select_down_ = controller_ui_trigger || optical_pinch_down_[1] || a;
         if (quick_transfer && !quick_transfer_was_down_)
         {
@@ -1395,6 +1408,7 @@ void InputBridge::reset_runtime_state()
     controller_trigger_candidate_since_[0] = controller_trigger_candidate_since_[1] = 0;
     controller_trigger_last_active_[0] = controller_trigger_last_active_[1] = 0;
     startup_menu_visible_ = false;
+    ui_trigger_gate_[0] = ui_trigger_gate_[1] = {};
     startup_menu_pointer_active_ = false;
     ui_select_down_ = false;
     controller_ui_trigger_was_down_ = false;

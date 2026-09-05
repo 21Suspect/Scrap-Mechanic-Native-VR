@@ -1,6 +1,6 @@
 # Chapter 2 release status
 
-Release candidate: `1.3.11-chapter2-20260904`
+Release candidate: `1.3.15-chapter2-20260905`
 
 Branch: `main`
 
@@ -8,6 +8,10 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 
 ## Current build
 
+- Palette/menu selection consumes the trigger until physical release before allowing a new gameplay action, including the native mouse queue, Lua hand state, and force-build chord (issue #12).
+- Fertilizer use from remote players retains the remote character's hosted effect; only a locally owned tool reads the local VR hand pose (issue #13).
+- Start VR begins its headset retry budget at the first OpenXR attempt and completes it when the session starts. Launch requests survive delayed add-on loading when the game process started promptly. Failure diagnostics include OpenXR result names and GPU adapter identities.
+- Focused input, Lua ownership, and cold-start retry regression checks pass. The reported VDXR-only-flatscreen case still requires the affected machine's native VR and ReShade logs to identify its failing stage; it has not been reproduced locally.
 - Native stereo OpenXR rendering at `2064 × 2272` per eye with six-degree-of-freedom head tracking.
 - Exact runtime FOV, correct depth and perspective, VR seam correction, and normal Scrap Mechanic color and contrast.
 - Standing VR keeps the world upright, preserves smooth desktop/controller pitch, and removes only pitch-orbit height movement; seated VR uses the original game camera behavior.
@@ -15,6 +19,7 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 - Profile-aware controller bindings keep Quest 3 defaults intact while giving SteamVR/Valve Index a trackpad menu path and grip sprint default.
 - Tracked tools and Chapter 2 weapons, including stock trigger-driven hammer attacks aimed from the right OpenXR hand, OpenXR tool targeting, and gunfire from the separately calibrated VR barrel pose.
 - Complete grouped held-item geometry with a live position/rotation calibration helper, including blocks, parts, buckets, glowsticks, cornades, loose clay, extinguisher, planting, fertilizer, food and drink, feeder food, soil, keys and power cores, resources, arbitrary carried objects, and the logbook.
+- The held-item helper follows the running game installation and exports every grouped pose as a shareable plain-text file for review.
 - Held-item actions use the right-hand VR pose for throwing, spraying, placing, targeting, inserting, dropping, and use interactions.
 - Right-controller B keeps Scrap Mechanic's stock Use interaction and redirects only its selection ray to the OpenXR right hand, including normal hold-to-refine behavior; a laser-free amber marker identifies the exact selected surface.
 - Grip plus A performs Scrap Mechanic's native Shift-click quick transfer in inventory/chest menus, and right grip plus right-stick vertical raises or lowers the lift.
@@ -42,4 +47,4 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 
 `dist/ScrapMechanicVR-Installer.exe` embeds and validates the managed payload, branded installer artwork, soundtrack, and a verified first-launch game-data cache. It starts music at 50% with a compact volume control and presents Install VR Mod, Uninstall VR Mod, Start VR, Open Logs, and Open Bindings. Install and uninstall detect current/older managed versions, explain the exact operation before asking for approval, migrate or restore safely, and verify automatically. Known prior-release payloads are migrated by exact path and SHA-256, same-version metadata refreshes retain their verified restore authority, and active calibration helpers are reported before any transaction begins. The wrist HUD is fixed in the native renderer, so no HUD calibration helper is installed. Start VR requires a connected headset reported by the active OpenXR runtime.
 
-Installer SHA-256: `4E9068749267B5DF47648F9907E863704F422B458BD0A05173AC29066D30CE43`. Installer and payload hashes are recorded in `SHA256SUMS.txt`.
+Installer SHA-256: `42D0B8CC7AA0B35542FF59B376FA67B3C1639FAC5A99FDD2DF1C94ADCEC2791D`. Installer and payload hashes are recorded in `SHA256SUMS.txt`.

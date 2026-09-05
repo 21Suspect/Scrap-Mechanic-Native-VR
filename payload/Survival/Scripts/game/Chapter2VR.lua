@@ -513,6 +513,15 @@ local function updateToolAim( self, data )
 	else
 		g_vrToolPointerDirection = laserOffset and pose.forward or nil
 	end
+	-- Construction tools expose their preview/drag endpoint from the tool-tip
+	-- ray, not the grip-center action pose. Keep the gameplay action origin and
+	-- basis on that same tracked tip so the stock connection/weld preview cannot
+	-- fall back to the desktop crosshair.
+	if g_vrToolPointerOrigin and g_vrToolPointerDirection and
+		(activeItem == VrConnectionToolItem or VrToolLaserItems[activeItem]) then
+		g_vrActionOrigin = g_vrToolPointerOrigin
+		g_vrActionDirection = g_vrToolPointerDirection
+	end
 	if activeItem == VrConnectionToolItem and g_vrToolPointerOrigin and g_vrToolPointerDirection then
 		local tick = sm.game.getCurrentTick()
 		if self.cl.vrConnectionTargetTick == nil or tick - self.cl.vrConnectionTargetTick >= 3 then

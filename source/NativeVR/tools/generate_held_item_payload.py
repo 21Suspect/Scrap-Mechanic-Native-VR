@@ -466,7 +466,10 @@ def patch_fertilizer_effect(text: str) -> str:
     marker = "function Fertilizer.onUse( self )\n"
     injected = marker + (
         "\tlocal vrPose, vrActive = nil, false\n"
-        "\tif Chapter2VR and Chapter2VR.actionPose then vrPose, vrActive = Chapter2VR.actionPose() end\n"
+        "\t-- Remote use notifications must retain the owner's third-person effect.\n"
+        "\tif self.tool:isLocal() and Chapter2VR and Chapter2VR.actionPose then\n"
+        "\t\tvrPose, vrActive = Chapter2VR.actionPose()\n"
+        "\tend\n"
     )
     text = replace_once(text, marker, injected, "Fertilizer effect pose")
     old = """\tif self.tool:isLocal() and self.tool:isInFirstPersonView() then

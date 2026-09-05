@@ -13,6 +13,7 @@
 #include <atomic>
 #include <array>
 #include <cstdint>
+#include "feature_ui_trigger_gate.hpp"
 
 namespace smvr::features
 {
@@ -197,6 +198,7 @@ private:
     bool mouse_attack_ = false;
     bool mouse_secondary_ = false;
     bool startup_menu_visible_ = false;
+    UiTriggerGate ui_trigger_gate_[2]{};
     bool startup_menu_pointer_active_ = false;
     bool ui_select_down_ = false;
     float ui_scroll_axis_ = 0.0f;

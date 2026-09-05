@@ -30,6 +30,8 @@ if ($branch -eq $snapshot.localFeatureBranch -or $branch -eq $snapshot.chapter2B
         @{ Path = 'src\native_vr.cpp'; Expected = $candidate.source.nativeVrSha256 },
         @{ Path = 'src\feature_input.cpp'; Expected = $candidate.source.featureInputSha256 },
         @{ Path = 'src\feature_input.hpp'; Expected = $candidate.source.featureInputHeaderSha256 },
+        @{ Path = 'src\feature_ui_trigger_gate.hpp'; Expected = $candidate.source.uiTriggerGateSha256 },
+        @{ Path = 'src\feature_launch_retry.hpp'; Expected = $candidate.source.launchRetryPolicySha256 },
         @{ Path = 'src\feature_engine_input.cpp'; Expected = $candidate.source.engineInputSha256 },
         @{ Path = 'src\feature_engine_input.hpp'; Expected = $candidate.source.engineInputHeaderSha256 },
         @{ Path = 'src\feature_startup_menu.cpp'; Expected = $candidate.source.startupMenuSha256 },

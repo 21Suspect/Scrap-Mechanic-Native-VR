@@ -265,7 +265,10 @@ end
 
 function Fertilizer.onUse( self )
 	local vrPose, vrActive = nil, false
-	if Chapter2VR and Chapter2VR.actionPose then vrPose, vrActive = Chapter2VR.actionPose() end
+	-- Remote use notifications must retain the owner's third-person effect.
+	if self.tool:isLocal() and Chapter2VR and Chapter2VR.actionPose then
+		vrPose, vrActive = Chapter2VR.actionPose()
+	end
 	if self.tool:isLocal() then
 		setFpAnimation( self.fpAnimations, "use", 0.25 )
 	end

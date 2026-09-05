@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "patchId": "scrap-mechanic-native-vr-chapter2",
-  "patchVersion": "1.3.11-chapter2-20260904",
+  "patchVersion": "1.3.15-chapter2-20260905",
   "description": "Scrap Mechanic Chapter 2 native OpenXR VR with OpenXR 1.1 Meta Touch, legacy Oculus Touch, Valve Index, and generic controller profiles, optional Quest optical hands, Custom Game content bridging, complete held-item geometry, grouped held-item pose calibration, hand-aimed world actions with a laser-free target marker, barrel-aimed weapons, binding-aware lift and inventory shortcuts, spatial live game menus, native queued keyboard and pointer input, transparent composition, restrained haptics, guarded right-trigger-plus-grip force-build, and always-visible fixed smartwatch-style wrist vitals, underwater oxygen, time, and world-space compass HUDs with live waypoint markers",
   "game": {
     "appId": "387990",
@@ -72,7 +72,7 @@
     },
     {
       "path": "Release\\smvr_native_vr_v1.addon64",
-      "patchedSha256": "D069C545CD1D0527CD1E4798B2364FCED7775285B61AE83D555FF553F79FC29F",
+      "patchedSha256": "1181A116D41595C4F64AC4350104B04B43144FA9EEE6678A575444CF8A76DCDD",
       "originalMayBeMissing": true,
       "module": "chapter2-native-openxr",
       "historicalPatchedSha256": [
@@ -99,6 +99,7 @@
         "6F5C2B339FCE8D616BDCBD1D11CA1C4CFCA888A3497328D978DE5A0F1DC94EED",
         "74295E66FF9A84BAB56E0D10C00B82FD259D359BCA3189DF23118D968297174B",
         "7CFB36E13C824641D3088213BF5C632FC91E3D99C3AE4993878FF66CD7B387F8",
+        "879DE659039CC0EF46C2A77749445915D18B2791C6DC288BD4B732068F48384D",
         "8C5744E65EC66492BA437A384A89A6F18A77CE2F9D95A2713EE7A1F6C53F1AF1",
         "8C654685A6DAB31D33A1D63B66423EDF24D84579B274B04217CCFA9A737ED052",
         "8FDAEF6FD3D97E51352CA3ED249F7E1EC39D15600FAB6FF97DCE20B593F1DCA0",
@@ -113,6 +114,7 @@
         "CA39F915C53BF6E73A3D7C5C30F37365E23DC7FC9E4B283B8912503F14E40164",
         "CBDD5FC0BE29910F70CDD26A420D613E9F00B55C8C68D8367096B3BCE38C2911",
         "CCDA98B0B8886A2C5819D759F0B6F50CD8CCD876353EBB89936A7AB76A9B4689",
+        "D069C545CD1D0527CD1E4798B2364FCED7775285B61AE83D555FF553F79FC29F",
         "D159E830D15841843D86794D14041311C4D7BB78D9F298AF006A6F4595B09A68",
         "D5BBD3EB3182AB1FB7733F7FDCFE287853F20D63C02C35434B0D6E7BBABBF253",
         "D5E39859EC0E0614EDD18A85AF3F8D54ACA1A397A4C5B2A6457554A95D6A475A",
@@ -153,16 +155,26 @@
     },
     {
       "path": "Release\\ScrapMechanicVR-HeldCalibration.exe",
-      "patchedSha256": "76DC7311590FCF75BA36D2E247C53279F62D9D26C4A3688665D6E572AD514D03",
+      "patchedSha256": "50F8DC5B23CB0D0942F24994F7593771CB9DF624BD840A48ECAC78AFFBB0E87B",
       "originalMayBeMissing": true,
-      "module": "chapter2-held-item-live-calibrator"
+      "module": "chapter2-held-item-live-calibrator",
+      "historicalPatchedSha256": [
+        "49F3D480195822943AA8D0CAB459A640E3712DBF950ABE9621880C22CF1E68AC",
+        "6765536FB75A02E610E2C72172BE772437235E7509A8CE4089AB562F2830BA13",
+        "76DC7311590FCF75BA36D2E247C53279F62D9D26C4A3688665D6E572AD514D03",
+        "A6C4F808F3936AD5F511D153134354AE657A70107BE3ADE3B711E3F7747D2B85"
+      ]
     },
     {
       "path": "Release\\ScrapMechanicVR-HeldCalibration.ini",
-      "patchedSha256": "851FFC999DDA8B4B5CCD856B7D8D455C9472705A725DA73A9998BBB818CF92DE",
+      "patchedSha256": "6B18AA3D3BAD84CD78FC7C994CC451A2C8C339C16E703E022806A880F598D306",
       "originalMayBeMissing": true,
       "runtimeMutable": true,
-      "module": "chapter2-held-item-live-calibration"
+      "module": "chapter2-held-item-live-calibration",
+      "historicalPatchedSha256": [
+        "734F03EB6F54AD16E6E0B9B1972C86C66BC2C5CE4580CFAB498C3DCBFF648808",
+        "851FFC999DDA8B4B5CCD856B7D8D455C9472705A725DA73A9998BBB818CF92DE"
+      ]
     },
     {
       "path": "Release\\ScrapMechanicVR-HeldItems.bin",
@@ -184,7 +196,7 @@
     },
     {
       "path": "Survival\\Scripts\\game\\Chapter2VR.lua",
-      "patchedSha256": "E851B0C16490995C4844F6BCF78F80F47D2A02DCC7ADBE82FD83FB3FE4001362",
+      "patchedSha256": "CAED8A2EABDB00F20FD6D2376C3E4AADA45ABA7174281AEDE140150D9CEE959A",
       "originalMayBeMissing": true,
       "module": "chapter2-gameplay-bridge",
       "historicalPatchedSha256": [
@@ -211,7 +223,8 @@
         "D466A960120E54127EC9443A0A9AE04AB59ED77D5BC81A271C0607405943002B",
         "D58F6D407D01DF578A51DC3607018CA50F8AD5717472A1FC360029B88E5F0C16",
         "D8A31D8BFF1F17FF4A57585F8453B2AD551F9FD2B478A549F7859C70846C3A80",
-        "DE8918DB540BDB32042A79078A5A78AA5613D0B960F47C9A369E0B5304181452"
+        "DE8918DB540BDB32042A79078A5A78AA5613D0B960F47C9A369E0B5304181452",
+        "E851B0C16490995C4844F6BCF78F80F47D2A02DCC7ADBE82FD83FB3FE4001362"
       ]
     },
     {
@@ -402,11 +415,14 @@
     },
     {
       "path": "Survival\\Scripts\\game\\tools\\Fertilizer.lua",
-      "patchedSha256": "DC15048ABE86A804E46A156BFD5F9FD3324B2C7BBDC347055BDD5D38A1801AAD",
+      "patchedSha256": "5E155840DB2F4A3F484135E50D0B0EA5C3493075BA43534D7C311B3E88AF5568",
       "originalSha256": [
         "A2DC6E6072BAD60A5692737F787D5CA7538F40949C7490953775EBD051A55DDA"
       ],
-      "module": "chapter2-vr-held-items"
+      "module": "chapter2-vr-held-items",
+      "historicalPatchedSha256": [
+        "DC15048ABE86A804E46A156BFD5F9FD3324B2C7BBDC347055BDD5D38A1801AAD"
+      ]
     },
     {
       "path": "Survival\\Scripts\\game\\tools\\Eat.lua",

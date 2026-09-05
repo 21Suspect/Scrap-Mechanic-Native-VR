@@ -16,6 +16,7 @@
 #include <MinHook.h>
 
 #include "feature_input.hpp"
+#include "feature_launch_retry.hpp"
 #include "feature_startup_menu.hpp"
 #include "custom_content_bridge.hpp"
 #include "vr_hands.hpp"
@@ -163,7 +164,7 @@ constexpr uint64_t kOpenXrRetryDelayMs = 5000;
 constexpr uint64_t kExplicitVrLaunchRetryWindowMs = 180000;
 constexpr uint64_t kVrLaunchMarkerMaximumAge100ns = 300ull * 10000000ull;
 std::atomic<uint64_t> g_openxr_retry_after_ms{0};
-std::atomic<uint64_t> g_explicit_vr_launch_retry_deadline_ms{0};
+features::LaunchRetryWindow g_explicit_vr_launch{kExplicitVrLaunchRetryWindowMs};
 std::atomic<bool> g_desktop_fallback_logged{false};
 std::atomic<bool> g_openxr_runtime_logged{false};
 std::atomic<bool> g_openxr_unavailable_logged{false};
@@ -362,17 +363,25 @@ void consume_vr_launch_request()
     current.HighPart = current_time.dwHighDateTime;
     modified.LowPart = attributes.ftLastWriteTime.dwLowDateTime;
     modified.HighPart = attributes.ftLastWriteTime.dwHighDateTime;
-    const bool fresh = current.QuadPart >= modified.QuadPart &&
-        current.QuadPart - modified.QuadPart <= kVrLaunchMarkerMaximumAge100ns;
+    FILETIME created{}, exited{}, kernel{}, user{};
+    ULARGE_INTEGER process_start{};
+    const bool have_process_start = GetProcessTimes(GetCurrentProcess(), &created, &exited, &kernel, &user) != FALSE;
+    process_start.LowPart = created.dwLowDateTime;
+    process_start.HighPart = created.dwHighDateTime;
+    // An add-on loaded late during cold startup still belongs to the game
+    // process that was launched promptly after the user's Start VR request.
+    const bool fresh = features::launch_marker_fresh(current.QuadPart, modified.QuadPart,
+        have_process_start ? process_start.QuadPart : 0, kVrLaunchMarkerMaximumAge100ns);
     DeleteFileW(marker.c_str());
     if (!fresh)
     {
         log_line("VR_LAUNCH_HANDOFF ignored=1 reason=stale_marker");
         return;
     }
-    g_explicit_vr_launch_retry_deadline_ms.store(
-        GetTickCount64() + kExplicitVrLaunchRetryWindowMs, std::memory_order_release);
-    log_line("VR_LAUNCH_HANDOFF active=1 retry_window_ms=%llu marker_consumed=1",
+    // Cold game loading can take minutes before any 3D frame reaches OpenXR.
+    // Start its retry budget at the first actual initialization attempt.
+    g_explicit_vr_launch.request();
+    log_line("VR_LAUNCH_HANDOFF active=1 retry_window_ms=%llu marker_consumed=1 budget_starts=first_xr_attempt",
         static_cast<unsigned long long>(kExplicitVrLaunchRetryWindowMs));
 }
 
@@ -2558,13 +2567,19 @@ struct OpenXrState
 
     bool fail(const char *stage, XrResult result)
     {
-        log_line("FAIL stage=%s xr=%d", stage, static_cast<int>(result));
+        char result_name[XR_MAX_RESULT_STRING_SIZE]{};
+        if (instance != XR_NULL_HANDLE) xrResultToString(instance, result, result_name);
+        log_line("FAIL stage=%s xr=%d result=%s", stage, static_cast<int>(result), result_name);
         mark_openxr_failed();
         return false;
     }
 
     bool initialize(ID3D11Device *device, const D3D11_TEXTURE2D_DESC &source)
     {
+        if (g_explicit_vr_launch.begin_attempt(GetTickCount64()))
+        {
+            log_line("VR_LAUNCH_HANDOFF retry_budget_started=1");
+        }
         if (!device) return fail("d3d11_graphics_device_missing", XR_ERROR_GRAPHICS_DEVICE_INVALID);
         device->AddRef();
         graphics_device = device;
@@ -2633,7 +2648,7 @@ struct OpenXrState
         {
             const uint64_t now = GetTickCount64();
             const uint64_t retry_deadline =
-                g_explicit_vr_launch_retry_deadline_ms.load(std::memory_order_acquire);
+                g_explicit_vr_launch.deadline();
             const bool retry = retry_deadline != 0 && now < retry_deadline;
             if (!g_openxr_unavailable_logged.exchange(true, std::memory_order_acq_rel))
                 log_line("XR_UNAVAILABLE reason=no_hmd desktop_fallback=1 auto_retry=%u "
@@ -2644,10 +2659,6 @@ struct OpenXrState
             return false;
         }
         if (XR_FAILED(result)) return fail("xrGetSystem", result);
-        const uint64_t launch_retry_deadline =
-            g_explicit_vr_launch_retry_deadline_ms.exchange(0, std::memory_order_acq_rel);
-        if (launch_retry_deadline != 0)
-            log_line("VR_LAUNCH_HANDOFF completed=1 xr_system_ready=1");
         result = xrGetInstanceProcAddr(instance, "xrGetD3D11GraphicsRequirementsKHR", reinterpret_cast<PFN_xrVoidFunction *>(&get_requirements));
         if (XR_FAILED(result) || !get_requirements) return fail("xrGetD3D11GraphicsRequirementsKHR.address", result);
         XrGraphicsRequirementsD3D11KHR requirements{XR_TYPE_GRAPHICS_REQUIREMENTS_D3D11_KHR};
@@ -2664,7 +2675,10 @@ struct OpenXrState
         if (dxgi_device) dxgi_device->Release();
         if (FAILED(hr) || std::memcmp(&adapter_desc.AdapterLuid, &requirements.adapterLuid, sizeof(LUID)) != 0)
         {
-            log_line("FAIL stage=adapter_luid_match hr=%08x", static_cast<unsigned>(hr));
+            log_line("FAIL stage=adapter_luid_match hr=%08x game_gpu=%ls game_luid=%08x:%08x runtime_luid=%08x:%08x",
+                static_cast<unsigned>(hr), adapter_desc.Description,
+                static_cast<unsigned>(adapter_desc.AdapterLuid.HighPart), adapter_desc.AdapterLuid.LowPart,
+                static_cast<unsigned>(requirements.adapterLuid.HighPart), requirements.adapterLuid.LowPart);
             mark_openxr_failed(); return false;
         }
 
@@ -2849,6 +2863,8 @@ struct OpenXrState
                         g_startup_menu.reset_world_anchor();
                         g_startup_menu.reset_state();
                         log_line("XR_SESSION_RUNNING");
+                        if (g_explicit_vr_launch.complete())
+                            log_line("VR_LAUNCH_HANDOFF completed=1 xr_session_running=1");
                     }
                     else fail("xrBeginSession", result);
                 }

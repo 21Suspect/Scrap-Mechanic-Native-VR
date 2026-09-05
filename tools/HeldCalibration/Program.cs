@@ -26,10 +26,10 @@ namespace ScrapMechanicVRHeldCalibration
         internal readonly string Section, Name, Category;
         internal readonly Pose Default;
         internal ProfileDef(string section, string name, string category, decimal x, decimal y,
-            decimal z, decimal scale)
+            decimal z, decimal scale, decimal pitch = 0m, decimal yaw = 0m, decimal roll = 0m)
         {
             Section = section; Name = name; Category = category;
-            Default = new Pose { X = x, Y = y, Z = z, Scale = scale };
+            Default = new Pose { X = x, Y = y, Z = z, Pitch = pitch, Yaw = yaw, Roll = roll, Scale = scale };
         }
         public override string ToString() { return Name; }
     }
@@ -50,10 +50,10 @@ namespace ScrapMechanicVRHeldCalibration
         private static readonly Color Accent = Color.FromArgb(255, 191, 32);
         private static readonly Color Muted = Color.FromArgb(170, 178, 186);
 
-        private readonly string gameRoot = Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory.TrimEnd(
-            Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)).FullName;
-        private readonly string configPath;
-        private readonly string statusPath;
+        private readonly string helperDirectory;
+        private string gameRoot;
+        private string configPath;
+        private string statusPath;
         private readonly List<ProfileDef> profiles = new List<ProfileDef>();
         private readonly Dictionary<string, ProfileDef> bySection = new Dictionary<string, ProfileDef>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Pose> poses = new Dictionary<string, Pose>(StringComparer.OrdinalIgnoreCase);
@@ -70,11 +70,15 @@ namespace ScrapMechanicVRHeldCalibration
         private ProfileDef selected;
         private Pose clipboardPose;
         private bool loading;
+        private bool poseChanged;
         private DateTime statusWriteTime;
+        private DateTime gameDiscoveryTime;
 
         internal CalibrationForm()
         {
-            configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ScrapMechanicVR-HeldCalibration.ini");
+            helperDirectory = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory);
+            gameRoot = ResolveGameRoot(helperDirectory);
+            configPath = ResolveConfigurationPath(helperDirectory, gameRoot);
             statusPath = Path.Combine(gameRoot, "Data", "NativeVR", "held_item_status.json");
             BuildProfiles();
 
@@ -94,13 +98,89 @@ namespace ScrapMechanicVRHeldCalibration
             saveTimer.Interval = 45;
             saveTimer.Tick += delegate { saveTimer.Stop(); SaveConfiguration(); };
             statusTimer.Interval = 150;
-            statusTimer.Tick += delegate { PollHeldStatus(); };
+            statusTimer.Tick += delegate { TryAttachToRunningGame(); PollHeldStatus(); };
             statusTimer.Start();
+        }
+
+        private void TryAttachToRunningGame()
+        {
+            // If the helper is already in the game directory, its path is authoritative.
+            // Otherwise retry discovery so the user may open the helper before the game.
+            if (IsGameRoot(gameRoot)) return;
+            DateTime now = DateTime.UtcNow;
+            if ((now - gameDiscoveryTime).TotalMilliseconds < 500) return;
+            gameDiscoveryTime = now;
+
+            string running = FindRunningGameRoot();
+            if (String.IsNullOrEmpty(running) || String.Equals(running, gameRoot, StringComparison.OrdinalIgnoreCase)) return;
+
+            bool carryChanges = poseChanged;
+            gameRoot = running;
+            configPath = ResolveConfigurationPath(helperDirectory, gameRoot);
+            statusPath = Path.Combine(gameRoot, "Data", "NativeVR", "held_item_status.json");
+            statusWriteTime = DateTime.MinValue;
+
+            if (carryChanges)
+            {
+                saveTimer.Stop();
+                SaveConfiguration();
+            }
+            else
+            {
+                LoadConfiguration();
+            }
+            status.Text = "Connected to Scrap Mechanic: " + configPath;
+        }
+
+        private static bool IsGameRoot(string path)
+        {
+            return !String.IsNullOrEmpty(path) &&
+                File.Exists(Path.Combine(path, "Release", "ScrapMechanic.exe"));
+        }
+
+        private static string FindRunningGameRoot()
+        {
+            try
+            {
+                Process[] processes = Process.GetProcessesByName("ScrapMechanic");
+                foreach (Process process in processes)
+                {
+                    try
+                    {
+                        string executable = process.MainModule == null ? "" : process.MainModule.FileName;
+                        string releaseDirectory = String.IsNullOrEmpty(executable) ? "" : Path.GetDirectoryName(executable);
+                        DirectoryInfo root = String.IsNullOrEmpty(releaseDirectory) ? null : Directory.GetParent(releaseDirectory);
+                        if (root != null && IsGameRoot(root.FullName)) return root.FullName;
+                    }
+                    catch (Exception) { }
+                    finally { process.Dispose(); }
+                }
+            }
+            catch (Exception) { }
+            return null;
+        }
+
+        private static string ResolveGameRoot(string helperDirectory)
+        {
+            DirectoryInfo parent = Directory.GetParent(helperDirectory.TrimEnd(
+                Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            string parentPath = parent == null ? helperDirectory : parent.FullName;
+            if (IsGameRoot(helperDirectory)) return helperDirectory;
+            if (IsGameRoot(parentPath)) return parentPath;
+            string running = FindRunningGameRoot();
+            return String.IsNullOrEmpty(running) ? parentPath : running;
+        }
+
+        private static string ResolveConfigurationPath(string helperDirectory, string gameRoot)
+        {
+            if (IsGameRoot(gameRoot))
+                return Path.Combine(gameRoot, "Release", "ScrapMechanicVR-HeldCalibration.ini");
+            return Path.Combine(helperDirectory, "ScrapMechanicVR-HeldCalibration.ini");
         }
 
         private void BuildProfiles()
         {
-            Add("Hammer", "Hammer", "Dedicated tools", 0.000m, -0.025m, -0.065m, 0.160m);
+            Add("Hammer", "Hammer", "Dedicated tools", 0.002m, -0.025m, -0.065m, 0.148m);
             Add("ConnectionTool", "Connection Tool", "Dedicated tools", -0.020m, -0.035m, -0.055m, 0.160m);
             Add("PaintTool", "Paint Tool", "Dedicated tools", -0.015m, -0.040m, -0.060m, 0.160m);
             Add("WeldTool", "Weld Tool", "Dedicated tools", -0.030m, -0.035m, -0.065m, 0.150m);
@@ -109,17 +189,17 @@ namespace ScrapMechanicVRHeldCalibration
             Add("GatlingGun", "Gatling Gun", "VR guns", -0.020m, -0.035m, -0.060m, 0.145m);
             Add("ScrapSpudgun", "Scrap Spudgun", "VR guns", -0.020m, -0.035m, -0.060m, 0.145m);
             Add("PotatoLauncher", "Potato Launcher", "VR guns", -0.020m, -0.035m, -0.060m, 0.145m);
-            Add("ClayGun", "Clay Gun", "VR guns", -0.122m, -0.031m, -0.172m, 0.145m);
-            Add("Lift", "Lift", "Gameplay items", -0.010m, -0.030m, -0.060m, 0.190m);
-            Add("Handbook", "Handbook", "Gameplay items", -0.010m, -0.045m, -0.100m, 0.130m);
-            Add("Bucket", "Buckets", "Gameplay items", -0.015m, -0.060m, -0.090m, 0.110m);
-            Add("Glowstick", "Glowstick", "Gameplay items", -0.010m, -0.030m, -0.045m, 0.160m);
-            Add("Cornade", "Cornade", "Gameplay items", -0.015m, -0.035m, -0.060m, 0.085m);
+            Add("ClayGun", "Clay Gun", "VR guns", -0.122m, -0.043m, -0.163m, 0.145m);
+            Add("Lift", "Lift", "Gameplay items", -0.004m, -0.064m, -0.069m, 0.190m, 0m, 60.10m, 0m);
+            Add("Handbook", "Handbook", "Gameplay items", -0.037m, -0.190m, -0.070m, 0.130m, 0m, 48.90m, 0m);
+            Add("Bucket", "Buckets", "Gameplay items", -0.016m, -0.154m, -0.181m, 0.070m, 0m, -2.50m, -94.60m);
+            Add("Glowstick", "Glowstick", "Gameplay items", -0.010m, -0.030m, -0.071m, 0.160m);
+            Add("Cornade", "Cornade", "Gameplay items", -0.015m, -0.035m, -0.069m, 0.085m);
             Add("LooseClay", "Loose Clay", "Gameplay items", -0.010m, -0.045m, -0.080m, 0.105m);
-            Add("FireExtinguisher", "Fire Extinguisher", "Gameplay items", -0.020m, -0.045m, -0.075m, 0.115m);
+            Add("FireExtinguisher", "Fire Extinguisher", "Gameplay items", -0.020m, -0.045m, -0.045m, 0.115m);
             Add("SeedPlanter", "Seed Planter", "Gameplay items", -0.010m, -0.025m, -0.045m, 0.140m);
             Add("Fertilizer", "Fertilizer", "Gameplay items", -0.010m, -0.040m, -0.065m, 0.120m);
-            Add("FoodAndDrink", "Food and Drink", "Gameplay items", -0.010m, -0.035m, -0.055m, 0.120m);
+            Add("FoodAndDrink", "Food and Drink", "Gameplay items", -0.010m, -0.035m, -0.055m, 0.059m);
             Add("LongSandwich", "Long Sandwich", "Gameplay items", -0.010m, -0.040m, -0.085m, 0.075m);
             Add("SoilBag", "Soil Bag", "Gameplay items", -0.010m, -0.040m, -0.075m, 0.100m);
             Add("KeyItems", "Key Items", "Gameplay items", -0.010m, -0.030m, -0.045m, 0.130m);
@@ -141,9 +221,9 @@ namespace ScrapMechanicVRHeldCalibration
         }
 
         private void Add(string section, string name, string category, decimal x, decimal y,
-            decimal z, decimal scale)
+            decimal z, decimal scale, decimal pitch = 0m, decimal yaw = 0m, decimal roll = 0m)
         {
-            ProfileDef profile = new ProfileDef(section, name, category, x, y, z, scale);
+            ProfileDef profile = new ProfileDef(section, name, category, x, y, z, scale, pitch, yaw, roll);
             profiles.Add(profile);
             bySection.Add(section, profile);
             poses.Add(section, profile.Default.Clone());
@@ -220,7 +300,7 @@ namespace ScrapMechanicVRHeldCalibration
             TableLayoutPanel edit = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 10 };
             edit.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
             for (int i = 1; i <= 7; ++i) edit.RowStyles.Add(new RowStyle(SizeType.Percent, 14.285f));
-            edit.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+            edit.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
             edit.RowStyles.Add(new RowStyle(SizeType.Absolute, 32));
             editor.Controls.Add(edit);
             editorTitle.Text = "Hammer"; editorTitle.AutoSize = true; editorTitle.Font = new Font("Segoe UI Semibold", 16f);
@@ -239,17 +319,18 @@ namespace ScrapMechanicVRHeldCalibration
             AddPoseRow(edit, 7, "Scale", "SCALE", 0.005m, 0.500m, 0.001m, 4, 1000m);
 
             FlowLayoutPanel buttons = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = false, Padding = new Padding(0, 8, 0, 0) };
+                WrapContents = true, AutoScroll = true, Padding = new Padding(0, 8, 0, 0) };
             Button reset = MakeButton("Reset this profile"); reset.Click += delegate { ResetSelected(); };
             Button copy = MakeButton("Copy pose"); copy.Click += delegate { clipboardPose = poses[selected.Section].Clone(); status.Text = "Pose copied."; };
-            Button paste = MakeButton("Paste pose"); paste.Click += delegate { if (clipboardPose != null) { poses[selected.Section] = clipboardPose.Clone(); LoadSelectedControls(); QueueSave(); } };
+            Button paste = MakeButton("Paste pose"); paste.Click += delegate { if (clipboardPose != null) { poses[selected.Section] = clipboardPose.Clone(); poseChanged = true; LoadSelectedControls(); QueueSave(); } };
             Button reload = MakeButton("Reload file"); reload.Click += delegate { LoadConfiguration(); LoadSelectedControls(); };
             Button folder = MakeButton("Open file"); folder.Click += delegate { Process.Start("explorer.exe", "/select,\"" + configPath + "\""); };
+            Button export = MakeButton("Export text..."); export.Click += delegate { ExportConfiguration(); };
             CheckBox top = new CheckBox { Text = "Always on top", AutoSize = true, ForeColor = Color.White,
                 Padding = new Padding(12, 7, 0, 0) };
             top.CheckedChanged += delegate { TopMost = top.Checked; };
             buttons.Controls.Add(reset); buttons.Controls.Add(copy); buttons.Controls.Add(paste);
-            buttons.Controls.Add(reload); buttons.Controls.Add(folder); buttons.Controls.Add(top);
+            buttons.Controls.Add(reload); buttons.Controls.Add(folder); buttons.Controls.Add(export); buttons.Controls.Add(top);
             edit.Controls.Add(buttons, 0, 8);
             Label gunNote = new Label { Dock = DockStyle.Fill, Text = "Gun muzzle position and firing direction follow the tuned gun pose.",
                 ForeColor = Muted, TextAlign = ContentAlignment.MiddleLeft };
@@ -280,7 +361,7 @@ namespace ScrapMechanicVRHeldCalibration
                 if (loading || selected == null) return;
                 int sliderValue = Decimal.ToInt32(number.Value * sliderFactor);
                 slider.Value = Math.Max(slider.Minimum, Math.Min(slider.Maximum, sliderValue));
-                SetPoseValue(poses[selected.Section], key, number.Value); QueueSave();
+                SetPoseValue(poses[selected.Section], key, number.Value); poseChanged = true; QueueSave();
             };
             slider.Scroll += delegate {
                 if (loading) return;
@@ -375,6 +456,7 @@ namespace ScrapMechanicVRHeldCalibration
                     Read(values, profile.Section, "Scale", ref pose.Scale);
                     poses[profile.Section] = pose;
                 }
+                poseChanged = false;
                 status.Text = "Loaded live calibration: " + configPath;
             }
             catch (Exception ex) { status.Text = "Load failed: " + ex.Message; }
@@ -394,38 +476,70 @@ namespace ScrapMechanicVRHeldCalibration
             status.Text = "Applying live update...";
         }
 
+        private string BuildConfigurationText()
+        {
+            StringBuilder text = new StringBuilder();
+            text.AppendLine("; Scrap Mechanic Native VR held-item calibration.");
+            text.AppendLine("; Send this plain-text file back to the mod author to review or hardcode these poses.");
+            text.AppendLine("; Profiles are shared by the item groups shown in the helper.");
+            foreach (ProfileDef profile in profiles)
+            {
+                Pose pose = poses[profile.Section];
+                text.AppendLine(); text.AppendLine("[" + profile.Section + "]");
+                text.AppendLine("PositionX=" + pose.X.ToString("F4", CultureInfo.InvariantCulture));
+                text.AppendLine("PositionY=" + pose.Y.ToString("F4", CultureInfo.InvariantCulture));
+                text.AppendLine("PositionZ=" + pose.Z.ToString("F4", CultureInfo.InvariantCulture));
+                text.AppendLine("PitchDegrees=" + pose.Pitch.ToString("F2", CultureInfo.InvariantCulture));
+                text.AppendLine("YawDegrees=" + pose.Yaw.ToString("F2", CultureInfo.InvariantCulture));
+                text.AppendLine("RollDegrees=" + pose.Roll.ToString("F2", CultureInfo.InvariantCulture));
+                text.AppendLine("Scale=" + pose.Scale.ToString("F4", CultureInfo.InvariantCulture));
+            }
+            return text.ToString();
+        }
+
         private void SaveConfiguration()
         {
             try
             {
-                StringBuilder text = new StringBuilder();
-                text.AppendLine("; Scrap Mechanic Native VR live held-item calibration.");
-                text.AppendLine("; Profiles are shared by the item groups shown in the helper.");
-                foreach (ProfileDef profile in profiles)
-                {
-                    Pose pose = poses[profile.Section];
-                    text.AppendLine(); text.AppendLine("[" + profile.Section + "]");
-                    text.AppendLine("PositionX=" + pose.X.ToString("F4", CultureInfo.InvariantCulture));
-                    text.AppendLine("PositionY=" + pose.Y.ToString("F4", CultureInfo.InvariantCulture));
-                    text.AppendLine("PositionZ=" + pose.Z.ToString("F4", CultureInfo.InvariantCulture));
-                    text.AppendLine("PitchDegrees=" + pose.Pitch.ToString("F2", CultureInfo.InvariantCulture));
-                    text.AppendLine("YawDegrees=" + pose.Yaw.ToString("F2", CultureInfo.InvariantCulture));
-                    text.AppendLine("RollDegrees=" + pose.Roll.ToString("F2", CultureInfo.InvariantCulture));
-                    text.AppendLine("Scale=" + pose.Scale.ToString("F4", CultureInfo.InvariantCulture));
-                }
+                string directory = Path.GetDirectoryName(configPath);
+                if (!String.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+                string text = BuildConfigurationText();
                 string temporary = configPath + ".tmp";
-                File.WriteAllText(temporary, text.ToString(), new UTF8Encoding(false));
+                File.WriteAllText(temporary, text, new UTF8Encoding(false));
                 if (File.Exists(configPath)) File.Replace(temporary, configPath, null);
                 else File.Move(temporary, configPath);
+                poseChanged = false;
                 status.Text = "Applied live at " + DateTime.Now.ToString("HH:mm:ss.fff") + " — " + selected.Name;
             }
             catch (Exception ex) { status.Text = "Save failed: " + ex.Message; }
         }
 
+        private void ExportConfiguration()
+        {
+            using (SaveFileDialog dialog = new SaveFileDialog())
+            {
+                dialog.Title = "Export held-item calibration";
+                dialog.Filter = "Calibration text (*.txt)|*.txt|Calibration config (*.ini)|*.ini|All files (*.*)|*.*";
+                dialog.DefaultExt = "txt";
+                dialog.AddExtension = true;
+                dialog.OverwritePrompt = true;
+                dialog.FileName = "ScrapMechanicVR-HeldCalibration.txt";
+                string directory = Path.GetDirectoryName(configPath);
+                if (!String.IsNullOrEmpty(directory) && Directory.Exists(directory)) dialog.InitialDirectory = directory;
+                if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                try
+                {
+                    File.WriteAllText(dialog.FileName, BuildConfigurationText(), new UTF8Encoding(false));
+                    status.Text = "Exported calibration text: " + dialog.FileName;
+                }
+                catch (Exception ex) { status.Text = "Export failed: " + ex.Message; }
+            }
+        }
+
         private void ResetSelected()
         {
             if (selected == null) return;
-            poses[selected.Section] = selected.Default.Clone(); LoadSelectedControls(); QueueSave();
+            poses[selected.Section] = selected.Default.Clone(); poseChanged = true; LoadSelectedControls(); QueueSave();
         }
 
         private static string JsonString(string text, string key)

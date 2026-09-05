@@ -402,7 +402,7 @@ namespace scrapvr::tools
 		{
 			switch (profile)
 			{
-			case HeldProfile::hammer: return { 0.000f, -0.025f, -0.065f, 0, 0, 0, 0.160f };
+			case HeldProfile::hammer: return { 0.002f, -0.025f, -0.065f, 0, 0, 0, 0.148f };
 			case HeldProfile::connect: return { -0.020f, -0.035f, -0.055f, 0, 0, 0, 0.160f };
 			case HeldProfile::paint: return { -0.015f, -0.040f, -0.060f, 0, 0, 0, 0.160f };
 			case HeldProfile::weld: return { -0.030f, -0.035f, -0.065f, 0, 0, 0, 0.150f };
@@ -411,17 +411,17 @@ namespace scrapvr::tools
 			case HeldProfile::gatling:
 			case HeldProfile::scrap:
 			case HeldProfile::launcher: return { -0.020f, -0.035f, -0.060f, 0, 0, 0, 0.145f };
-			case HeldProfile::clay: return { -0.122f, -0.031f, -0.172f, 0, 0, 0, 0.145f };
-			case HeldProfile::lift: return { -0.010f, -0.030f, -0.060f, 0, 0, 0, 0.190f };
-			case HeldProfile::handbook: return { -0.010f, -0.045f, -0.100f, 0, 0, 0, 0.130f };
-			case HeldProfile::bucket: return { -0.015f, -0.060f, -0.090f, 0, 0, 0, 0.110f };
-			case HeldProfile::glowstick: return { -0.010f, -0.030f, -0.045f, 0, 0, 0, 0.160f };
-			case HeldProfile::cornade: return { -0.015f, -0.035f, -0.060f, 0, 0, 0, 0.085f };
+			case HeldProfile::clay: return { -0.122f, -0.043f, -0.163f, 0, 0, 0, 0.145f };
+			case HeldProfile::lift: return { -0.004f, -0.064f, -0.069f, 0, 60.10f, 0, 0.190f };
+			case HeldProfile::handbook: return { -0.037f, -0.190f, -0.070f, 0, 48.90f, 0, 0.130f };
+			case HeldProfile::bucket: return { -0.016f, -0.154f, -0.181f, 0, -2.50f, -94.60f, 0.070f };
+			case HeldProfile::glowstick: return { -0.010f, -0.030f, -0.071f, 0, 0, 0, 0.160f };
+			case HeldProfile::cornade: return { -0.015f, -0.035f, -0.069f, 0, 0, 0, 0.085f };
 			case HeldProfile::loose_clay: return { -0.010f, -0.045f, -0.080f, 0, 0, 0, 0.105f };
-			case HeldProfile::extinguisher: return { -0.020f, -0.045f, -0.075f, 0, 0, 0, 0.115f };
+			case HeldProfile::extinguisher: return { -0.020f, -0.045f, -0.045f, 0, 0, 0, 0.115f };
 			case HeldProfile::planter: return { -0.010f, -0.025f, -0.045f, 0, 0, 0, 0.140f };
 			case HeldProfile::fertilizer: return { -0.010f, -0.040f, -0.065f, 0, 0, 0, 0.120f };
-			case HeldProfile::food: return { -0.010f, -0.035f, -0.055f, 0, 0, 0, 0.120f };
+			case HeldProfile::food: return { -0.010f, -0.035f, -0.055f, 0, 0, 0, 0.059f };
 			case HeldProfile::feeder: return { -0.010f, -0.040f, -0.085f, 0, 0, 0, 0.075f };
 			case HeldProfile::soilbag: return { -0.010f, -0.040f, -0.075f, 0, 0, 0, 0.100f };
 			case HeldProfile::key: return { -0.010f, -0.030f, -0.045f, 0, 0, 0, 0.130f };

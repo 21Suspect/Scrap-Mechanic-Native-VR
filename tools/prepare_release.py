@@ -228,6 +228,8 @@ def main() -> None:
         "nativeVrSha256": "src/native_vr.cpp",
         "featureInputSha256": "src/feature_input.cpp",
         "featureInputHeaderSha256": "src/feature_input.hpp",
+        "uiTriggerGateSha256": "src/feature_ui_trigger_gate.hpp",
+        "launchRetryPolicySha256": "src/feature_launch_retry.hpp",
         "engineInputSha256": "src/feature_engine_input.cpp",
         "engineInputHeaderSha256": "src/feature_engine_input.hpp",
         "startupMenuSha256": "src/feature_startup_menu.cpp",
