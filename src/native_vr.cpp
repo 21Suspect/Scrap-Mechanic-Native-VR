@@ -3502,6 +3502,25 @@ ID3D11Texture2D *refresh_present_frame_target(void *manager, uint32_t width, uin
     return candidate;
 }
 
+// Some runtimes (notably VDXR during a cold launch) create the game swapchain
+// before the renderer's present-target wrapper is populated. In that window the
+// old path silently stayed desktop-only forever. The pinned game backbuffer is
+// a valid render source and is already identity-checked by capture_native_renderer;
+// use it only as an initialization fallback until the normal target appears.
+ID3D11Texture2D *ensure_backbuffer_target()
+{
+    if (g_final_target.load(std::memory_order_acquire)) return
+        g_final_target.load(std::memory_order_acquire);
+    IUnknown *identity = g_backbuffer_identity.load(std::memory_order_acquire);
+    if (!identity) return nullptr;
+    ID3D11Texture2D *candidate = nullptr;
+    if (FAILED(identity->QueryInterface(IID_PPV_ARGS(&candidate))) || !candidate) return nullptr;
+    ID3D11Texture2D *old = g_final_target.exchange(candidate, std::memory_order_acq_rel);
+    if (old) old->Release();
+    log_line("VR_TARGET_FALLBACK source=pinned_game_backbuffer pointer=%p", candidate);
+    return candidate;
+}
+
 bool run_highres_pc_probe(RenderSetupFn original, void *renderer, float scalar,
                           const float *world_to_view, const float *projection, void *settings)
 {
@@ -3612,6 +3631,7 @@ void __fastcall hk_render_setup(void *renderer, float scalar, const float *world
     ID3D11Device *device = g_device.load(std::memory_order_acquire);
     ID3D11DeviceContext *context = g_context.load(std::memory_order_acquire);
     ID3D11Texture2D *target = g_final_target.load(std::memory_order_acquire);
+    if (!target) target = ensure_backbuffer_target();
     if (!device || !context || !target)
     {
         if (g_xr.initialized || g_xr.running)
