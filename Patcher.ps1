@@ -450,10 +450,10 @@ function Install-Patch([string]$Root, $Manifest) {
         }
         if ($status.Status -eq 'conflict') {
             if ($entry.runtimeMutable) {
-                # ReShade and the VR INI may legitimately differ. Preserve the
-                # current file, install the portable baseline, and restore the
-                # user's previous file on uninstall.
-                $plan += [pscustomobject]@{ Entry = $entry; Status = $status; Adopt = $false }
+                # Runtime-mutable files belong to the user once they exist.
+                # Keep them byte-for-byte intact across upgrades; replacing the
+                # baseline silently discards controller, HUD, and runtime edits.
+                $plan += [pscustomobject]@{ Entry = $entry; Status = $status; Adopt = $false; PreserveRuntimeMutable = $true }
                 continue
             }
             $conflicts += "$($entry.path) (unknown SHA-256 $($status.Hash))"
@@ -494,7 +494,19 @@ function Install-Patch([string]$Root, $Manifest) {
                 installedSha256 = [string]$entry.patchedSha256
                 backupRelativePath = $null
                 replacedManagedSha256 = $(if ($item.ReplaceHistorical) { [string]$item.Status.Hash } else { $null })
-                rollbackRelativePath = $null
+            rollbackRelativePath = $null
+            preserveRuntimeMutable = [bool]$item.PreserveRuntimeMutable
+            }
+            if ($item.PreserveRuntimeMutable) {
+                # The existing config is already the installed runtime file.
+                # Record it for safe upgrade/uninstall accounting, but do not
+                # copy the package default over the user's settings.
+                $record.existed = $true
+                $record.originalSha256 = [string]$item.Status.Hash
+                $record.installedSha256 = [string]$item.Status.Hash
+                [void]$changed.Add($record)
+                Write-Host "Preserved runtime configuration $($entry.path)"
+                continue
             }
             if ($item.Adopt) {
                 [void]$changed.Add($record)
@@ -762,6 +774,12 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
             [string]$previousEntry.patchedSha256 -ne [string]$record.installedSha256) {
             Write-Warning "The extracted package for '$($state.patchVersion)' differs from the recorded installed hash for $recordPath. The state record and its hash-verified backup will be used instead."
         }
+        if ($record.preserveRuntimeMutable) {
+            if (-not $record.originalSha256 -or -not $record.installedSha256) {
+                [void]$stateIssues.Add("missing preserved runtime hash for $recordPath")
+            }
+            continue
+        }
         if ($record.existed) {
             if (-not $record.originalSha256) {
                 [void]$stateIssues.Add("missing original hash for $recordPath")
@@ -819,6 +837,7 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
     $backupStatus = @{}
     $invalidBackups = New-Object Collections.ArrayList
     foreach ($record in $recognizedRecords) {
+        if ($record.preserveRuntimeMutable) { continue }
         if (-not $record.existed) { continue }
         $backup = $null
         $valid = $false
@@ -856,6 +875,10 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
     $quarantineRoot = Join-Path $StateRoot "conflicts\$($Manifest.patchId)-$stamp-$key"
     $preserved = New-Object Collections.ArrayList
     foreach ($record in $recognizedRecords) {
+        if ($record.preserveRuntimeMutable) {
+            Write-Host "Keeping user runtime configuration $($record.path)"
+            continue
+        }
         $target = Join-Path $Root $record.path
         if (-not (Test-Path -LiteralPath $target -PathType Leaf)) { continue }
         $actual = Get-Sha256 $target

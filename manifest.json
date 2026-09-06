@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "patchId": "scrap-mechanic-native-vr-chapter2",
-  "patchVersion": "1.3.16-chapter2-20260905",
+  "patchVersion": "1.3.17-chapter2-20260906",
   "description": "Scrap Mechanic Chapter 2 native OpenXR VR with OpenXR 1.1 Meta Touch, legacy Oculus Touch, Valve Index, and generic controller profiles, optional Quest optical hands, Custom Game content bridging, complete held-item geometry, grouped held-item pose calibration, hand-aimed world actions with a laser-free target marker, barrel-aimed weapons, binding-aware lift and inventory shortcuts, spatial live game menus, native queued keyboard and pointer input, transparent composition, restrained haptics, guarded right-trigger-plus-grip force-build, and always-visible fixed smartwatch-style wrist vitals, underwater oxygen, time, and world-space compass HUDs with live waypoint markers",
   "game": {
     "appId": "387990",
@@ -72,7 +72,7 @@
     },
     {
       "path": "Release\\smvr_native_vr_v1.addon64",
-      "patchedSha256": "9ED60D15D3606DE887C8CEAC22574435D67F391E6630C7AB442A8BA0BFFBC8EC",
+      "patchedSha256": "87B5C70CFF79453F90C51FE9B22BB001463693A098D1A04277F0AB506D99D5E8",
       "originalMayBeMissing": true,
       "module": "chapter2-native-openxr",
       "historicalPatchedSha256": [

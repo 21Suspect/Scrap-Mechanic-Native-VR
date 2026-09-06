@@ -29,7 +29,11 @@ constexpr uint64_t kWorldStatePollMilliseconds = 100;
 // event-driven: initial/final transition states, clicks, scrolling, and one
 // refresh after the pointer settles. This avoids continuous render-target
 // rebuilds and the resulting eye flash while retaining exact native hover art.
-constexpr uint64_t kNativeCapturePointerSettleMs = 75;
+// Keep native UI state responsive without tying the stereo render loop to a
+// slow desktop-capture cadence. The cached panel is still composited every
+// headset frame; this only controls how quickly changed hover/UI pixels are
+// refreshed.
+constexpr uint64_t kNativeCapturePointerSettleMs = 33;
 
 struct ButtonRegion
 {
@@ -306,7 +310,11 @@ bool StartupMenuUi::initialize(ID3D11Device *device, const wchar_t *asset_path)
             // panels remain above it, while black and the fade fringe disappear.
             float peak=max(color.r,max(color.g,color.b));
             float fadeCoverage=smoothstep(0.0030,0.0150,peak);
-            color.a=min(saturate(color.a),fadeCoverage);
+            // Native menu captures can inherit a scene-dependent alpha from
+            // the game's post-process chain. Using it makes the panel pulse
+            // in dark areas; coverage is intentionally derived only from the
+            // stable black-key luminance.
+            color.a=fadeCoverage;
             if (color.a<0.004) discard;
             return color;
         }
@@ -406,7 +414,7 @@ void StartupMenuUi::update_visibility(bool game_ui_open_intent)
         native_width_=native_height_=0;
         native_capture_last_ms_=0;
         request_native_capture(0);
-        native_capture_followup_ms_=now+(world_active?300u:350u);
+        native_capture_followup_ms_=now+(world_active?100u:120u);
         log_line(world_active ?
             "VR_SPATIAL_UI_OPEN mode=in_game source=native_modal_cursor world_locked=1" :
             "VR_SPATIAL_UI_OPEN mode=startup source=native_menu world_locked=1");
@@ -620,7 +628,7 @@ void StartupMenuUi::update_interaction(bool select_down, float scroll_axis)
                 ++ui_click_count_;
                 pending_haptic_event_=UiHapticEvent::click;
                 request_native_capture(0);
-                native_capture_followup_ms_=GetTickCount64()+350;
+                native_capture_followup_ms_=GetTickCount64()+120;
                 if (!input_route_logged_)
                 {
                     input_route_logged_=true;
@@ -654,7 +662,7 @@ void StartupMenuUi::update_interaction(bool select_down, float scroll_axis)
         {
             scroll_last_ms_=now;
             request_native_capture(0);
-            native_capture_followup_ms_=now+260;
+            native_capture_followup_ms_=now+100;
         }
     }
 }

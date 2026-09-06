@@ -1878,7 +1878,13 @@ namespace scrapvr::tools
 		poll_active_tool();
 		if (g_player_seated) return ContextAction::none;
 		if (g_active_tool == Tool::paint) return ContextAction::paint_palette;
-		if (g_active_tool == Tool::catalog) return ContextAction::rotate_placement;
+		// Q is the game's placement-rotation action.  Treat every held
+		// placement item as a rotation context, not only catalog blocks; keys,
+		// lifts, chests and other large carried parts use the same placement
+		// pipeline but were previously left without a VR B action.
+		if (g_active_tool == Tool::catalog || g_active_tool == Tool::lift ||
+			g_active_tool == Tool::key || g_active_tool == Tool::resource ||
+			g_active_tool == Tool::carry) return ContextAction::rotate_placement;
 		return ContextAction::none;
 	}
 
