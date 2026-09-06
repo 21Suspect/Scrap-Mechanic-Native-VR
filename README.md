@@ -4,6 +4,8 @@
 
 Native OpenXR VR for the current Scrap Mechanic Chapter 2 / 1.0 release, made by [21Suspect](https://github.com/21Suspect).
 
+**Version 1.4 — tested with Meta Quest 3 and Meta Quest Link.** Other headsets and VR software, including Virtual Desktop/VDXR and SteamVR, also appear to work based on community reports. They have not all been personally tested, and compatibility can vary by setup.
+
 [![Latest release](https://img.shields.io/github/v/release/21Suspect/Scrap-Mechanic-Native-VR?display_name=tag&sort=semver)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/21Suspect/Scrap-Mechanic-Native-VR/total)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases)
 [![License: MIT](https://img.shields.io/badge/original_code-MIT-ffc124.svg)](LICENSE)
@@ -23,7 +25,7 @@ The installer has five clear actions: **Install VR Mod**, **Uninstall VR Mod**, 
 
 ## Features
 
-- Native stereo OpenXR rendering at the headset-recommended `2064 × 2272` resolution per eye.
+- Native stereo OpenXR rendering using the active runtime's recommended per-eye resolution.
 - Six-degree-of-freedom head tracking, correct stereo depth and perspective, exact runtime FOV, and the VR seam fix.
 - A level standing horizon with mouse/controller pitch-height movement removed, while seats retain Scrap Mechanic's original camera orbit.
 - OpenXR 1.1 Meta Touch, legacy Oculus Touch, Valve Index, and generic OpenXR controller profiles, plus optional Meta Quest optical hand tracking.
@@ -38,10 +40,11 @@ The installer has five clear actions: **Install VR Mod**, **Uninstall VR Mod**, 
 - Calibrated Chapter 2 clay-gun grip and moving parts, with the included clay-gun calibration helper.
 - Included held-item calibration helper: run `ScrapMechanicVR-HeldCalibration.exe` before or after Scrap Mechanic to tune grouped poses live; it attaches when the game starts. Use **Export text...** to save a shareable plain-text configuration for review or hardcoding.
 - World-locked startup and in-game spatial menus using Scrap Mechanic's live native UI.
-- Right-hand menu laser, native hover/click/hold/drag input, and smooth transparent menu presentation.
+- Right-hand menu laser and native hover/click/hold/drag input. In-game floating UI refreshes every game frame, with panel proportions and pointer alignment matched to the desktop UI aspect ratio, including ultrawide resolutions.
 - Controller keyboard and pointer events are queued inside Scrap Mechanic, so gameplay remains responsive through Meta, VDXR, and SteamVR even when the desktop window is not foreground.
 - Restrained controller haptics for UI, tools, weapons, interactions, and recentering.
 - Fixed compact curved smartwatch-style wrist HUD: left glove vitals/health, a dynamic blue underwater oxygen bar, and in-game time; right glove a world-space compass with cardinal markers and live quest, beacon, raid, enemy, and event waypoints.
+- Wrist HUD depth testing prevents the displays appearing through the gloves from underneath.
 - Normal PC mode keeps the standard first-person viewmodel; VR mode removes it.
 - Survival, Creative, and Custom Games share the same tracked-hand, held-item, and spatial-menu integration.
 - Chapter 2 VR Mod branding on both the desktop and VR main menus.
@@ -56,6 +59,8 @@ The installer has five clear actions: **Install VR Mod**, **Uninstall VR Mod**, 
 | Quest A / Index right A | Jump; click, hold, or drag in a menu |
 | Grip + Quest A / Index right A while pointing at an inventory or chest slot | Quick-transfer the item between inventories |
 | Quest B / Index right B | Use / interact along the right-hand aim ray; hold to refine loose resources |
+| Quest B / Index right B while holding a block or part | Rotate placement (PC **Q**); aiming at a seat retains the seat interaction |
+| Quest B / Index right B while holding the paint tool | Open the paint-color palette |
 | Right trigger | Primary action |
 | Right trigger + right grip (Index/middle-finger triggers) | Force-build the held item (the game's **F** action) |
 | Left trigger | Secondary action |
@@ -64,11 +69,17 @@ The installer has five clear actions: **Install VR Mod**, **Uninstall VR Mod**, 
 | Quest X / Y or Index left A / B while seated | Zoom in / out |
 | Quest left menu / Index left trackpad press | Pause / resume (the Index system button remains available only if explicitly selected in bindings) |
 | Index left grip | Sprint by default; change it in the SteamVR bindings section |
+| Quest left stick click | Sprint |
+| Right stick click | Crouch |
 | Right grip + right stick up / down while standing | Raise / lower the lift using your current Scrap Mechanic Lift Up / Lift Down bindings |
 | Hold both thumbsticks for one second | Recenter view and floor |
 | Optical pinch | Primary tool or menu interaction |
 
 Set `VerticalStickLook=0` in `Release\ScrapMechanicVR.ini` if you want the right stick to turn horizontally only; headset pitch remains unchanged.
+
+Hammer attacks use **right-hand aim + right trigger**, not swing-to-hit. Point the right hand at loose wood, stone, or metal and hold **B** to refine it. For painting and welding, the tool pointer marks the surface; the connection-tool pointer targets connections through ordinary blocks.
+
+The controls above are the shipped defaults. Context matters: menu input replaces gameplay actions while a floating menu is open, and seated X/Y controls zoom rather than hotbar selection.
 
 ### Controller bindings
 
