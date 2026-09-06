@@ -38,6 +38,8 @@ public:
     void update_pointer(const XrPosef &right_hand, bool active);
     void update_interaction(bool select_down, float scroll_axis);
     bool capture_native_menu(ID3D11DeviceContext *context, IDXGISwapChain *swapchain);
+    bool capture_native_texture(ID3D11DeviceContext *context, ID3D11Texture2D *source,
+        uint32_t layout_width = 0, uint32_t layout_height = 0);
     bool render(ID3D11DeviceContext *context, const XrView *views,
                 ID3D11RenderTargetView *const *targets,
                 const uint32_t *widths, const uint32_t *heights);

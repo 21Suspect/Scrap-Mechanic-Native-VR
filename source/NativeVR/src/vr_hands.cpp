@@ -676,9 +676,10 @@ namespace scrapvr::hands
 		}
 
 		void render_wrist_hud(ID3D11DeviceContext *context, ID3D11RenderTargetView *target,
-			uint32_t width, uint32_t height, const XrView &eye, float world_heading)
+			ID3D11DepthStencilView *depth, uint32_t width, uint32_t height,
+			const XrView &eye, float world_heading)
 		{
-			if (!context || !target || !g_hud_texture || !g_hud_vertex_buffer ||
+			if (!context || !target || !depth || !g_hud_texture || !g_hud_vertex_buffer ||
 				!g_hud_constant_buffer || !g_hud_vertex_shader || !g_hud_pixel_shader ||
 				!g_hud_input_layout || !g_hud_sampler || !g_hud_blend_state || !g_hud_depth_state)
 				return;
@@ -690,7 +691,7 @@ namespace scrapvr::hands
 			// change the displayed world direction.
 			const float heading = std::isfinite(world_heading) ? world_heading : 0.0f;
 			update_hud_texture(context, state, heading);
-			context->OMSetRenderTargets(1, &target, nullptr);
+			context->OMSetRenderTargets(1, &target, depth);
 			const float blend_factor[4] = {};
 			context->OMSetBlendState(g_hud_blend_state, blend_factor, 0xffffffffu);
 			D3D11_VIEWPORT viewport = {0.0f, 0.0f, static_cast<float>(width),
@@ -1231,9 +1232,9 @@ namespace scrapvr::hands
 		hud_blend_desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 		if (FAILED(g_device->CreateBlendState(&hud_blend_desc, &g_hud_blend_state))) return false;
 		D3D11_DEPTH_STENCIL_DESC hud_depth_desc = {};
-		hud_depth_desc.DepthEnable = FALSE;
+		hud_depth_desc.DepthEnable = TRUE;
 		hud_depth_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
-		hud_depth_desc.DepthFunc = D3D11_COMPARISON_ALWAYS;
+		hud_depth_desc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
 		if (FAILED(g_device->CreateDepthStencilState(&hud_depth_desc, &g_hud_depth_state))) return false;
 		std::vector<uint8_t> pixels; uint32_t texture_width = 0, texture_height = 0;
 		if (load_tga(pixels, texture_width, texture_height))
@@ -1363,7 +1364,7 @@ namespace scrapvr::hands
 			right_aim_pose, right_aim_active, right_target_distance,
 			right_target_active, interaction_target_distance,
 			interaction_target_active);
-		render_wrist_hud(context, target, width, height, eye, world_heading);
+		render_wrist_hud(context, target, g_depth_view, width, height, eye, world_heading);
 		ID3D11ShaderResourceView *none = nullptr; context->PSSetShaderResources(0, 1, &none); context->OMSetRenderTargets(1, &target, nullptr);
 		if (!g_render_logged && g_log) { g_render_logged = true; g_log("VISIBLE TRACKED HANDS ACTIVE: mechanic glove geometry rendered independently into both stereo eyes"); }
 		return true;

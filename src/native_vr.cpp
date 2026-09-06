@@ -1967,6 +1967,7 @@ struct OpenXrState
     bool mirror_logged = false;
     bool mirror_failed = false;
     bool startup_desktop_ui_logged = false;
+    bool live_ui_surface_pending = false;
     bool render_size_override_logged = false;
     bool render_size_restore_logged = false;
     uint64_t mirror_source_copies = 0;
@@ -3004,6 +3005,12 @@ struct OpenXrState
         if (g_feature_startup_menu_enabled)
         {
             g_startup_menu.update_visibility(g_input.game_ui_open_intent());
+            // The outer engine UI pass has completed since the last render hook.
+            // Capture its offscreen surface before either eye overwrites it.
+            if (live_ui_surface_pending && g_startup_menu.visible() &&
+                g_startup_menu.in_game_mode())
+                g_startup_menu.capture_native_texture(context, source, desktop_width, desktop_height);
+            live_ui_surface_pending = false;
             XrPosef menu_head=head_pose;
             menu_head.orientation=yaw_only(head_pose.orientation);
             g_startup_menu.set_world_anchor(menu_head);
@@ -3267,6 +3274,24 @@ struct OpenXrState
             pending_eye_ms[i] = eye_render_ms[i];
         }
 
+        if (g_feature_startup_menu_enabled && g_startup_menu.visible() &&
+            g_startup_menu.in_game_mode())
+        {
+            // Leave a clean UI-only surface for the game's outer UI pass.
+            // Keep the VR extent stable: no desktop/eye target rebuild and no
+            // third scene render. The next hook consumes the completed UI.
+            ID3D11Texture2D *ui_surface = g_final_target.load(std::memory_order_acquire);
+            ID3D11RenderTargetView *ui_target = nullptr;
+            if (ui_surface && SUCCEEDED(graphics_device->CreateRenderTargetView(
+                    ui_surface, nullptr, &ui_target)))
+            {
+                const float clear[4]{};
+                context->ClearRenderTargetView(ui_target, clear);
+                ui_target->Release();
+                live_ui_surface_pending = true;
+            }
+            return finish_pending_frame(context, false);
+        }
         if (g_feature_startup_menu_enabled && g_startup_menu.visible() &&
             g_startup_menu.native_capture_due())
         {

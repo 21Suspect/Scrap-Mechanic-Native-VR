@@ -683,6 +683,17 @@ bool StartupMenuUi::capture_native_menu(ID3D11DeviceContext *context, IDXGISwapC
     // overwrites it, never from the Present callback after the overwrite.
     HRESULT hr=swapchain->GetBuffer(0,IID_PPV_ARGS(&source));
     if (FAILED(hr) || !source) return false;
+    const bool captured=capture_native_texture(context,source);
+    source->Release();
+    return captured;
+}
+
+bool StartupMenuUi::capture_native_texture(ID3D11DeviceContext *context, ID3D11Texture2D *source,
+    uint32_t layout_width, uint32_t layout_height)
+{
+    if (!visible_ || !device_ || !context || !source) return false;
+    source->AddRef();
+    HRESULT hr=S_OK;
     D3D11_TEXTURE2D_DESC source_desc{};
     source->GetDesc(&source_desc);
     if (source_desc.Width==0 || source_desc.Height==0 || source_desc.ArraySize!=1 ||
@@ -725,8 +736,12 @@ bool StartupMenuUi::capture_native_menu(ID3D11DeviceContext *context, IDXGISwapC
                 static_cast<unsigned>(hr),static_cast<unsigned>(source_desc.Format));
             return false;
         }
-        native_width_=source_desc.Width; native_height_=source_desc.Height;
     }
+    // The live surface has eye-buffer dimensions, but the GUI is laid out in
+    // desktop coordinates. Preserve that logical aspect for BOTH panel drawing
+    // and pointer intersection. Update even when no texture recreation occurs.
+    native_width_=layout_width && layout_height ? layout_width : source_desc.Width;
+    native_height_=layout_width && layout_height ? layout_height : source_desc.Height;
     context->CopyResource(native_menu_texture_,source);
     source->Release();
     const uint64_t capture_time=GetTickCount64();
