@@ -1864,6 +1864,12 @@ namespace scrapvr::tools
 		return g_active_tool == Tool::hammer;
 	}
 
+	bool is_gun_active()
+	{
+		poll_active_tool();
+		return is_gun(g_active_tool);
+	}
+
 	HapticProfile active_haptic_profile()
 	{
 		poll_active_tool();

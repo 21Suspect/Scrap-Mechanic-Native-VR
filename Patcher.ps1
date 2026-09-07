@@ -92,12 +92,30 @@ function Assert-Payload($Manifest) {
         foreach ($requiredMarker in @(
             'ScrapVRProjectilePoseNative',
             'ScrapVRActionPoseNative',
+            'ScrapVRTriggerStateNative',
             'tracked_barrel_native_logic_task',
             'source = firePos and "vr_barrel"',
-            'authoritative and "blocked" or "pc_fallback"'
+            'authoritative and "blocked" or "pc_fallback"',
+            'seatedGunUpdate',
+            'SCRAPVR_SEATED_GUN_DIRECT'
         )) {
             if (-not $chapter2Bridge.Contains($requiredMarker)) {
                 $failures += "VR barrel regression: Chapter2VR.lua is missing '$requiredMarker'"
+            }
+        }
+    }
+
+    $seatPath = Join-Path $payloadRoot 'Survival\Scripts\game\interactables\Seat.lua'
+    if (Test-Path -LiteralPath $seatPath -PathType Leaf) {
+        $seatText = [IO.File]::ReadAllText($seatPath)
+        foreach ($requiredMarker in @(
+            'ScrapVrSeatGunItems',
+            'ScrapVRProjectilePoseNative',
+            'SCRAPVR_SEATED_GUN_ACTION',
+            'source=Seat.lua'
+        )) {
+            if (-not $seatText.Contains($requiredMarker)) {
+                $failures += "VR seat regression: Seat.lua is missing '$requiredMarker'"
             }
         }
     }
@@ -120,6 +138,7 @@ function Assert-Payload($Manifest) {
         $gunText = [IO.File]::ReadAllText($gunPath)
         foreach ($requiredMarker in @(
             'Chapter2VR.gunFirePose( self.tool, true )',
+            'Chapter2VR.seatedGunUpdate( self,',
             'if vrAuthoritative and not vrFirePos then return end',
             'vrGunAim and vrDirection or sm.localPlayer.getDirection()',
             'vrGunAim and vrFirePos'
@@ -138,6 +157,9 @@ function Assert-Payload($Manifest) {
         }
         if (-not $nativeAddonStrings.Contains('ScrapVRActionPoseNative')) {
             $failures += 'VR action regression: native addon does not export the direct Logic Task hand-aim bridge'
+        }
+        if (-not $nativeAddonStrings.Contains('ScrapVRTriggerStateNative')) {
+            $failures += 'VR seat regression: native addon does not export the direct Logic Task trigger-state bridge'
         }
     }
 

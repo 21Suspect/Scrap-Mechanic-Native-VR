@@ -1179,6 +1179,7 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
 
     const float deadzone = std::clamp(config_.stick_deadzone, 0.05f, 0.95f);
     const bool player_seated = scrapvr::tools::is_player_seated();
+    const bool seated_gun = player_seated && scrapvr::tools::is_gun_active();
     const bool player_first_person = scrapvr::tools::is_player_first_person();
     const bool lift_axis_active = !player_seated && right_grip &&
         !force_build_active && std::fabs(turn.y) > deadzone && std::fabs(turn.y) >= std::fabs(turn.x);
@@ -1293,6 +1294,16 @@ void InputBridge::update_game_input(const XrPosef &head_pose)
     menu_was_down_=menu;
     b_was_down_=logical_use;
 
+    // Keep the normal primary mouse action for every item.  The patched Seat.lua
+    // callback filters every primary alias for a live VR firearm, allowing its
+    // equipped-tool callback to consume the tracked trigger.  Non-firearms
+    // still reach the stock seat action and press the first switch.
+    if (seated_gun != seated_gun_route_logged_)
+    {
+        log_line("VR_SEATED_TRIGGER_ROUTE mode=%s action=%s",
+            seated_gun ? "gun" : "seat_button", seated_gun ? "weapon_primary" : "seat_primary");
+        seated_gun_route_logged_ = seated_gun;
+    }
     send_mouse_button(0,right_trigger,mouse_attack_);
     send_mouse_button(1,left_trigger,mouse_secondary_);
 
@@ -1379,6 +1390,7 @@ void InputBridge::release_injected_input()
     right_primary_was_down_=left_primary_was_down_=menu_was_down_=b_was_down_=false;
     quick_transfer_was_down_=false;
     lift_axis_was_active_=false;
+    seated_gun_route_logged_=false;
 }
 
 bool InputBridge::consume_recenter_request()
@@ -1420,6 +1432,7 @@ void InputBridge::reset_runtime_state()
     last_haptic_ms_[0]=last_haptic_ms_[1]=0;
     right_primary_was_down_=left_primary_was_down_=menu_was_down_=b_was_down_=false;
     inventory_was_down_ = false;
+    seated_gun_route_logged_ = false;
     haptic_ready_logged_=haptic_failure_logged_=false;
     for (HandState &hand_state : hands_) hand_state = {};
 }

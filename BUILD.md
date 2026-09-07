@@ -40,9 +40,9 @@ Only use the payload with the exact executable hash documented in `README.md`. D
 
 The public artifact is `dist/ScrapMechanicVR-Installer.exe`. It validates its embedded patcher, manifest, native add-on, branded UI assets, soundtrack, and the managed payload before installation. Its five user actions are Install VR Mod, Uninstall VR Mod, Start VR, Open Logs, and Open Bindings. Install automatically migrates a managed older/current build and verifies the completed installation. Uninstall removes managed current/older builds, restores backups, and verifies the result. Start VR requires the active OpenXR runtime to report a connected headset.
 
-Current version: `1.3.15-chapter2-20260905`
+Current version: `1.4.7`
 
-Installer SHA-256: `42D0B8CC7AA0B35542FF59B376FA67B3C1639FAC5A99FDD2DF1C94ADCEC2791D` (also recorded in `SHA256SUMS.txt`).
+Installer SHA-256: `513467972A5770B50D7F17F1609775DA4D7AF50D0A1F3A03D9A4072BFF528E3F` (also recorded in `SHA256SUMS.txt`).
 
 Focused regression checks for palette input, fertilizer ownership, and startup retries:
 

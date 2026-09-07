@@ -1,6 +1,6 @@
 # Chapter 2 release status
 
-Release candidate: `1.3.15-chapter2-20260905`
+Current release: `1.4.7`
 
 Branch: `main`
 
@@ -8,6 +8,8 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 
 ## Current build
 
+- Seated VR firing uses the first-person effect set, restoring muzzle sound and particles for all six supported firearms, including the clay gun.
+- Gun effects originate from the calibrated native barrel pose, including the stock-forward offset.
 - Palette/menu selection consumes the trigger until physical release before allowing a new gameplay action, including the native mouse queue, Lua hand state, and force-build chord (issue #12).
 - Fertilizer use from remote players retains the remote character's hosted effect; only a locally owned tool reads the local VR hand pose (issue #13).
 - Start VR begins its headset retry budget at the first OpenXR attempt and completes it when the session starts. Launch requests survive delayed add-on loading when the game process started promptly. Failure diagnostics include OpenXR result names and GPU adapter identities.
@@ -47,4 +49,4 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 
 `dist/ScrapMechanicVR-Installer.exe` embeds and validates the managed payload, branded installer artwork, soundtrack, and a verified first-launch game-data cache. It starts music at 50% with a compact volume control and presents Install VR Mod, Uninstall VR Mod, Start VR, Open Logs, and Open Bindings. Install and uninstall detect current/older managed versions, explain the exact operation before asking for approval, migrate or restore safely, and verify automatically. Known prior-release payloads are migrated by exact path and SHA-256, same-version metadata refreshes retain their verified restore authority, and active calibration helpers are reported before any transaction begins. The wrist HUD is fixed in the native renderer, so no HUD calibration helper is installed. Start VR requires a connected headset reported by the active OpenXR runtime.
 
-Installer SHA-256: `42D0B8CC7AA0B35542FF59B376FA67B3C1639FAC5A99FDD2DF1C94ADCEC2791D`. Installer and payload hashes are recorded in `SHA256SUMS.txt`.
+Installer SHA-256: `513467972A5770B50D7F17F1609775DA4D7AF50D0A1F3A03D9A4072BFF528E3F`. Installer and payload hashes are recorded in `SHA256SUMS.txt`.

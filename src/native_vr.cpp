@@ -118,6 +118,7 @@ constexpr int kLuaTypeTable = 5;
 constexpr char kLuaProjectilePoseFunction[] = "ScrapVRProjectilePoseNative";
 constexpr char kLuaActionPoseFunction[] = "ScrapVRActionPoseNative";
 constexpr char kLuaConnectionTargetFunction[] = "ScrapVRConnectionTargetNative";
+constexpr char kLuaTriggerStateFunction[] = "ScrapVRTriggerStateNative";
 
 HMODULE g_module = nullptr;
 HMODULE g_game = nullptr;
@@ -234,6 +235,12 @@ struct NativeProjectilePose
 };
 std::mutex g_native_projectile_mutex;
 NativeProjectilePose g_native_projectile_pose;
+// The equipped-tool callback and the player/seat callback run in separate Lua
+// Logic Tasks. Keep the live right-hand interaction state in a tiny native
+// bridge so a seat cannot swallow the firearm trigger before the tool sees it.
+std::atomic<bool> g_native_trigger_active{false};
+std::atomic<bool> g_native_trigger_down{false};
+std::atomic<bool> g_native_force_build_active{false};
 struct NativeActionPose
 {
     bool authoritative = false;
@@ -251,6 +258,7 @@ std::vector<const void *> g_lua_registered_environments;
 std::atomic<bool> g_lua_projectile_registration_logged{false};
 std::atomic<bool> g_lua_projectile_call_logged{false};
 std::atomic<bool> g_lua_action_call_logged{false};
+std::atomic<bool> g_lua_trigger_call_logged{false};
 std::atomic<bool> g_tool_raycast_logged{false};
 std::atomic<bool> g_use_raycast_logged{false};
 thread_local int g_active_eye = -1;
@@ -744,6 +752,27 @@ int __cdecl lua_native_projectile_pose(lua_State *state)
     return 10;
 }
 
+int __cdecl lua_native_trigger_state(lua_State *state)
+{
+    bool authoritative = false;
+    {
+        std::lock_guard lock(g_native_projectile_mutex);
+        authoritative = g_native_projectile_pose.authoritative;
+    }
+    const bool active = g_native_trigger_active.load(std::memory_order_acquire);
+    const bool down = g_native_trigger_down.load(std::memory_order_acquire);
+    const bool force_build = g_native_force_build_active.load(std::memory_order_acquire);
+    g_lua_pushboolean(state, authoritative ? 1 : 0);
+    g_lua_pushboolean(state, active ? 1 : 0);
+    g_lua_pushboolean(state, down ? 1 : 0);
+    g_lua_pushboolean(state, force_build ? 1 : 0);
+    if (!g_lua_trigger_call_logged.exchange(true))
+        log_line("VR_LUA_TRIGGER_BRIDGE_CALLED authoritative=%u active=%u down=%u force_build=%u",
+            authoritative ? 1u : 0u, active ? 1u : 0u, down ? 1u : 0u,
+            force_build ? 1u : 0u);
+    return 4;
+}
+
 int __cdecl lua_native_action_pose(lua_State *state)
 {
     NativeActionPose pose;
@@ -836,6 +865,8 @@ void ensure_lua_projectile_api(lua_State *state, int argument_count)
     {
         g_lua_pushcclosure(state, lua_native_projectile_pose, 0);
         g_lua_setfield(state, kLuaGlobalsIndex, kLuaProjectilePoseFunction);
+        g_lua_pushcclosure(state, lua_native_trigger_state, 0);
+        g_lua_setfield(state, kLuaGlobalsIndex, kLuaTriggerStateFunction);
         g_lua_pushcclosure(state, lua_native_action_pose, 0);
         g_lua_setfield(state, kLuaGlobalsIndex, kLuaActionPoseFunction);
         g_lua_pushcclosure(state, lua_native_connection_target, 0);
@@ -866,6 +897,8 @@ void ensure_lua_projectile_api(lua_State *state, int argument_count)
             {
                 g_lua_pushcclosure(state, lua_native_projectile_pose, 0);
                 g_lua_setfield(state, -2, kLuaProjectilePoseFunction);
+                g_lua_pushcclosure(state, lua_native_trigger_state, 0);
+                g_lua_setfield(state, -2, kLuaTriggerStateFunction);
                 g_lua_pushcclosure(state, lua_native_action_pose, 0);
                 g_lua_setfield(state, -2, kLuaActionPoseFunction);
                 g_lua_pushcclosure(state, lua_native_connection_target, 0);
@@ -875,7 +908,7 @@ void ensure_lua_projectile_api(lua_State *state, int argument_count)
         g_lua_settop(state, top);
     }
     if ((register_global || argument_count >= 0) && !g_lua_projectile_registration_logged.exchange(true))
-        log_line("VR_LUA_NATIVE_API_REGISTERED transport=native_logic_task projectile_pose=1 action_pose=1 connection_target=1");
+        log_line("VR_LUA_NATIVE_API_REGISTERED transport=native_logic_task projectile_pose=1 trigger_state=1 action_pose=1 connection_target=1");
 }
 
 int __cdecl hk_lua_pcall(lua_State *state, int argument_count, int result_count, int error_function)
@@ -996,6 +1029,9 @@ void reset_hand_bridge(bool reset_session = false)
     g_interaction_laser_target_distance.store(0.0f, std::memory_order_release);
     g_interaction_laser_target_ms.store(0, std::memory_order_release);
     g_interaction_laser_target_kind.store(0, std::memory_order_release);
+    g_native_trigger_active.store(false, std::memory_order_release);
+    g_native_trigger_down.store(false, std::memory_order_release);
+    g_native_force_build_active.store(false, std::memory_order_release);
     set_native_projectile_pose(false, false);
     set_native_action_pose(false, false);
 }
@@ -1016,6 +1052,9 @@ void deactivate_hand_bridge(bool vr_authoritative = false)
     g_interaction_laser_target_distance.store(0.0f, std::memory_order_release);
     g_interaction_laser_target_ms.store(0, std::memory_order_release);
     g_interaction_laser_target_kind.store(0, std::memory_order_release);
+    g_native_trigger_active.store(false, std::memory_order_release);
+    g_native_trigger_down.store(false, std::memory_order_release);
+    g_native_force_build_active.store(false, std::memory_order_release);
     set_native_projectile_pose(vr_authoritative, false);
     set_native_action_pose(vr_authoritative, false);
 
@@ -1077,6 +1116,11 @@ void publish_hand_bridge(const XrPosef &reference, const float *game_world_to_vi
         scrapvr::hands::get_pose(0, poses[0], optical[0], interaction[0]),
         scrapvr::hands::get_pose(1, poses[1], optical[1], interaction[1])
     };
+    g_native_trigger_active.store(active[1], std::memory_order_release);
+    g_native_trigger_down.store(active[1] && interaction[1], std::memory_order_release);
+    const bool force_build = active[1] && !optical[1] && interaction[1] &&
+        g_input.hand(1).squeeze > 0.55f;
+    g_native_force_build_active.store(force_build, std::memory_order_release);
     XrVector3f world[2]{}, forward[2]{}, up[2]{};
     const XrQuaternionf inverse_reference = conjugate(normalize(reference.orientation));
     for (uint32_t hand = 0; hand < 2; ++hand)

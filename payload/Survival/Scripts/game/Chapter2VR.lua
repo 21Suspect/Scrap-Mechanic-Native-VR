@@ -69,6 +69,80 @@ local VrToolLaserItems = {
 local VrConnectionToolItem = "8c7efc37-cd7c-4262-976e-39585f8527bf"
 local VrConnectionLaserRange = 8.0
 
+-- Seat.client_onAction normally consumes the primary mouse action to press a
+-- seat switch. That is correct for every ordinary held item, but it also
+-- prevents a firearm's client_onEquippedUpdate callback from receiving the
+-- primary state while the player is seated. Keep the exact six firearm UUIDs
+-- in this bridge so the native input route and the seat filter agree.
+local VrSeatGunItems = {
+	["c5ea0c2f-185b-48d6-b4df-45c386a575cc"] = true, -- spudgun
+	["f6250bf4-9726-406f-a29a-945c06e460e5"] = true, -- shotgun
+	["9fde0601-c2ba-4c70-8d5c-2a7a9fdd122b"] = true, -- gatling
+	["d51ec758-057b-4263-bd16-7a731e149480"] = true, -- scrap spudgun
+	["a2a2bb33-a841-4b23-88da-b758063d9206"] = true, -- launcher
+	["6993e5df-6852-4e84-88ae-df49f765e784"] = true -- clay gun
+}
+local VrSeatGunAttackDown = false
+
+local function vrSeatGunActive()
+	return VrSeatGunItems[tostring( sm.localPlayer.getActiveItem() )] == true
+end
+
+local function vrSeatGunPrimaryAction( controllerAction )
+	-- Right-trigger input is injected as mouse button 0, which Scrap Mechanic
+	-- reports to Seat as `create`/`item0` on some builds and as `attack`/`item1`
+	-- on others. Filter every primary alias so the seat never sees a firearm
+	-- trigger as a seat-switch press.
+	return controllerAction == sm.interactable.actions.attack or
+		controllerAction == sm.interactable.actions.create or
+		controllerAction == sm.interactable.actions.item0 or
+		controllerAction == sm.interactable.actions.item1
+end
+
+local function vrSeatGunSessionActive()
+	-- This direct native bridge is available in every Logic Task. It is a
+	-- session-level authority bit, so the seat filter does not depend on the
+	-- JSON hand packet being readable on this exact callback tick.
+	local nativePose = ScrapVRProjectilePoseNative
+	if type( nativePose ) == "function" then
+		local ok, authoritative = pcall( nativePose )
+		if ok and authoritative == true then return true end
+	end
+	return g_vrBridgeActive == true
+end
+
+-- Install once after the game has loaded the stock Seat class. DriverSeat
+-- and GyroSeat delegate their attack action to Seat.client_onAction, so this
+-- single wrapper covers all seat variants without changing their steering.
+local function installSeatGunActionRouting()
+	if type( Seat ) ~= "table" or type( Seat.client_onAction ) ~= "function" then return end
+	-- New packages patch the actual Seat.lua callback in its own Logic Task.
+	-- Keep this wrapper only as a fallback for older installs where that file
+	-- was not replaced; it also avoids double-filtering and duplicate logs.
+	if Seat.__scrapvrSeatGunActionRouting == true then return end
+	local stockSeatAction = Seat.client_onAction
+	Seat.client_onAction = function( self, controllerAction, state )
+		if vrSeatGunPrimaryAction( controllerAction ) then
+			local player = sm.localPlayer.getPlayer()
+			local character = player and player:getCharacter() or nil
+			local seated = character ~= nil and character:isSeated()
+			local vrGun = seated and vrSeatGunSessionActive() and vrSeatGunActive()
+			if ( state == true and vrGun ) or ( state == false and ( VrSeatGunAttackDown or vrGun ) ) then
+				local nextDown = state == true
+				if nextDown ~= VrSeatGunAttackDown then
+					sm.log.warning( "SCRAPVR_SEATED_GUN_ACTION state=" .. ( nextDown and "1" or "0" ) ..
+						" action=" .. tostring( controllerAction ) .. " source=Chapter2VR" )
+				end
+				VrSeatGunAttackDown = nextDown
+				return false
+			end
+		end
+		return stockSeatAction( self, controllerAction, state )
+	end
+	Seat.__scrapvrSeatGunActionRouting = true
+	sm.log.warning( "SCRAPVR_SEATED_GUN_ACTION_ROUTE installed=1 attack=tool" )
+end
+
 local function publishConnectionTarget( active, distance )
 	local setter = ScrapVRConnectionTargetNative
 	if type( setter ) == "function" then
@@ -466,6 +540,7 @@ function Chapter2VR.clientCreate( self )
 		publishPlayerState( false, false, false, nil )
 		sm.log.warning( "SCRAPVR_BRIDGE_CREATE" )
 	end
+	installSeatGunActionRouting()
 	clearClientAim()
 end
 
@@ -558,6 +633,7 @@ end
 
 function Chapter2VR.clientUpdate( self, dt )
 	if self.player ~= sm.localPlayer.getPlayer() then return end
+	installSeatGunActionRouting()
 	local character = self.player:getCharacter()
 	local locking = character and character:getLockingInteractable() or nil
 	local seated = locking ~= nil and locking:hasSeat()
@@ -844,7 +920,128 @@ function Chapter2VR.actionRaycast( maxRange, ignore, filter )
 	return sm.localPlayer.getLatestRaycast()
 end
 
+-- Seat.client_onAction consumes the primary mouse action before the equipped
+-- tool receives client_onEquippedUpdate. Read the trigger from the native
+-- bridge instead, since this callback executes in the tool's separate Logic
+-- Task and cannot rely on the player's g_vrPrimaryActionDown global.
+local function readNativeTriggerState()
+	local nativeTrigger = ScrapVRTriggerStateNative
+	if type( nativeTrigger ) == "function" then
+		local ok, authoritative, active, down, forceBuild = pcall( nativeTrigger )
+		if ok and authoritative == true then
+			return active == true, down == true, forceBuild == true
+		end
+		-- A successful desktop/cleanup result is authoritative too: do not fall
+		-- back to a stale per-task global after VR has ended.
+		if ok then return false, false, false end
+	end
+
+	-- Older add-ons have no trigger-state function. Preserve their existing
+	-- bridge as a compatibility fallback, but only while its packet is fresh.
+	local tick = sm.game.getCurrentTick()
+	local bridgeAge = type( g_vrBridgeLastTick ) == "number" and tick - g_vrBridgeLastTick or nil
+	local fresh = g_vrPrimaryActionAvailable == true and g_vrBridgeActive == true and
+		bridgeAge ~= nil and bridgeAge >= 0 and bridgeAge <= VrPrimaryBridgeFreshTicks
+	if fresh then return true, g_vrPrimaryActionDown == true, false end
+	return false, false, false
+end
+
+-- Direct seated-fire path. This runs before each firearm's equip guard,
+-- including when the seat unequips the stock tool. Rifles use their one-shot
+-- callback; gatling/clay use their existing wind-up loop and cooldown logic.
+function Chapter2VR.seatedGunUpdate( tool, expectedItem, dt )
+	if tool == nil or tool.tool == nil or not tool.tool:isLocal() then return end
+
+	local activeItem = tostring( sm.localPlayer.getActiveItem() )
+	local previousItem = tool.vrSeatedGunDirectItem
+	local itemChanged = previousItem ~= nil and previousItem ~= activeItem
+	local owner = tool.tool:getOwner()
+	local character = owner and owner.character or nil
+	if character == nil then
+		local player = sm.localPlayer.getPlayer()
+		character = player and player:getCharacter() or nil
+	end
+	local triggerAvailable, triggerDown, forceBuild = readNativeTriggerState()
+	local seatedGun = triggerAvailable and character ~= nil and character:isSeated() and
+		activeItem == expectedItem and VrSeatGunItems[activeItem] == true
+	local wasRoute = tool.vrSeatedGunDirect == true
+	if seatedGun ~= wasRoute or previousItem ~= activeItem then
+		sm.log.warning( "SCRAPVR_SEATED_GUN_DIRECT_ROUTE active=" .. ( seatedGun and "1" or "0" ) ..
+			" item=" .. activeItem .. " source=tool_update equipped=" .. tostring( tool.equipped ) )
+	end
+	tool.vrSeatedGunDirectItem = activeItem
+
+	if itemChanged then
+		tool.vrSeatedGunTriggerDown = false
+		tool.vrPrimaryTriggerDown = false
+		tool.vrSeatedGunGatling = false
+	end
+
+	if not seatedGun then
+		if tool.vrSeatedGunTriggerDown == true then
+			sm.log.warning( "SCRAPVR_SEATED_GUN_DIRECT state=0 item=" .. activeItem ..
+				" source=tool_update reason=route_lost" )
+		end
+		if tool.vrSeatedGunGatling == true then tool.gatlingActive = false end
+		tool.vrSeatedGunDirect = false
+		tool.vrSeatedGunTriggerDown = false
+		tool.vrPrimaryTriggerDown = false
+		tool.vrSeatedGunGatling = false
+		return
+	end
+
+	tool.vrSeatedGunDirect = true
+	-- A seat can unequip the stock tool while the VR model stays selected.
+	-- Its regular update then returns early, so advance firing timers here.
+	if not tool.equipped then
+		for _, name in ipairs( { "fireCooldownTimer", "spreadCooldownTimer", "sprintCooldownTimer" } ) do
+			if type( tool[name] ) == "number" then
+				tool[name] = math.max( tool[name] - dt, 0.0 )
+			end
+		end
+	end
+	-- Clay's stock force-build chord is right-trigger + right-grip. The native
+	-- trigger bridge exposes that chord so the direct seated route cannot fire a
+	-- weapon while the player is intentionally holding F for force-build.
+	if forceBuild then triggerDown = false end
+	local previousDown = tool.vrSeatedGunTriggerDown == true
+	if not triggerAvailable then
+		if previousDown then
+			sm.log.warning( "SCRAPVR_SEATED_GUN_DIRECT state=0 item=" .. activeItem ..
+				" source=tool_update reason=trigger_unavailable" )
+		end
+		if tool.vrSeatedGunGatling == true then tool.gatlingActive = false end
+		tool.vrSeatedGunTriggerDown = false
+		tool.vrPrimaryTriggerDown = false
+		return
+	end
+
+	local gatling = activeItem == "9fde0601-c2ba-4c70-8d5c-2a7a9fdd122b" or
+		activeItem == "6993e5df-6852-4e84-88ae-df49f765e784"
+	tool.vrSeatedGunGatling = gatling
+	tool.vrPrimaryTriggerDown = triggerDown
+	if gatling then
+		-- cl_updateGatling below consumes this same field and keeps the stock
+		-- wind-up, cooldown, ammo and projectile behavior intact.
+		tool.gatlingActive = triggerDown
+	elseif triggerDown and not previousDown and type( tool.cl_onPrimaryUse ) == "function" then
+		tool:cl_onPrimaryUse( sm.tool.interactState.start )
+	end
+	if triggerDown ~= previousDown then
+		sm.log.warning( "SCRAPVR_SEATED_GUN_DIRECT state=" .. ( triggerDown and "1" or "0" ) ..
+			" item=" .. activeItem .. " source=tool_update" )
+	end
+	tool.vrSeatedGunTriggerDown = triggerDown
+	if gatling and not tool.equipped then tool:cl_updateGatling( dt ) end
+end
+
 function Chapter2VR.primaryState( toolState, primaryState )
+	-- Once the direct seated route owns the firearm trigger, ignore any stale
+	-- primary state the engine may still report from the consumed seat action.
+	-- The direct helper above updates vrPrimaryTriggerDown and gatlingActive.
+	if toolState and toolState.vrSeatedGunDirect == true then
+		return sm.tool.interactState.null
+	end
 	-- This check must be independent of Chapter2VR.clientUpdate's dt timer. The
 	-- player callback can temporarily stop during seat/headset transitions while
 	-- equipped tools continue updating; a cached VR trigger must then expire on
@@ -1071,6 +1268,25 @@ function Chapter2VR.gunFirePose( tool, firing )
 
 	if firing then writeGunFireDiagnostic( nil, nil, authoritative, reason ) end
 	return nil, nil, authoritative
+end
+
+-- Start a local VR gun's first-person muzzle effect from the same calibrated
+-- barrel pose used by projectileAttack. The stock scripts choose the
+-- third-person effect whenever isInFirstPersonView() is false; Native VR
+-- intentionally reports that state while seated, which made the effect (and
+-- its embedded firing audio) spawn on the stale third-person bone at the rear
+-- of the model. Keep the small stock muzzle lead so the particle begins at
+-- the visible barrel opening rather than inside the mesh.
+function Chapter2VR.startGunMuzzleEffect( tool, effectFP )
+	if tool == nil or effectFP == nil or not tool:isLocal() then return false end
+	local firePos, direction, authoritative = Chapter2VR.gunFirePose( tool )
+	if not authoritative or firePos == nil or direction == nil then return false end
+	local effectPos = firePos + direction * 0.20
+	effectFP:setPosition( effectPos )
+	effectFP:setVelocity( tool:getMovementVelocity() )
+	effectFP:setRotation( sm.vec3.getRotation( sm.vec3.new( 0, 0, 1 ), direction ) )
+	effectFP:start()
+	return true
 end
 
 -- Thrown Glowsticks/Cornades and the Fire Extinguisher use the identical fresh,

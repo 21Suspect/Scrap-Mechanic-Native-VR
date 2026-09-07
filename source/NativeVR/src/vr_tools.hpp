@@ -77,6 +77,10 @@ namespace scrapvr::tools
 	// Lua uses this value for spawning; no visible debug ray is required.
 	bool get_gun_muzzle_offset(XrVector3f &offset, XrVector3f &local_direction, const char *&item_uuid);
 	bool is_hammer_active();
+	// True only for firearm tools (spudgun, shotgun, gatling, scrap spudgun,
+	// potato launcher, and clay gun). Seated trigger routing uses this to keep
+	// firearm primary-use input separate from a seat's button/switch UI.
+	bool is_gun_active();
 	HapticProfile active_haptic_profile();
 	// Mirrors Scrap Mechanic's contextual Q action for right-controller B.
 	// B still sends the normal use/interact action independently, so seats remain

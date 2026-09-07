@@ -156,6 +156,10 @@ function ScrapPotatoRifle.loadAnimations( self )
 end
 
 function ScrapPotatoRifle.client_onUpdate( self, dt )
+	-- Seated VR firing must run even when the engine has unequipped the tool.
+	if Chapter2VR and Chapter2VR.seatedGunUpdate then
+		Chapter2VR.seatedGunUpdate( self, "d51ec758-057b-4263-bd16-7a731e149480", dt )
+	end
 
 	-- First person animation
 	local isSprinting =  self.tool:isSprinting()
@@ -187,11 +191,12 @@ function ScrapPotatoRifle.client_onUpdate( self, dt )
 		return
 	end
 
+
 	if self.tool:isLocal() then
 		local vrFirePos, vrDirection = Chapter2VR.gunFirePose( self.tool )
 		local dir = vrFirePos and vrDirection or sm.localPlayer.getDirection()
 		local firePos = vrFirePos or self.tool:getFpBonePos( "pejnt_barrel" )
-		local effectPosFP = vrFirePos and firePos or firePos + dir * 0.2
+		local effectPosFP = firePos + dir * 0.2
 		local rotFP = sm.vec3.getRotation( sm.vec3.new( 0, 0, 1 ), dir )
 		self.shootEffectFP:setPosition( effectPosFP )
 		self.shootEffectFP:setVelocity( self.tool:getMovementVelocity() )
@@ -445,10 +450,14 @@ function ScrapPotatoRifle.onShoot( self, dir )
 
 	setTpAnimation( self.tpAnimations, self.aiming and "aimShoot" or "shoot", 10.0 )
 
-	if self.tool:isInFirstPersonView() then
-		self.shootEffectFP:start()
-	else
-		self.shootEffect:start()
+	local vrEffect = Chapter2VR and Chapter2VR.startGunMuzzleEffect and
+		Chapter2VR.startGunMuzzleEffect( self.tool, self.shootEffectFP )
+	if not vrEffect then
+		if self.tool:isInFirstPersonView() then
+			self.shootEffectFP:start()
+		else
+			self.shootEffect:start()
+		end
 	end
 
 end

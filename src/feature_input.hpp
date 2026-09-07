@@ -228,6 +228,7 @@ private:
     bool b_was_down_ = false;
     bool quick_transfer_was_down_ = false;
     bool lift_axis_was_active_ = false;
+    bool seated_gun_route_logged_ = false;
     uint64_t game_ui_open_intent_until_ms_ = 0;
     uint64_t last_haptic_ms_[2]{};
     bool haptic_ready_logged_ = false;

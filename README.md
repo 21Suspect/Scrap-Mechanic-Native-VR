@@ -4,7 +4,7 @@
 
 Native OpenXR VR for the current Scrap Mechanic Chapter 2 / 1.0 release, made by [21Suspect](https://github.com/21Suspect).
 
-**Version 1.4 — tested with Meta Quest 3 and Meta Quest Link.** Other headsets and VR software, including Virtual Desktop/VDXR and SteamVR, also appear to work based on community reports. They have not all been personally tested, and compatibility can vary by setup.
+**Version 1.4.7 — tested with Meta Quest 3 and Meta Quest Link.** Other headsets and VR software, including Virtual Desktop/VDXR and SteamVR, also appear to work based on community reports. They have not all been personally tested, and compatibility can vary by setup.
 
 [![Latest release](https://img.shields.io/github/v/release/21Suspect/Scrap-Mechanic-Native-VR?display_name=tag&sort=semver)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/21Suspect/Scrap-Mechanic-Native-VR/total)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases)
@@ -33,6 +33,7 @@ The installer has five clear actions: **Install VR Mod**, **Uninstall VR Mod**, 
 - Tracked mechanic gloves with animated fingers and no artificial arms.
 - VR locomotion, turning, jump, crouch, sprint, interaction, hotbar controls, seated zoom, pause, and recentering.
 - Tracked hammer, connection tool, paint tool, weld tool, lift, handbook, potato weapons, Chapter 2 scrap spudgun, potato launcher, and clay gun.
+- Seated VR firing retains each gun's first-person muzzle sound and particles, positioned from the calibrated native barrel pose.
 - Complete grouped held-item geometry for blocks, parts, buckets and their contents, glowsticks, cornades, loose clay, extinguisher, seed packets, fertilizer, every food and drink, feeder food, soil bags, keycards, power cores, resources, carried objects, and the logbook.
 - VR-hand action origins for throwing, spraying, placing, targeting, inserting, dropping, eating, and using held items.
 - Aim the right hand and use B for Scrap Mechanic's normal interactions, including holding B to refine loose wood, stone, or metal; a small amber surface marker shows the exact target without drawing a laser.

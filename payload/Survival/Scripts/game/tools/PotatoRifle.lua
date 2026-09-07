@@ -152,6 +152,10 @@ function PotatoRifle.loadAnimations( self )
 end
 
 function PotatoRifle.client_onUpdate( self, dt )
+	-- Seated VR firing must run even when the engine has unequipped the tool.
+	if Chapter2VR and Chapter2VR.seatedGunUpdate then
+		Chapter2VR.seatedGunUpdate( self, "c5ea0c2f-185b-48d6-b4df-45c386a575cc", dt )
+	end
 
 	-- First person animation
 	local isSprinting =  self.tool:isSprinting()
@@ -183,6 +187,7 @@ function PotatoRifle.client_onUpdate( self, dt )
 		return
 	end
 
+
 	local effectPos, rot
 
 	if self.tool:isLocal() then
@@ -191,7 +196,7 @@ function PotatoRifle.client_onUpdate( self, dt )
 		local firePos = vrFirePos or self.tool:getFpBonePos( "pejnt_barrel" )
 
 		if vrFirePos then
-			effectPos = firePos
+			effectPos = firePos + dir * 0.2
 		elseif not self.aiming then
 			effectPos = firePos + dir * 0.2
 		else
@@ -458,10 +463,14 @@ function PotatoRifle.onShoot( self, dir )
 
 	setTpAnimation( self.tpAnimations, self.aiming and "aimShoot" or "shoot", 10.0 )
 
-	if self.tool:isInFirstPersonView() then
+	local vrEffect = Chapter2VR and Chapter2VR.startGunMuzzleEffect and
+		Chapter2VR.startGunMuzzleEffect( self.tool, self.shootEffectFP )
+	if not vrEffect then
+		if self.tool:isInFirstPersonView() then
 			self.shootEffectFP:start()
 		else
 			self.shootEffect:start()
+		end
 	end
 
 end

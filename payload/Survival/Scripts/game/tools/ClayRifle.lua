@@ -125,6 +125,10 @@ function ClayRifle.loadAnimations( self )
 end
 
 function ClayRifle.client_onUpdate( self, dt )
+	-- Seated VR firing must run even when the engine has unequipped the tool.
+	if Chapter2VR and Chapter2VR.seatedGunUpdate then
+		Chapter2VR.seatedGunUpdate( self, "6993e5df-6852-4e84-88ae-df49f765e784", dt )
+	end
 
 	-- First person animation
 	local isSprinting =  self.tool:isSprinting()
@@ -149,6 +153,7 @@ function ClayRifle.client_onUpdate( self, dt )
 		return
 	end
 
+
 	local effectPos, rot
 
 	if self.tool:isLocal() then
@@ -156,7 +161,7 @@ function ClayRifle.client_onUpdate( self, dt )
 		local dir = vrFirePos and vrDirection or sm.localPlayer.getDirection()
 		local firePos = vrFirePos or self.tool:getFpBonePos( "pejnt_barrel" )
 
-		effectPos = vrFirePos and firePos or firePos + dir * 0.2
+		effectPos = firePos + dir * 0.2
 
 		rot = sm.vec3.getRotation( sm.vec3.new( 0, 0, 1 ), dir )
 
@@ -378,7 +383,11 @@ function ClayRifle.onShoot( self, dir )
 
 	setTpAnimation( self.tpAnimations, "shoot", 10.0 )
 
-	if self.tool:isInFirstPersonView() then
+	local vrEffect = Chapter2VR and Chapter2VR.startGunMuzzleEffect and
+		Chapter2VR.startGunMuzzleEffect( self.tool, self.shootEffectFP )
+	if vrEffect then
+		setFpAnimation( self.fpAnimations, "shoot", 0.0 )
+	elseif self.tool:isInFirstPersonView() then
 		self.shootEffectFP:start()
 		setFpAnimation( self.fpAnimations, "shoot", 0.0 )
 	else
