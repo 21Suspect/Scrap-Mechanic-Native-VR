@@ -9,6 +9,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <cwctype>
 #include <cwchar>
 #include <cstring>
 #include <cstdlib>
@@ -78,6 +79,8 @@ namespace scrapvr::tools
 		{
 			ID3D11Buffer *vertices = nullptr;
 			ID3D11ShaderResourceView *texture = nullptr;
+			ID3D11ShaderResourceView *normal_texture = nullptr;
+			ID3D11ShaderResourceView *material_texture = nullptr;
 			uint32_t count = 0;
 			held_item_catalog::Material material = held_item_catalog::Material::opaque;
 		};
@@ -637,18 +640,58 @@ namespace scrapvr::tools
 			release(texture); return ok;
 		}
 
+		bool create_linear_texture(const wchar_t *relative, ID3D11ShaderResourceView **output)
+		{
+			if (!relative || !output) return false;
+			std::vector<uint8_t> pixels; uint32_t width = 0, height = 0;
+			if (!load_tga(relative, pixels, width, height)) return false;
+			D3D11_TEXTURE2D_DESC desc = {}; desc.Width = width; desc.Height = height; desc.MipLevels = 1; desc.ArraySize = 1;
+			desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; desc.SampleDesc.Count = 1; desc.Usage = D3D11_USAGE_IMMUTABLE; desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			D3D11_SUBRESOURCE_DATA data = {}; data.pSysMem = pixels.data(); data.SysMemPitch = width * 4;
+			ID3D11Texture2D *texture = nullptr;
+			const bool ok = SUCCEEDED(g_device->CreateTexture2D(&desc, &data, &texture)) &&
+				SUCCEEDED(g_device->CreateShaderResourceView(texture, nullptr, output));
+			release(texture); return ok;
+		}
+
 		bool create_solid_texture(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha,
-			ID3D11ShaderResourceView **output)
+			ID3D11ShaderResourceView **output, bool linear = false)
 		{
 			const uint8_t pixel[4] = { red, green, blue, alpha };
 			D3D11_TEXTURE2D_DESC desc = {}; desc.Width = desc.Height = desc.MipLevels = desc.ArraySize = 1;
-			desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; desc.SampleDesc.Count = 1;
+			desc.Format = linear ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; desc.SampleDesc.Count = 1;
 			desc.Usage = D3D11_USAGE_IMMUTABLE; desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
 			D3D11_SUBRESOURCE_DATA data = {}; data.pSysMem = pixel; data.SysMemPitch = 4;
 			ID3D11Texture2D *texture = nullptr;
 			const bool ok = SUCCEEDED(g_device->CreateTexture2D(&desc, &data, &texture)) &&
 				SUCCEEDED(g_device->CreateShaderResourceView(texture, nullptr, output));
 			release(texture); return ok;
+		}
+
+		std::wstring surface_map_path(const wchar_t *diffuse_path, const wchar_t *map_suffix)
+		{
+			if (!diffuse_path || !map_suffix) return {};
+			std::wstring result(diffuse_path);
+			const std::wstring diffuse_suffix = L"_dif.tga";
+			if (result.size() < diffuse_suffix.size()) return {};
+			const size_t offset = result.size() - diffuse_suffix.size();
+			for (size_t index = 0; index < diffuse_suffix.size(); ++index)
+				if (std::towlower(result[offset + index]) != diffuse_suffix[index]) return {};
+			result.resize(offset);
+			result += map_suffix;
+			return result;
+		}
+
+		bool create_surface_maps(const wchar_t *diffuse_path, DrawResource &draw)
+		{
+			const std::wstring normal_path = surface_map_path(diffuse_path, L"_nor.tga");
+			const std::wstring material_path = surface_map_path(diffuse_path, L"_asg.tga");
+			const bool normal_ready = !normal_path.empty() && create_linear_texture(normal_path.c_str(), &draw.normal_texture);
+			const bool material_ready = !material_path.empty() && create_linear_texture(material_path.c_str(), &draw.material_texture);
+			// Neutral maps retain the original appearance for assets without authored
+			// surface data while allowing the same richer shader path for every item.
+			return (normal_ready || create_solid_texture(128, 128, 255, 255, &draw.normal_texture, true)) &&
+				(material_ready || create_solid_texture(255, 0, 64, 255, &draw.material_texture, true));
 		}
 
 		bool create_resource(DrawResource &draw, const Vertex *vertices, uint32_t count,
@@ -658,18 +701,21 @@ namespace scrapvr::tools
 		{
 			release(draw.vertices);
 			release(draw.texture);
+			release(draw.normal_texture);
+			release(draw.material_texture);
 			draw.count = count; draw.material = material;
 			D3D11_BUFFER_DESC desc = {}; desc.ByteWidth = count * sizeof(Vertex); desc.Usage = D3D11_USAGE_IMMUTABLE; desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 			D3D11_SUBRESOURCE_DATA data = {}; data.pSysMem = vertices;
 			if (FAILED(g_device->CreateBuffer(&desc, &data, &draw.vertices))) return false;
-			if (texture && create_texture(texture, &draw.texture, rgba, apply_paint, mask, material)) return true;
-			const bool ok = create_solid_texture(
+			const bool diffuse_ready = texture && create_texture(texture, &draw.texture, rgba, apply_paint, mask, material);
+			const bool fallback_ready = diffuse_ready || create_solid_texture(
 				static_cast<uint8_t>(rgba & 0xffu),
 				static_cast<uint8_t>((rgba >> 8) & 0xffu),
 				static_cast<uint8_t>((rgba >> 16) & 0xffu),
 				material == held_item_catalog::Material::glass ? 112u :
 				apply_paint ? 255u : static_cast<uint8_t>((rgba >> 24) & 0xffu), &draw.texture);
-			if (!ok) { release(draw.vertices); draw.count = 0; }
+			const bool ok = fallback_ready && create_surface_maps(texture, draw);
+			if (!ok) { release(draw.vertices); release(draw.texture); release(draw.normal_texture); release(draw.material_texture); draw.count = 0; }
 			return ok;
 		}
 
@@ -685,8 +731,12 @@ namespace scrapvr::tools
 			D3D11_BUFFER_DESC desc = {}; desc.ByteWidth = count * sizeof(Vertex);
 			desc.Usage = D3D11_USAGE_IMMUTABLE; desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 			D3D11_SUBRESOURCE_DATA data = {}; data.pSysMem = vertices;
-			return SUCCEEDED(g_device->CreateBuffer(&desc, &data, &draw.vertices)) &&
-				create_solid_texture(red, green, blue, alpha, &draw.texture);
+			const bool ok = SUCCEEDED(g_device->CreateBuffer(&desc, &data, &draw.vertices)) &&
+				create_solid_texture(red, green, blue, alpha, &draw.texture) &&
+				create_solid_texture(128, 128, 255, 255, &draw.normal_texture, true) &&
+				create_solid_texture(255, 0, 64, 255, &draw.material_texture, true);
+			if (!ok) { release(draw.vertices); release(draw.texture); release(draw.normal_texture); release(draw.material_texture); draw.count = 0; }
+			return ok;
 		}
 
 		void draw_resource(ID3D11DeviceContext *context, DrawId id)
@@ -694,7 +744,8 @@ namespace scrapvr::tools
 			DrawResource &draw = g_draws[id]; if (!draw.vertices || !draw.texture) return;
 			UINT stride = sizeof(Vertex), offset = 0;
 			context->IASetVertexBuffers(0, 1, &draw.vertices, &stride, &offset);
-			context->PSSetShaderResources(0, 1, &draw.texture);
+			ID3D11ShaderResourceView *textures[] = { draw.texture, draw.normal_texture, draw.material_texture };
+			context->PSSetShaderResources(0, 3, textures);
 			context->Draw(draw.count, 0);
 		}
 
@@ -707,7 +758,8 @@ namespace scrapvr::tools
 				if (!draw.vertices || !draw.texture) continue;
 				UINT stride = sizeof(Vertex), offset = 0;
 				context->IASetVertexBuffers(0, 1, &draw.vertices, &stride, &offset);
-				context->PSSetShaderResources(0, 1, &draw.texture);
+				ID3D11ShaderResourceView *textures[] = { draw.texture, draw.normal_texture, draw.material_texture };
+				context->PSSetShaderResources(0, 3, textures);
 				context->Draw(draw.count, 0);
 			}
 		}
@@ -718,6 +770,8 @@ namespace scrapvr::tools
 			{
 				release(draw.vertices);
 				release(draw.texture);
+				release(draw.normal_texture);
+				release(draw.material_texture);
 				draw.count = 0;
 			}
 			g_catalog_draws.clear();
@@ -824,7 +878,8 @@ namespace scrapvr::tools
 				}
 				UINT stride = sizeof(Vertex), offset = 0;
 				context->IASetVertexBuffers(0, 1, &draw.vertices, &stride, &offset);
-				context->PSSetShaderResources(0, 1, &draw.texture);
+				ID3D11ShaderResourceView *textures[] = { draw.texture, draw.normal_texture, draw.material_texture };
+				context->PSSetShaderResources(0, 3, textures);
 				context->Draw(draw.count, 0);
 			}
 			context->PSSetShader(g_pixel_shader, nullptr, 0);
@@ -1504,14 +1559,36 @@ namespace scrapvr::tools
 			VSOut vs_main(VSIn input) { VSOut o; float4 local = float4(input.position, 1); float4 world = mul(model, local);
 				o.position = mul(mvp, local); o.uv = input.uv; o.world_position = world.xyz;
 				o.world_normal = normalize(mul((float3x3)model, input.normal)); return o; }
-			Texture2D tex : register(t0); SamplerState samp : register(s0);
-			float4 shade(VSOut input, float4 c) { float3 n = normalize(input.world_normal);
+			Texture2D tex : register(t0); Texture2D normal_map : register(t1); Texture2D asg_map : register(t2); SamplerState samp : register(s0);
+			float4 shade(VSOut input, float4 c) { float3 base_normal = normalize(input.world_normal);
+				float3 dpdx = ddx(input.world_position), dpdy = ddy(input.world_position);
+				float2 duvdx = ddx(input.uv), duvdy = ddy(input.uv);
+				float3 tangent_raw = dpdy * duvdx.x - dpdx * duvdy.x;
+				float3 fallback_axis = abs(base_normal.y) < 0.9 ? float3(0, 1, 0) : float3(1, 0, 0);
+				float3 tangent = dot(tangent_raw, tangent_raw) > 0.000001 ? normalize(tangent_raw) : normalize(cross(fallback_axis, base_normal));
+				float3 bitangent = normalize(cross(base_normal, tangent));
+				float3 mapped_normal = normal_map.Sample(samp, input.uv).xyz * 2.0 - 1.0;
+				float3 detail_normal = normalize(tangent * mapped_normal.x + bitangent * mapped_normal.y + base_normal * mapped_normal.z);
+				// These meshes retain game normals but not the authored tangent stream used
+				// by the desktop viewmodel. Blend reconstructed detail into the stable mesh
+				// normal so paint/tool surfaces gain texture without their lighting inverting.
+				float3 n = normalize(lerp(base_normal, detail_normal, 0.28));
+				float3 asg = asg_map.Sample(samp, input.uv).rgb;
 				float3 key_direction = normalize(float3(-0.35, 0.78, -0.52)); float sky = 0.5 + 0.5 * n.y;
-				float ambient = lerp(0.32, 0.48, sky); float key = 0.38 * saturate(dot(n, key_direction));
-				float fill = 0.06 * saturate(dot(n, normalize(float3(0.65, 0.25, 0.72))));
+				// Desktop viewmodels receive a camera-relative studio/environment fill in
+				// addition to world lighting. Keep the VR-held equivalent readable at night.
+				float ambient = lerp(0.68, 0.82, sky) * lerp(0.88, 1.0, asg.x);
+				float key = 0.30 * saturate(dot(n, key_direction));
+				float fill = 0.12 * saturate(dot(n, normalize(float3(0.65, 0.25, 0.72))));
 				float3 view_direction = normalize(eye_position.xyz - input.world_position);
-				float specular = 0.035 * pow(saturate(dot(n, normalize(key_direction + view_direction))), 30.0);
-				float3 linear_lit = c.rgb * (ambient + key + fill) + specular;
+				float smoothness = lerp(0.20, 0.72, asg.z);
+				float specular = lerp(0.055, 0.22, max(asg.y, 0.18)) * pow(saturate(dot(n, normalize(key_direction + view_direction))), lerp(14.0, 72.0, smoothness));
+				float rim = pow(1.0 - saturate(dot(n, view_direction)), 5.0) * 0.055;
+				float3 reflected = reflect(-view_direction, n);
+				float studio_height = saturate(reflected.y * 0.5 + 0.5);
+				float3 studio_reflection = lerp(float3(0.08, 0.11, 0.17), float3(0.58, 0.66, 0.80), studio_height);
+				float reflection_strength = lerp(0.09, 0.24, smoothness);
+				float3 linear_lit = c.rgb * (ambient + key + fill + rim) + specular + studio_reflection * reflection_strength;
 				return float4(saturate((linear_lit - 0.18) * 1.08 + 0.16), c.a); }
 			float4 ps_main(VSOut input) : SV_TARGET { return shade(input, tex.Sample(samp, input.uv)); }
 			float4 ps_cutout(VSOut input) : SV_TARGET { float4 c = tex.Sample(samp, input.uv);
@@ -1808,7 +1885,7 @@ namespace scrapvr::tools
 				context->PSSetShader(g_pixel_shader, nullptr, 0);
 			}
 		}
-		ID3D11ShaderResourceView *none = nullptr; context->PSSetShaderResources(0, 1, &none);
+		ID3D11ShaderResourceView *none[] = { nullptr, nullptr, nullptr }; context->PSSetShaderResources(0, 3, none);
 		if (!g_render_logged && g_log) { g_render_logged = true; g_log("NATIVE VR TOOLS VISIBLE: selected tool uses the tracked-hand stereo pose and depth buffer; world targeting uses a laser-free OpenXR aim marker; white pointers are limited to interaction tools"); }
 		return true;
 	}
@@ -1923,8 +2000,8 @@ namespace scrapvr::tools
 
 	void shutdown()
 	{
-		for (auto &draw : g_draws) { release(draw.vertices); release(draw.texture); draw.count = 0; }
-		for (auto &draw : g_held_draws) { release(draw.vertices); release(draw.texture); draw.count = 0; }
+		for (auto &draw : g_draws) { release(draw.vertices); release(draw.texture); release(draw.normal_texture); release(draw.material_texture); draw.count = 0; }
+		for (auto &draw : g_held_draws) { release(draw.vertices); release(draw.texture); release(draw.normal_texture); release(draw.material_texture); draw.count = 0; }
 		release_catalog_draws();
 		release(g_alpha_blend_state); release(g_glass_depth_state); release(g_depth_state);
 		release(g_rasterizer); release(g_sampler); release(g_input_layout);

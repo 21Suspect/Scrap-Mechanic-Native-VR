@@ -54,6 +54,8 @@ namespace scrapvr::hands
 		ID3D11PixelShader *g_pixel_shader = nullptr;
 		ID3D11InputLayout *g_input_layout = nullptr;
 		ID3D11ShaderResourceView *g_texture = nullptr;
+		ID3D11ShaderResourceView *g_normal_texture = nullptr;
+		ID3D11ShaderResourceView *g_material_texture = nullptr;
 		ID3D11SamplerState *g_sampler = nullptr;
 		ID3D11RasterizerState *g_rasterizer = nullptr;
 		ID3D11BlendState *g_opaque_blend_state = nullptr;
@@ -134,8 +136,8 @@ namespace scrapvr::hands
 			ID3D11DomainShader *domain_shader = nullptr;
 			ID3D11PixelShader *pixel_shader = nullptr;
 			ID3D11Buffer *vertex_constant = nullptr;
-			ID3D11ShaderResourceView *pixel_resource = nullptr;
-			ID3D11SamplerState *pixel_sampler = nullptr;
+			ID3D11ShaderResourceView *pixel_resources[3] = {};
+			ID3D11SamplerState *pixel_samplers[3] = {};
 
 			explicit ContextStateGuard(ID3D11DeviceContext *value) : context(value)
 			{
@@ -153,8 +155,8 @@ namespace scrapvr::hands
 				context->DSGetShader(&domain_shader, nullptr, nullptr);
 				context->PSGetShader(&pixel_shader, nullptr, nullptr);
 				context->VSGetConstantBuffers(0, 1, &vertex_constant);
-				context->PSGetShaderResources(0, 1, &pixel_resource);
-				context->PSGetSamplers(0, 1, &pixel_sampler);
+				context->PSGetShaderResources(0, 3, pixel_resources);
+				context->PSGetSamplers(0, 3, pixel_samplers);
 				context->GSSetShader(nullptr, nullptr, 0);
 				context->HSSetShader(nullptr, nullptr, 0);
 				context->DSSetShader(nullptr, nullptr, 0);
@@ -176,9 +178,10 @@ namespace scrapvr::hands
 				context->DSSetShader(domain_shader, nullptr, 0);
 				context->PSSetShader(pixel_shader, nullptr, 0);
 				context->VSSetConstantBuffers(0, 1, &vertex_constant);
-				context->PSSetShaderResources(0, 1, &pixel_resource);
-				context->PSSetSamplers(0, 1, &pixel_sampler);
-				release(pixel_sampler); release(pixel_resource); release(vertex_constant);
+				context->PSSetShaderResources(0, 3, pixel_resources);
+				context->PSSetSamplers(0, 3, pixel_samplers);
+				for (uint32_t index = 0; index < 3; ++index) { release(pixel_samplers[index]); release(pixel_resources[index]); }
+				release(vertex_constant);
 				release(pixel_shader); release(domain_shader); release(hull_shader);
 				release(geometry_shader); release(vertex_shader); release(vertex_buffer);
 				release(input_layout); release(rasterizer); release(depth_state);
@@ -810,7 +813,7 @@ namespace scrapvr::hands
 			}
 		}
 
-		std::wstring texture_path()
+		std::wstring texture_path(const wchar_t *suffix)
 		{
 			wchar_t module_path[MAX_PATH] = {};
 			HMODULE module = GetModuleHandleW(L"smvr_native_vr_v1.addon64");
@@ -823,13 +826,13 @@ namespace scrapvr::hands
 			path.resize(slash);
 			// The embedded hand mesh is generated from the ship-mechanic glove DAE,
 			// so its UVs must use the matching ship-mechanic texture atlas.
-			path += L"\\..\\Survival\\Character\\Char_Shipmechanic\\char_shipmechanic_gloves_dif.tga";
+			path += L"\\..\\Survival\\Character\\Char_Shipmechanic\\char_shipmechanic_gloves";
+			path += suffix;
 			return path;
 		}
 
-		bool load_tga(std::vector<uint8_t> &rgba, uint32_t &width, uint32_t &height)
+		bool load_tga(const std::wstring &path, std::vector<uint8_t> &rgba, uint32_t &width, uint32_t &height)
 		{
-			const std::wstring path = texture_path();
 			std::ifstream file(path.c_str(), std::ios::binary);
 			if (!file)
 				return false;
@@ -1054,6 +1057,37 @@ namespace scrapvr::hands
 			g_depth_width = width; g_depth_height = height;
 			return true;
 		}
+
+		bool create_linear_tga_texture(const std::wstring &path, ID3D11ShaderResourceView **output)
+		{
+			if (!output || path.empty()) return false;
+			std::vector<uint8_t> pixels; uint32_t width = 0, height = 0;
+			if (!load_tga(path, pixels, width, height)) return false;
+			D3D11_TEXTURE2D_DESC desc = {};
+			desc.Width = width; desc.Height = height; desc.MipLevels = 1; desc.ArraySize = 1;
+			desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; desc.SampleDesc.Count = 1;
+			desc.Usage = D3D11_USAGE_IMMUTABLE; desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			D3D11_SUBRESOURCE_DATA data = {}; data.pSysMem = pixels.data(); data.SysMemPitch = width * 4;
+			ID3D11Texture2D *texture = nullptr;
+			const bool ok = SUCCEEDED(g_device->CreateTexture2D(&desc, &data, &texture)) &&
+				SUCCEEDED(g_device->CreateShaderResourceView(texture, nullptr, output));
+			release(texture); return ok;
+		}
+
+		bool create_neutral_surface_texture(uint8_t red, uint8_t green, uint8_t blue,
+			ID3D11ShaderResourceView **output)
+		{
+			const uint8_t pixel[] = { red, green, blue, 255 };
+			D3D11_TEXTURE2D_DESC desc = {};
+			desc.Width = desc.Height = desc.MipLevels = desc.ArraySize = 1;
+			desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; desc.SampleDesc.Count = 1;
+			desc.Usage = D3D11_USAGE_IMMUTABLE; desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+			D3D11_SUBRESOURCE_DATA data = {}; data.pSysMem = pixel; data.SysMemPitch = sizeof(pixel);
+			ID3D11Texture2D *texture = nullptr;
+			const bool ok = SUCCEEDED(g_device->CreateTexture2D(&desc, &data, &texture)) &&
+				SUCCEEDED(g_device->CreateShaderResourceView(texture, nullptr, output));
+			release(texture); return ok;
+		}
 	}
 
 	bool initialize(ID3D11Device *device, LogFunction log)
@@ -1073,17 +1107,35 @@ namespace scrapvr::hands
 				VSOut output; float4 world = mul(model, position); output.position = mul(mvp, position); output.uv = input.uv;
 				output.world_position = world.xyz; output.world_normal = normalize(mul((float3x3)model, normal)); return output;
 			}
-			Texture2D glove_texture : register(t0); SamplerState glove_sampler : register(s0);
+			Texture2D glove_texture : register(t0); Texture2D glove_normal : register(t1);
+			Texture2D glove_asg : register(t2); SamplerState glove_sampler : register(s0);
 			float4 ps_main(VSOut input) : SV_TARGET {
-				float4 color = glove_texture.Sample(glove_sampler, input.uv); float3 n = normalize(input.world_normal);
+				float4 color = glove_texture.Sample(glove_sampler, input.uv);
+				float3 base_normal = normalize(input.world_normal);
+				float3 dpdx = ddx(input.world_position), dpdy = ddy(input.world_position);
+				float2 duvdx = ddx(input.uv), duvdy = ddy(input.uv);
+				float3 tangent_raw = dpdy * duvdx.x - dpdx * duvdy.x;
+				float3 fallback_axis = abs(base_normal.y) < 0.9 ? float3(0, 1, 0) : float3(1, 0, 0);
+				float3 tangent = dot(tangent_raw, tangent_raw) > 0.000001 ? normalize(tangent_raw) : normalize(cross(fallback_axis, base_normal));
+				float3 bitangent = normalize(cross(base_normal, tangent));
+				float3 map_normal = glove_normal.Sample(glove_sampler, input.uv).xyz * 2.0 - 1.0;
+				float3 detail_normal = normalize(tangent * map_normal.x + bitangent * map_normal.y + base_normal * map_normal.z);
+				float3 n = normalize(lerp(base_normal, detail_normal, 0.42));
+				float3 asg = glove_asg.Sample(glove_sampler, input.uv).rgb;
 				float3 key_direction = normalize(float3(-0.35, 0.78, -0.52));
-				float sky = 0.5 + 0.5 * n.y; float ambient = lerp(0.32, 0.48, sky);
+				float sky = 0.5 + 0.5 * n.y; float occlusion = lerp(0.55, 1.0, asg.x);
+				float ambient = lerp(0.34, 0.52, sky) * occlusion;
 				float key = 0.38 * saturate(dot(n, key_direction));
-				float fill = 0.06 * saturate(dot(n, normalize(float3(0.65, 0.25, 0.72))));
+				float fill = 0.09 * saturate(dot(n, normalize(float3(0.65, 0.25, 0.72))));
 				float3 view_direction = normalize(eye_position.xyz - input.world_position);
 				float3 half_vector = normalize(key_direction + view_direction);
-				float specular = 0.035 * pow(saturate(dot(n, half_vector)), 28.0);
-				float3 linear_lit = color.rgb * (ambient + key + fill) + specular;
+				float smoothness = lerp(0.12, 0.82, asg.z);
+				float metalness = asg.y * 0.35;
+				float fresnel = pow(1.0 - saturate(dot(n, view_direction)), 5.0);
+				float specular = pow(saturate(dot(n, half_vector)), lerp(10.0, 92.0, smoothness));
+				float3 specular_color = lerp(float3(0.04, 0.04, 0.04), color.rgb, metalness);
+				float3 linear_lit = color.rgb * (ambient + key + fill) +
+					specular_color * specular * (0.12 + smoothness * 0.56) + specular_color * fresnel * 0.08;
 				// The OpenXR RTV is R8G8B8A8_UNORM_SRGB. Return linear light and let
 				// the target perform the one required transfer; manual gamma here was
 				// the cause of the pale, bright hand/tool overlays.
@@ -1237,7 +1289,7 @@ namespace scrapvr::hands
 		hud_depth_desc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
 		if (FAILED(g_device->CreateDepthStencilState(&hud_depth_desc, &g_hud_depth_state))) return false;
 		std::vector<uint8_t> pixels; uint32_t texture_width = 0, texture_height = 0;
-		if (load_tga(pixels, texture_width, texture_height))
+		if (load_tga(texture_path(L"_dif.tga"), pixels, texture_width, texture_height))
 		{
 			D3D11_TEXTURE2D_DESC texture_desc = {}; texture_desc.Width = texture_width; texture_desc.Height = texture_height; texture_desc.MipLevels = 1; texture_desc.ArraySize = 1;
 			texture_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; texture_desc.SampleDesc.Count = 1; texture_desc.Usage = D3D11_USAGE_IMMUTABLE; texture_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
@@ -1252,6 +1304,11 @@ namespace scrapvr::hands
 			if (g_log) g_log("VR HAND RENDERER: Chapter 2 default glove texture could not be decoded; hand pass disabled instead of drawing an untextured fallback");
 			return false;
 		}
+		if (!create_linear_tga_texture(texture_path(L"_nor.tga"), &g_normal_texture) &&
+			!create_neutral_surface_texture(128, 128, 255, &g_normal_texture)) return false;
+		if (!create_linear_tga_texture(texture_path(L"_asg.tga"), &g_material_texture) &&
+			!create_neutral_surface_texture(255, 0, 64, &g_material_texture)) return false;
+		if (g_log) g_log("VR HAND MATERIAL: diffuse + normal + ASG maps enabled for viewmodel-grade glove lighting");
 		D3D11_SAMPLER_DESC sampler = {}; sampler.Filter = D3D11_FILTER_ANISOTROPIC; sampler.AddressU = sampler.AddressV = sampler.AddressW = D3D11_TEXTURE_ADDRESS_WRAP; sampler.MaxAnisotropy = 8; sampler.MaxLOD = D3D11_FLOAT32_MAX;
 		if (FAILED(g_device->CreateSamplerState(&sampler, &g_sampler))) return false;
 		D3D11_RASTERIZER_DESC rasterizer = {}; rasterizer.FillMode = D3D11_FILL_SOLID; rasterizer.CullMode = D3D11_CULL_NONE; rasterizer.DepthClipEnable = TRUE;
@@ -1341,7 +1398,8 @@ namespace scrapvr::hands
 		context->RSSetViewports(1, &viewport); context->RSSetState(g_rasterizer); context->OMSetDepthStencilState(g_depth_state, 0);
 		context->IASetInputLayout(g_input_layout); context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		context->VSSetShader(g_vertex_shader, nullptr, 0); context->VSSetConstantBuffers(0, 1, &g_constant_buffer);
-		context->PSSetShader(g_pixel_shader, nullptr, 0); context->PSSetShaderResources(0, 1, &g_texture); context->PSSetSamplers(0, 1, &g_sampler);
+		ID3D11ShaderResourceView *hand_textures[] = { g_texture, g_normal_texture, g_material_texture };
+		context->PSSetShader(g_pixel_shader, nullptr, 0); context->PSSetShaderResources(0, 3, hand_textures); context->PSSetSamplers(0, 1, &g_sampler);
 		const Matrix view_projection = multiply(projection(eye.fov), inverse_pose(eye.pose));
 		const uint32_t counts[] = { mechanic_hands_asset::left_vertex_count, mechanic_hands_asset::right_vertex_count };
 		for (uint32_t hand = 0; hand < 2; ++hand)
@@ -1365,7 +1423,7 @@ namespace scrapvr::hands
 			right_target_active, interaction_target_distance,
 			interaction_target_active);
 		render_wrist_hud(context, target, g_depth_view, width, height, eye, world_heading);
-		ID3D11ShaderResourceView *none = nullptr; context->PSSetShaderResources(0, 1, &none); context->OMSetRenderTargets(1, &target, nullptr);
+		ID3D11ShaderResourceView *none[] = { nullptr, nullptr, nullptr }; context->PSSetShaderResources(0, 3, none); context->OMSetRenderTargets(1, &target, nullptr);
 		if (!g_render_logged && g_log) { g_render_logged = true; g_log("VISIBLE TRACKED HANDS ACTIVE: mechanic glove geometry rendered independently into both stereo eyes"); }
 		return true;
 	}
@@ -1377,7 +1435,7 @@ namespace scrapvr::hands
 		release(g_hud_texture); release(g_hud_texture_resource); release(g_hud_input_layout);
 		release(g_hud_pixel_shader); release(g_hud_vertex_shader);
 		release(g_hud_constant_buffer); release(g_hud_vertex_buffer);
-		release(g_depth_view); release(g_depth_texture); release(g_depth_state); release(g_opaque_blend_state); release(g_rasterizer); release(g_sampler); release(g_texture);
+		release(g_depth_view); release(g_depth_texture); release(g_depth_state); release(g_opaque_blend_state); release(g_rasterizer); release(g_sampler); release(g_material_texture); release(g_normal_texture); release(g_texture);
 		release(g_input_layout); release(g_pixel_shader); release(g_vertex_shader); release(g_constant_buffer);
 		for (auto &buffer : g_vertex_buffers) release(buffer);
 		g_device = nullptr; g_log = nullptr; g_initialized = false; g_render_logged = false;
