@@ -4,7 +4,7 @@
 
 Native OpenXR VR for the current Scrap Mechanic Chapter 2 / 1.0 release, made by [21Suspect](https://github.com/21Suspect).
 
-**Version 1.4.7 — tested with Meta Quest 3 and Meta Quest Link.** Other headsets and VR software, including Virtual Desktop/VDXR and SteamVR, also appear to work based on community reports. They have not all been personally tested, and compatibility can vary by setup.
+**Version 1.4.8 — tested with Meta Quest 3 and Meta Quest Link.** This update adds asymmetric/canted-display support for headsets such as Bigscreen Beyond, runtime-neutral headset sleep/resume behavior, and fixes the VDXR/SteamVR gameplay-input handoff. Those additional setups remain community-tested rather than locally hardware-tested.
 
 [![Latest release](https://img.shields.io/github/v/release/21Suspect/Scrap-Mechanic-Native-VR?display_name=tag&sort=semver)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/21Suspect/Scrap-Mechanic-Native-VR/total)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases)
@@ -26,6 +26,7 @@ The installer has five clear actions: **Install VR Mod**, **Uninstall VR Mod**, 
 ## Features
 
 - Native stereo OpenXR rendering using the active runtime's recommended per-eye resolution.
+- Per-eye asymmetric and canted-display FOV support while retaining the established mirrored Meta Quest projection path.
 - Six-degree-of-freedom head tracking, correct stereo depth and perspective, exact runtime FOV, and the VR seam fix.
 - A level standing horizon with mouse/controller pitch-height movement removed, while seats retain Scrap Mechanic's original camera orbit.
 - OpenXR 1.1 Meta Touch, legacy Oculus Touch, Valve Index, and generic OpenXR controller profiles, plus optional Meta Quest optical hand tracking.
@@ -103,6 +104,8 @@ Do not mix files or installers from the legacy and current builds.
 ## Build and support
 
 Build instructions are in [BUILD.md](BUILD.md). Installer and payload checksums are recorded in [SHA256SUMS.txt](SHA256SUMS.txt).
+
+Installer SHA-256: `2B1ABFE7602AB041871363C875F0D09ED3D53EB46E5CF7E7291F1B1C183A3FB0`.
 
 If you enjoy the project, you can [buy 21Suspect a coffee](https://buymeacoffee.com/21suspect).
 

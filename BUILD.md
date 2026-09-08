@@ -40,9 +40,9 @@ Only use the payload with the exact executable hash documented in `README.md`. D
 
 The public artifact is `dist/ScrapMechanicVR-Installer.exe`. It validates its embedded patcher, manifest, native add-on, branded UI assets, soundtrack, and the managed payload before installation. Its five user actions are Install VR Mod, Uninstall VR Mod, Start VR, Open Logs, and Open Bindings. Install automatically migrates a managed older/current build and verifies the completed installation. Uninstall removes managed current/older builds, restores backups, and verifies the result. Start VR requires the active OpenXR runtime to report a connected headset.
 
-Current version: `1.4.7`
+Current version: `1.4.8`
 
-Installer SHA-256: `513467972A5770B50D7F17F1609775DA4D7AF50D0A1F3A03D9A4072BFF528E3F` (also recorded in `SHA256SUMS.txt`).
+Installer SHA-256: `2B1ABFE7602AB041871363C875F0D09ED3D53EB46E5CF7E7291F1B1C183A3FB0` (also recorded in `SHA256SUMS.txt`).
 
 Focused regression checks for palette input, fertilizer ownership, and startup retries:
 
@@ -51,12 +51,14 @@ c++.exe -std=c++20 tools/tests/ui_trigger_gate.cpp -o build/ui_trigger_gate_test
 .\build\ui_trigger_gate_test.exe
 c++.exe -std=c++20 tools/tests/launch_retry.cpp -o build/launch_retry_test.exe
 .\build\launch_retry_test.exe
+c++.exe -std=c++20 tools/tests/vr_projection.cpp -o build/vr_projection_test.exe
+.\build\vr_projection_test.exe
 python tools/tests/test_fertilizer_effect.py --lua-dll '<game directory>/Release/lua51.dll'
 ```
 
 The Lua test executes the shipped fertilizer script with mocked tool owners. The C++ tests exercise the production input gate and launch retry policy. These checks do not replace an in-headset multiplayer or VDXR test.
 
-The payload includes a verified `Cache/Bundle/core_data.cbo` seed for the supported game build. This avoids Scrap Mechanic's unstable cold-cache compiler path on the first VR launch; the cache remains runtime-mutable and is backed up/restored like every other managed file.
+The payload includes a verified `Cache/Bundle/core_data.cbo` seed for the supported game build. This avoids Scrap Mechanic's unstable cold-cache compiler path on the first VR launch. It is a derived runtime cache, so upgrades refresh it while preserving user-authored INI configuration; uninstall still restores a verified pre-install cache when one existed.
 
 ## Release checks
 

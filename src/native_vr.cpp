@@ -18,6 +18,7 @@
 #include "feature_input.hpp"
 #include "feature_launch_retry.hpp"
 #include "feature_startup_menu.hpp"
+#include "vr_projection.hpp"
 #include "custom_content_bridge.hpp"
 #include "vr_hands.hpp"
 #include "vr_tools.hpp"
@@ -1813,28 +1814,6 @@ bool build_eye_projection(const XrFovf &fov, const float *game_projection,
     return true;
 }
 
-int32_t eye_crop_width(const XrFovf &fov, uint32_t source_width)
-{
-    const float left = std::tan(fov.angleLeft);
-    const float right = std::tan(fov.angleRight);
-    const float symmetric = (std::max)(-left, right);
-    if (!std::isfinite(left) || !std::isfinite(right) || symmetric <= 0.001f) return -1;
-    const long first = std::lround(((left / symmetric) + 1.0f) * 0.5f * source_width);
-    const long last = std::lround(((right / symmetric) + 1.0f) * 0.5f * source_width);
-    return static_cast<int32_t>(last - first);
-}
-
-int32_t eye_crop_height(const XrFovf &fov, uint32_t source_height)
-{
-    const float down = std::tan(fov.angleDown);
-    const float up = std::tan(fov.angleUp);
-    const float symmetric = (std::max)(-down, up);
-    if (!std::isfinite(down) || !std::isfinite(up) || symmetric <= 0.001f) return -1;
-    const long first = std::lround((1.0f - (up / symmetric)) * 0.5f * source_height);
-    const long last = std::lround((1.0f - (down / symmetric)) * 0.5f * source_height);
-    return static_cast<int32_t>(last - first);
-}
-
 struct EyeSwapchain
 {
     XrSwapchain handle = XR_NULL_HANDLE;
@@ -1848,25 +1827,18 @@ bool choose_vr_source_size(const std::array<XrView,2> &views, const EyeSwapchain
                            uint32_t &width, uint32_t &height)
 {
     width = height = 0;
-    for (uint32_t candidate = 16; candidate <= D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION; ++candidate)
+    for (uint32_t eye = 0; eye != 2; ++eye)
     {
-        const int32_t left = eye_crop_width(views[0].fov, candidate);
-        const int32_t right = eye_crop_width(views[1].fov, candidate);
-        if (left <= 0 || right <= 0) return false;
-        if (left <= static_cast<int32_t>(eyes[0].width) && right <= static_cast<int32_t>(eyes[1].width))
-            width = candidate;
-        else break;
+        uint32_t eye_width = 0, eye_height = 0;
+        if (!smvr::projection::minimum_centered_extent(
+                views[eye].fov.angleLeft, views[eye].fov.angleRight,
+                eyes[eye].width, eye_width) ||
+            !smvr::projection::minimum_centered_extent(
+                views[eye].fov.angleDown, views[eye].fov.angleUp,
+                eyes[eye].height, eye_height)) return false;
+        width = (std::max)(width, eye_width);
+        height = (std::max)(height, eye_height);
     }
-    for (uint32_t candidate = 16; candidate <= D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION; ++candidate)
-    {
-        const int32_t left = eye_crop_height(views[0].fov, candidate);
-        const int32_t right = eye_crop_height(views[1].fov, candidate);
-        if (left <= 0 || right <= 0) return false;
-        if (left <= static_cast<int32_t>(eyes[0].height) && right <= static_cast<int32_t>(eyes[1].height))
-            height = candidate;
-        else break;
-    }
-    if (width < eyes[0].width || height < eyes[0].height) return false;
     if (width > UINT32_MAX - 2 * kVrCullingMarginPixels ||
         height > UINT32_MAX - 2 * kVrCullingMarginPixels) return false;
     width = align_up(width + 2 * kVrCullingMarginPixels, kVrRenderTargetAlignment);
@@ -1980,7 +1952,8 @@ struct OpenXrState
     XrSpace space = XR_NULL_HANDLE;
     XrSessionState state = XR_SESSION_STATE_UNKNOWN;
     bool running = false;
-    uint64_t last_focused_ms = 0;
+    uint64_t unfocused_since_ms = 0;
+    bool desktop_handoff_active = false;
     bool initialized = false;
     ID3D11Device *graphics_device = nullptr;
     ID3D11DeviceContext *graphics_context = nullptr;
@@ -2605,7 +2578,8 @@ struct OpenXrState
         instance = XR_NULL_HANDLE; system = XR_NULL_SYSTEM_ID; session = XR_NULL_HANDLE; space = XR_NULL_HANDLE;
         initialized = false; anchor_valid = false; eye_math_logged = false; state = XR_SESSION_STATE_UNKNOWN;
         camera_mode_known = false; camera_mode_seated = false; standing_camera.reset();
-        last_focused_ms = 0;
+        unfocused_since_ms = 0;
+        desktop_handoff_active = false;
         source_width = source_height = desktop_width = desktop_height = 0;
         pending_desktop_width = pending_desktop_height = 0;
     }
@@ -2894,7 +2868,8 @@ struct OpenXrState
                 const auto &changed = *reinterpret_cast<const XrEventDataSessionStateChanged *>(&event);
                 state = changed.state;
                 g_input.on_session_state(state);
-                if (state == XR_SESSION_STATE_FOCUSED) last_focused_ms = GetTickCount64();
+                if (state == XR_SESSION_STATE_FOCUSED)
+                    unfocused_since_ms = 0;
                 log_line("XR_SESSION_STATE state=%d", static_cast<int>(state));
                 if (state == XR_SESSION_STATE_READY && !running)
                 {
@@ -2904,6 +2879,8 @@ struct OpenXrState
                     if (XR_SUCCEEDED(result))
                     {
                         running = true; anchor_valid = false;
+                        unfocused_since_ms = state == XR_SESSION_STATE_FOCUSED ? 0 : GetTickCount64();
+                        desktop_handoff_active = false;
                         camera_mode_known = false; standing_camera.reset();
                         g_startup_menu.reset_world_anchor();
                         g_startup_menu.reset_state();
@@ -2920,6 +2897,8 @@ struct OpenXrState
                     abandon_pending_frame();
                     result = xrEndSession(session);
                     running = false; anchor_valid = false;
+                    unfocused_since_ms = 0;
+                    desktop_handoff_active = false;
                     g_vr_target_tracking_locked.store(false, std::memory_order_release);
                     camera_mode_known = false; standing_camera.reset();
                     g_startup_menu.reset_world_anchor();
@@ -2931,6 +2910,8 @@ struct OpenXrState
                 else if (state == XR_SESSION_STATE_EXITING || state == XR_SESSION_STATE_LOSS_PENDING)
                 {
                     running = false;
+                    unfocused_since_ms = 0;
+                    desktop_handoff_active = false;
                     g_vr_target_tracking_locked.store(false, std::memory_order_release);
                     g_startup_menu.reset_world_anchor();
                     g_startup_menu.reset_state();
@@ -2946,10 +2927,39 @@ struct OpenXrState
             // This prevents a trigger edge from becoming a desktop-crosshair shot,
             // while restoring ordinary desktop controls after the headset is off.
             const uint64_t now = GetTickCount64();
-            const bool transition_authority = running && last_focused_ms != 0 &&
-                now >= last_focused_ms && now - last_focused_ms <= 1500;
+            if (running && unfocused_since_ms == 0) unfocused_since_ms = now;
+            const bool transition_authority = running && now >= unfocused_since_ms &&
+                now - unfocused_since_ms <= 1500;
             deactivate_hand_bridge(transition_authority);
         }
+    }
+
+    bool should_handoff_to_desktop() const
+    {
+        if (!running || state == XR_SESSION_STATE_FOCUSED || unfocused_since_ms == 0) return false;
+        const uint64_t now = GetTickCount64();
+        return now >= unfocused_since_ms && now - unfocused_since_ms > 1500;
+    }
+
+    bool pump_desktop_handoff_frame()
+    {
+        // OpenXR still requires frame pacing while a session is visible or
+        // synchronized. Submit an empty frame so every runtime can remain alive
+        // while Scrap Mechanic's original renderer owns the desktop window.
+        abandon_pending_frame();
+        XrFrameWaitInfo wait_info{XR_TYPE_FRAME_WAIT_INFO};
+        XrFrameState frame_state{XR_TYPE_FRAME_STATE};
+        XrResult result = xrWaitFrame(session, &wait_info, &frame_state);
+        if (XR_FAILED(result)) return fail("xrWaitFrame.desktop_handoff", result);
+        XrFrameBeginInfo begin_info{XR_TYPE_FRAME_BEGIN_INFO};
+        result = xrBeginFrame(session, &begin_info);
+        if (XR_FAILED(result)) return fail("xrBeginFrame.desktop_handoff", result);
+        XrFrameEndInfo end_info{XR_TYPE_FRAME_END_INFO};
+        end_info.displayTime = frame_state.predictedDisplayTime;
+        end_info.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+        result = xrEndFrame(session, &end_info);
+        if (XR_FAILED(result)) return fail("xrEndFrame.desktop_handoff", result);
+        return true;
     }
 
     bool render_stereo(RenderSetupFn original, void *renderer, float scalar, const float *game_world_to_view,
@@ -2960,6 +2970,35 @@ struct OpenXrState
             restore_render_size_override();
             restore_viewmodel_pass_patch();
             return false;
+        }
+        if (should_handoff_to_desktop())
+        {
+            if (!desktop_handoff_active)
+            {
+                desktop_handoff_active = true;
+                anchor_valid = false;
+                camera_mode_known = false;
+                standing_camera.reset();
+                g_startup_menu.reset_world_anchor();
+                g_startup_menu.reset_state();
+                log_line("VR_DESKTOP_HANDOFF active=1 reason=xr_session_unfocused state=%d",
+                    static_cast<int>(state));
+            }
+            g_vr_target_tracking_locked.store(false, std::memory_order_release);
+            restore_render_size_override();
+            restore_viewmodel_pass_patch();
+            pump_desktop_handoff_frame();
+            return false;
+        }
+        if (desktop_handoff_active)
+        {
+            desktop_handoff_active = false;
+            anchor_valid = false;
+            camera_mode_known = false;
+            standing_camera.reset();
+            g_startup_menu.reset_world_anchor();
+            g_startup_menu.reset_state();
+            log_line("VR_DESKTOP_HANDOFF active=0 reason=xr_session_focused");
         }
         context = bound_context(context, "render_stereo");
         if (!context) return fail("bound_d3d11_context_missing", XR_ERROR_GRAPHICS_DEVICE_INVALID);
@@ -3187,7 +3226,13 @@ struct OpenXrState
             if (!build_tracking_view(anchor_head, views[i].pose, tracking_view) ||
                 !build_eye_projection(views[i].fov, game_projection, source_width, source_height,
                     eyes[i].width, eyes[i].height, eye_projection, mapping))
+            {
+                log_line("FAIL stage=eye_projection eye=%u source=%ux%u target=%ux%u fov=%.7f,%.7f,%.7f,%.7f",
+                    i, source_width, source_height, eyes[i].width, eyes[i].height,
+                    views[i].fov.angleLeft, views[i].fov.angleRight,
+                    views[i].fov.angleDown, views[i].fov.angleUp);
                 return abort_frame("eye_camera_build", XR_ERROR_VALIDATION_FAILURE);
+            }
             if (mapping.width != static_cast<int32_t>(eyes[i].width) ||
                 mapping.height != static_cast<int32_t>(eyes[i].height))
             {
@@ -3756,7 +3801,7 @@ void __fastcall hk_render_setup(void *renderer, float scalar, const float *world
     }
     if (!g_xr.render_stereo(original, renderer, scalar, world_to_view, projection, settings, context, target))
     {
-        if (g_failed.load(std::memory_order_acquire))
+        if (g_xr.desktop_handoff_active || g_failed.load(std::memory_order_acquire))
         {
             g_xr.restore_render_size_override();
             restore_viewmodel_pass_patch();

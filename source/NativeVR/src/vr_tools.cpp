@@ -1394,7 +1394,11 @@ namespace scrapvr::tools
 							g_player_state_last_valid_ms = now;
 							g_player_state_source_path = state_path;
 							g_player_state_source_custom = custom_content;
-							if (custom_content) custom_content_bridge::mirror_world_state(active);
+							// The startup-menu input route only needs to know whether gameplay is
+							// active. Mirror the already validated player-state bridge for both
+							// base Survival and Custom Games so a stale compiled Lua cache cannot
+							// leave motion-controller input trapped in the floating menu.
+							custom_content_bridge::mirror_world_state(active);
 						}
 					}
 				}
@@ -1403,9 +1407,9 @@ namespace scrapvr::tools
 			{
 				apply_player_state(Tool::none, ItemVariant::none, -1, {}, false, false);
 				g_wrist_hud_state = WristHudState{};
+				custom_content_bridge::mirror_world_state(false);
 				if (g_player_state_source_custom)
 				{
-					custom_content_bridge::mirror_world_state(false);
 					custom_content_bridge::clear_custom_source();
 					g_player_state_source_path.clear();
 					g_player_state_source_custom = false;

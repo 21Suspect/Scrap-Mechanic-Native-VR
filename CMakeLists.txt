@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.24)
 project(smvr_native_vr_chapter2 LANGUAGES C CXX)
 
+include(CTest)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -75,3 +77,9 @@ set_target_properties(smvr_native_vr_v1 PROPERTIES
   SUFFIX ".addon64"
   OUTPUT_NAME "smvr_native_vr_v1"
 )
+
+if(BUILD_TESTING)
+  add_executable(vr_projection_test tools/tests/vr_projection.cpp)
+  target_compile_options(vr_projection_test PRIVATE -Wall -Wextra)
+  add_test(NAME vr_projection COMMAND vr_projection_test)
+endif()

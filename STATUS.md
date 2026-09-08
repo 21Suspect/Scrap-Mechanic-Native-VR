@@ -1,6 +1,6 @@
 # Chapter 2 release status
 
-Current release: `1.4.7`
+Current release: `1.4.8`
 
 Branch: `main`
 
@@ -8,12 +8,16 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 
 ## Current build
 
+- Asymmetric per-eye FOVs now choose a shared render extent large enough for both eyes, fixing the Bigscreen Beyond/SteamVR `eye_camera_build` failure without changing mirrored Quest/Meta projection behavior (issue #28).
+- Headset removal hands rendering and input back to ordinary desktop mode after a short focus transition while pumping empty OpenXR frames; refocusing rebuilds the VR anchor on Meta, VDXR, and SteamVR runtimes (issue #27).
+- The validated native player-state bridge now drives the gameplay/menu marker in base Survival as well as Custom Games, preventing a stale marker from trapping motion-controller input in the floating UI (issue #25).
+- Installer upgrades refresh the derived `core_data.cbo` seed while continuing to preserve user-authored INI settings, and uninstall safely adopts legacy runtime-mutable records from 1.4.0 (issue #26).
 - Seated VR firing uses the first-person effect set, restoring muzzle sound and particles for all six supported firearms, including the clay gun.
 - Gun effects originate from the calibrated native barrel pose, including the stock-forward offset.
 - Palette/menu selection consumes the trigger until physical release before allowing a new gameplay action, including the native mouse queue, Lua hand state, and force-build chord (issue #12).
 - Fertilizer use from remote players retains the remote character's hosted effect; only a locally owned tool reads the local VR hand pose (issue #13).
 - Start VR begins its headset retry budget at the first OpenXR attempt and completes it when the session starts. Launch requests survive delayed add-on loading when the game process started promptly. Failure diagnostics include OpenXR result names and GPU adapter identities.
-- Focused input, Lua ownership, and cold-start retry regression checks pass. The reported VDXR-only-flatscreen case still requires the affected machine's native VR and ReShade logs to identify its failing stage; it has not been reproduced locally.
+- Focused input, Lua ownership, cold-start retry, asymmetric-projection, and installer runtime-cache regression checks pass.
 - Native stereo OpenXR rendering at `2064 × 2272` per eye with six-degree-of-freedom head tracking.
 - Exact runtime FOV, correct depth and perspective, VR seam correction, and normal Scrap Mechanic color and contrast.
 - Standing VR keeps the world upright, preserves smooth desktop/controller pitch, and removes only pitch-orbit height movement; seated VR uses the original game camera behavior.
@@ -41,7 +45,7 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 
 - Two high-level engine scene renders per OpenXR frame: left eye and right eye.
 - OpenXR swapchains use the runtime-recommended extent and an sRGB format.
-- The centered engine source is `2565 × 2711` and is cropped to the runtime FOV without a rotational guard band.
+- The centered engine source is derived from the larger requirement of both reported eye FOVs and is cropped to each runtime eye extent without a rotational guard band.
 - The user's desktop resolution setting remains independent from the VR eye resolution.
 - The live menu compositor captures native UI on transitions and interactions while its cached stereo panel, head tracking, laser input, and haptics continue at headset rate.
 
@@ -49,4 +53,4 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 
 `dist/ScrapMechanicVR-Installer.exe` embeds and validates the managed payload, branded installer artwork, soundtrack, and a verified first-launch game-data cache. It starts music at 50% with a compact volume control and presents Install VR Mod, Uninstall VR Mod, Start VR, Open Logs, and Open Bindings. Install and uninstall detect current/older managed versions, explain the exact operation before asking for approval, migrate or restore safely, and verify automatically. Known prior-release payloads are migrated by exact path and SHA-256, same-version metadata refreshes retain their verified restore authority, and active calibration helpers are reported before any transaction begins. The wrist HUD is fixed in the native renderer, so no HUD calibration helper is installed. Start VR requires a connected headset reported by the active OpenXR runtime.
 
-Installer SHA-256: `513467972A5770B50D7F17F1609775DA4D7AF50D0A1F3A03D9A4072BFF528E3F`. Installer and payload hashes are recorded in `SHA256SUMS.txt`.
+Installer SHA-256: `2B1ABFE7602AB041871363C875F0D09ED3D53EB46E5CF7E7291F1B1C183A3FB0`. Installer and payload hashes are recorded in `SHA256SUMS.txt`.

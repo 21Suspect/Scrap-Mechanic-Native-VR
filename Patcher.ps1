@@ -69,6 +69,23 @@ function Test-ManagedPatchedHash($Entry, [string]$Hash) {
     return Test-HistoricalPatchedHash $Entry $Hash
 }
 
+function Test-PreserveRuntimeMutableOnUpgrade($Entry) {
+    if (-not $Entry.runtimeMutable) { return $false }
+    $property = $Entry.PSObject.Properties['preserveOnUpgrade']
+    return -not $property -or [bool]$property.Value
+}
+
+function Test-PreservedRuntimeRecord($Record, $Entry) {
+    if ([bool]$Record.preserveRuntimeMutable) { return $true }
+    # 1.4.0 could serialize a preserved runtime file without the explicit flag.
+    # Adopt only the unambiguous shape: no backup, equal recorded hashes, and a
+    # manifest entry that is runtime-writable. This does not weaken path checks.
+    return [bool]$Entry.runtimeMutable -and [bool]$Record.existed -and
+        [string]::IsNullOrWhiteSpace([string]$Record.backupRelativePath) -and
+        -not [string]::IsNullOrWhiteSpace([string]$Record.originalSha256) -and
+        [string]$Record.originalSha256 -eq [string]$Record.installedSha256
+}
+
 function Assert-Payload($Manifest) {
     $failures = @()
     foreach ($entry in $Manifest.files) {
@@ -81,6 +98,14 @@ function Assert-Payload($Manifest) {
         if ($actual -ne $entry.patchedSha256.ToUpperInvariant()) {
             $failures += "payload hash mismatch: $($entry.path) expected=$($entry.patchedSha256) actual=$actual"
         }
+    }
+
+    $compiledCache = @($Manifest.files | Where-Object {
+        [string]$_.path -ieq 'Cache\Bundle\core_data.cbo'
+    })
+    if ($compiledCache.Count -ne 1 -or -not [bool]$compiledCache[0].runtimeMutable -or
+        (Test-PreserveRuntimeMutableOnUpgrade $compiledCache[0])) {
+        $failures += 'installer regression: core_data.cbo must be runtime-writable but refreshed on upgrade'
     }
 
     # This is a release-blocking gameplay contract, not just a collection of
@@ -160,6 +185,12 @@ function Assert-Payload($Manifest) {
         }
         if (-not $nativeAddonStrings.Contains('ScrapVRTriggerStateNative')) {
             $failures += 'VR seat regression: native addon does not export the direct Logic Task trigger-state bridge'
+        }
+        if (-not $nativeAddonStrings.Contains('VR_DESKTOP_HANDOFF')) {
+            $failures += 'OpenXR lifecycle regression: native addon does not include desktop headset handoff'
+        }
+        if (-not $nativeAddonStrings.Contains('eye_projection')) {
+            $failures += 'OpenXR projection regression: native addon does not include per-eye FOV diagnostics'
         }
     }
 
@@ -471,11 +502,18 @@ function Install-Patch([string]$Root, $Manifest) {
             continue
         }
         if ($status.Status -eq 'conflict') {
-            if ($entry.runtimeMutable) {
+            if (Test-PreserveRuntimeMutableOnUpgrade $entry) {
                 # Runtime-mutable files belong to the user once they exist.
                 # Keep them byte-for-byte intact across upgrades; replacing the
                 # baseline silently discards controller, HUD, and runtime edits.
                 $plan += [pscustomobject]@{ Entry = $entry; Status = $status; Adopt = $false; PreserveRuntimeMutable = $true }
+                continue
+            }
+            if ($entry.runtimeMutable) {
+                # Derived runtime caches are writable but not user-authored.
+                # Back up the current cache and replace it with this release's
+                # verified seed so old compiled Lua cannot survive an upgrade.
+                $plan += [pscustomobject]@{ Entry = $entry; Status = $status; Adopt = $false; ReplaceHistorical = $false }
                 continue
             }
             $conflicts += "$($entry.path) (unknown SHA-256 $($status.Hash))"
@@ -516,8 +554,8 @@ function Install-Patch([string]$Root, $Manifest) {
                 installedSha256 = [string]$entry.patchedSha256
                 backupRelativePath = $null
                 replacedManagedSha256 = $(if ($item.ReplaceHistorical) { [string]$item.Status.Hash } else { $null })
-            rollbackRelativePath = $null
-            preserveRuntimeMutable = [bool]$item.PreserveRuntimeMutable
+                rollbackRelativePath = $null
+                preserveRuntimeMutable = [bool]$item.PreserveRuntimeMutable
             }
             if ($item.PreserveRuntimeMutable) {
                 # The existing config is already the installed runtime file.
@@ -597,6 +635,7 @@ function Install-Patch([string]$Root, $Manifest) {
         for ($i = $changed.Count - 1; $i -ge 0; $i--) {
             $record = $changed[$i]
             $target = Join-Path $Root $record.path
+            if ($record.preserveRuntimeMutable) { continue }
             if ($record.existed) {
                 $backup = Join-Path $backupRoot $record.backupRelativePath
                 if (Test-Path -LiteralPath $backup) {
@@ -760,6 +799,7 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
     $recognizedRecords = New-Object Collections.ArrayList
     $unknownRecords = New-Object Collections.ArrayList
     $historicalOriginalPaths = @{}
+    $preservedRuntimeRecords = @{}
     if ($state.backupRoot) {
         try {
             $allowedBackupRoot = [IO.Path]::GetFullPath((Join-Path $StateRoot 'backups')).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
@@ -796,7 +836,12 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
             [string]$previousEntry.patchedSha256 -ne [string]$record.installedSha256) {
             Write-Warning "The extracted package for '$($state.patchVersion)' differs from the recorded installed hash for $recordPath. The state record and its hash-verified backup will be used instead."
         }
-        if ($record.preserveRuntimeMutable) {
+        $preservedRuntimeRecord = Test-PreservedRuntimeRecord $record $entry
+        if ($preservedRuntimeRecord) {
+            $preservedRuntimeRecords[$recordPath] = $true
+            if (-not [bool]$record.preserveRuntimeMutable) {
+                Write-Warning "Adopting legacy preserved runtime record for $recordPath."
+            }
             if (-not $record.originalSha256 -or -not $record.installedSha256) {
                 [void]$stateIssues.Add("missing preserved runtime hash for $recordPath")
             }
@@ -859,7 +904,7 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
     $backupStatus = @{}
     $invalidBackups = New-Object Collections.ArrayList
     foreach ($record in $recognizedRecords) {
-        if ($record.preserveRuntimeMutable) { continue }
+        if ($preservedRuntimeRecords.ContainsKey([string]$record.path)) { continue }
         if (-not $record.existed) { continue }
         $backup = $null
         $valid = $false
@@ -897,7 +942,7 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
     $quarantineRoot = Join-Path $StateRoot "conflicts\$($Manifest.patchId)-$stamp-$key"
     $preserved = New-Object Collections.ArrayList
     foreach ($record in $recognizedRecords) {
-        if ($record.preserveRuntimeMutable) {
+        if ($preservedRuntimeRecords.ContainsKey([string]$record.path)) {
             Write-Host "Keeping user runtime configuration $($record.path)"
             continue
         }
@@ -944,6 +989,10 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
     $needsSteam = New-Object Collections.ArrayList
     foreach ($record in @($recognizedRecords)) {
         $target = Join-Path $Root $record.path
+        if ($preservedRuntimeRecords.ContainsKey([string]$record.path)) {
+            Write-Host "Keeping user runtime configuration $($record.path)"
+            continue
+        }
         if ($record.existed) {
             if ($historicalOriginalPaths.ContainsKey([string]$record.path)) {
                 if ($ForUpgrade) {

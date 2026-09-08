@@ -226,6 +226,7 @@ def main() -> None:
     source_meta = candidate.setdefault("source", {})
     source_paths = {
         "nativeVrSha256": "src/native_vr.cpp",
+        "vrProjectionSha256": "src/vr_projection.hpp",
         "featureInputSha256": "src/feature_input.cpp",
         "featureInputHeaderSha256": "src/feature_input.hpp",
         "uiTriggerGateSha256": "src/feature_ui_trigger_gate.hpp",
