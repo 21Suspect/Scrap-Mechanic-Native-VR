@@ -2,6 +2,10 @@
 
 ![Scrap Mechanic VR gameplay](docs/images/scrap-vr-demo.gif)
 
+## Huge shoutout to gegs8! 🎉
+
+**gegs8 is the very first supporter of Scrap Mechanic Native VR.** They even bought a VR headset because of this project and sent the kindest message about finally having the VR mod they had dreamed of. Thank you for believing in the project and helping keep development going!
+
 Native OpenXR VR for the current Scrap Mechanic Chapter 2 / 1.0 release, made by [21Suspect](https://github.com/21Suspect).
 
 **Version 1.4.8 — tested with Meta Quest 3 and Meta Quest Link.** This update adds asymmetric/canted-display support for headsets such as Bigscreen Beyond, runtime-neutral headset sleep/resume behavior, and fixes the VDXR/SteamVR gameplay-input handoff. Those additional setups remain community-tested rather than locally hardware-tested.
