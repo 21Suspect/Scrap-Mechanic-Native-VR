@@ -5,6 +5,7 @@ param(
     [string]$GamePath,
     [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'ScrapMechanicVR-Chapter2'),
     [switch]$Force,
+    [switch]$AllowUnsupportedGameBuild,
     [string[]]$AdditionalSteamRoot = @()
 )
 
@@ -277,7 +278,7 @@ function Find-GameRoot([string]$ExplicitPath, $Manifest, [string[]]$ExtraSteamRo
     throw 'Could not find the Scrap Mechanic game data directory. Pass -GamePath with the folder containing Data, Survival, and Release.'
 }
 
-function Assert-GameBuild([string]$Root, $Manifest) {
+function Assert-GameBuild([string]$Root, $Manifest, [switch]$AllowUnsupported) {
     foreach ($folder in @('Data', 'Survival', 'Release')) {
         if (-not (Test-Path -LiteralPath (Join-Path $Root $folder) -PathType Container)) {
             throw "Invalid game directory; missing $folder under $Root"
@@ -286,16 +287,28 @@ function Assert-GameBuild([string]$Root, $Manifest) {
     $exe = Join-Path $Root $Manifest.game.executable
     $actual = Get-Sha256 $exe
     $expected = $Manifest.game.executableSha256.ToUpperInvariant()
+    $mismatches = @()
     if ($actual -ne $expected) {
-        throw "Unsupported ScrapMechanic.exe. This patch requires Steam build $($Manifest.game.buildId), executable SHA-256 $expected; found $actual."
+        $mismatches += "ScrapMechanic.exe SHA-256 is $actual; supported SHA-256 is $expected"
     }
 
     $appManifest = Join-Path $Root '..\..\appmanifest_387990.acf'
     if (Test-Path -LiteralPath $appManifest) {
         $text = Get-Content -Raw -LiteralPath $appManifest
         if ($text -match '"buildid"\s+"(\d+)"' -and $matches[1] -ne [string]$Manifest.game.buildId) {
-            throw "Steam reports build $($matches[1]); this patch requires build $($Manifest.game.buildId)."
+            $mismatches += "Steam reports build $($matches[1]); supported build is $($Manifest.game.buildId)"
         }
+    }
+    if ($mismatches.Count -gt 0) {
+        if (-not $AllowUnsupported) {
+            throw "Unsupported Scrap Mechanic build. $($mismatches -join '; '). Use the installer's explicit unsupported-build override only if you accept the risk."
+        }
+        Write-Warning 'UNSUPPORTED GAME BUILD OVERRIDE ACTIVE. Compatibility is not guaranteed; the game may fail to start, render incorrectly, or crash.'
+        foreach ($mismatch in $mismatches) {
+            Write-Warning $mismatch
+        }
+        Write-Host 'Per-file original and payload hash checks remain enabled. Unknown modified game files will not be overwritten.' -ForegroundColor Yellow
+        return
     }
     Write-Host "Supported game build verified: $($Manifest.game.buildId)." -ForegroundColor Green
 }
@@ -473,7 +486,7 @@ function Remove-ExactLegacyVrFiles([string]$Root, $Manifest) {
     Write-Host "Legacy files were preserved at $quarantineRoot" -ForegroundColor Green
 }
 
-function Install-Patch([string]$Root, $Manifest) {
+function Install-Patch([string]$Root, $Manifest, [switch]$UnsupportedGameBuildOverride) {
     Assert-GameClosed
     $statePath = Get-StatePath $Root
     if (Test-Path -LiteralPath $statePath) {
@@ -614,11 +627,13 @@ function Install-Patch([string]$Root, $Manifest) {
             Clear-CompiledDataCache $Root
         }
 
+        $installedGameExecutableHash = Get-Sha256 (Join-Path $Root $Manifest.game.executable)
         $state = [ordered]@{
             patchId = [string]$Manifest.patchId
             patchVersion = [string]$Manifest.patchVersion
             gameRoot = $Root
-            gameExecutableSha256 = [string]$Manifest.game.executableSha256
+            gameExecutableSha256 = $installedGameExecutableHash
+            unsupportedGameBuildOverride = [bool]$UnsupportedGameBuildOverride
             installedAt = (Get-Date).ToString('o')
             backupRoot = $backupRoot
             files = @($changed)
@@ -814,7 +829,14 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
     }
     if ($state.gameExecutableSha256 -and
         $state.gameExecutableSha256.ToUpperInvariant() -ne $Manifest.game.executableSha256.ToUpperInvariant()) {
-        [void]$stateIssues.Add("state executable hash $($state.gameExecutableSha256) does not match supported build $($Manifest.game.executableSha256)")
+        $currentExecutableHash = Get-Sha256 (Join-Path $Root $Manifest.game.executable)
+        if ([bool]$state.unsupportedGameBuildOverride -and
+            $state.gameExecutableSha256.ToUpperInvariant() -eq $currentExecutableHash) {
+            Write-Warning "Using restore state created by an explicitly approved unsupported-build installation [$currentExecutableHash]."
+        }
+        else {
+            [void]$stateIssues.Add("state executable hash $($state.gameExecutableSha256) does not match supported build $($Manifest.game.executableSha256) or the current executable")
+        }
     }
     foreach ($record in $state.files) {
         $recordPath = [string]$record.path
@@ -1160,10 +1182,10 @@ if ($Action -eq 'ValidatePayload') { return }
 
 $root = Find-GameRoot $GamePath $manifest $AdditionalSteamRoot
 Write-Host "Game directory: $root"
-Assert-GameBuild $root $manifest
+Assert-GameBuild $root $manifest -AllowUnsupported:$AllowUnsupportedGameBuild
 
 switch ($Action) {
-    'Install' { Install-Patch $root $manifest }
+    'Install' { Install-Patch $root $manifest -UnsupportedGameBuildOverride:$AllowUnsupportedGameBuild }
     'ForceInstall' { Force-InstallPatch $root $manifest }
     'Verify' { Verify-Patch $root $manifest }
     'Repair' { Repair-PatchTargets $root $manifest }

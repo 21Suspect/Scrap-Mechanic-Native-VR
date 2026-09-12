@@ -6,7 +6,7 @@
 
 Native OpenXR VR for the current Scrap Mechanic Chapter 2 / 1.0 release, made by [21Suspect](https://github.com/21Suspect).
 
-**Version 1.4.8 — tested with Meta Quest 3 and Meta Quest Link.** This update adds asymmetric/canted-display support for headsets such as Bigscreen Beyond, runtime-neutral headset sleep/resume behavior, and fixes the VDXR/SteamVR gameplay-input handoff. Those additional setups remain community-tested rather than locally hardware-tested.
+**Version 1.4.9 pre-release — prepared for the upcoming Scrap Mechanic Patch 1.0.6.** It keeps the tested 1.4.8 VR payload and Quest 3 / Meta Quest Link behavior unchanged, while allowing installation on a newer untested game build only after a prominent risk warning and explicit confirmation. Compatibility with Patch 1.0.6 is not guaranteed until it has been tested.
 
 [![Latest release](https://img.shields.io/github/v/release/21Suspect/Scrap-Mechanic-Native-VR?display_name=tag&sort=semver)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/21Suspect/Scrap-Mechanic-Native-VR/total)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases)
@@ -23,7 +23,7 @@ Native OpenXR VR for the current Scrap Mechanic Chapter 2 / 1.0 release, made by
 
 For Virtual Desktop, select **VDXR** as the OpenXR runtime in Virtual Desktop Streamer before connecting the headset. You can also select **SteamVR**, provided SteamVR is configured as the active OpenXR runtime. The installer supports both paths and checks the connected headset through the selected runtime.
 
-The installer has five clear actions: **Install VR Mod**, **Uninstall VR Mod**, **Start VR**, **Open Logs**, and **Open Bindings**. Install automatically removes a detected older/current managed build before upgrading, and both install and uninstall verify their result automatically. Start VR checks that the active OpenXR runtime reports a connected headset. The installer is currently unsigned, so Windows SmartScreen may ask for confirmation.
+The installer has five clear actions: **Install VR Mod**, **Uninstall VR Mod**, **Start VR**, **Open Logs**, and **Open Bindings**. Install automatically removes a detected older/current managed build before upgrading, and both install and uninstall verify their result automatically. An untested game build can be installed only after accepting a prominent compatibility warning; all managed-file integrity checks remain active. Start VR checks that the active OpenXR runtime reports a connected headset. The installer is currently unsigned, so Windows SmartScreen may ask for confirmation.
 
 ## Features
 
@@ -107,7 +107,7 @@ Do not mix files or installers from the legacy and current builds.
 
 Build instructions are in [BUILD.md](BUILD.md). Installer and payload checksums are recorded in [SHA256SUMS.txt](SHA256SUMS.txt).
 
-Installer SHA-256: `2B1ABFE7602AB041871363C875F0D09ED3D53EB46E5CF7E7291F1B1C183A3FB0`.
+Installer SHA-256: `CB224ACE16E9BA075627DE53456C596A4AE131513A74B93166AB6958774A1D33`.
 
 If you enjoy the project, you can [buy 21Suspect a coffee](https://buymeacoffee.com/21suspect).
 

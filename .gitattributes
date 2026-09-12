@@ -15,3 +15,4 @@ payload/Release/*.ini binary
 *.py text eol=lf
 *.ps1 text eol=lf
 *.txt text eol=lf
+*.tsv text eol=lf

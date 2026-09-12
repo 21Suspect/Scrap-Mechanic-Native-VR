@@ -17,14 +17,14 @@ using Microsoft.Win32;
 [assembly: AssemblyDescription("Installer, verifier, repair manager, and restorer for Scrap Mechanic Chapter 2 VR")]
 [assembly: AssemblyCompany("Scrap Mechanic VR Community Project")]
 [assembly: AssemblyProduct("Scrap Mechanic VR Chapter 2")]
-[assembly: AssemblyVersion("1.4.8.0")]
-[assembly: AssemblyFileVersion("1.4.8.0")]
+[assembly: AssemblyVersion("1.4.9.0")]
+[assembly: AssemblyFileVersion("1.4.9.0")]
 
 namespace ScrapMechanicVRPatcher
 {
     internal static class BuildInfo
     {
-        internal const string Version = "1.4.8-chapter2-20260908";
+        internal const string Version = "1.4.9-chapter2-20260912";
         internal const string GameBuild = "24529696";
         internal const string GameExeHash = "5D663BA2EC5DC8C7ABEFCC5C9344AE86F0A066C4069A91F54833524AC9A5B4F5";
         internal const string AddonHash = "4C40DB95F9C4C3DA1190AEACA1FBC8517918F79E4C64BF82035ADFD30598890B";
@@ -32,8 +32,8 @@ namespace ScrapMechanicVRPatcher
         internal const string LoaderHash = "018C6519AFBDEADE6DA9E7D59C406068DD58674D87A65AE27353484A05E6674A";
         internal const string MusicHash = "02E8E98721A899C2731ED8AFDF6378DB98DC09BB87FA5896FBA911CE5D875660";
         internal const string LogoHash = "C692A16C8CB01B94618951C09F64A156D7DD6A71D349B91E023B018165504C34";
-        internal const string ManifestHash = "0950E8FF55DE33BF220278931D2D1529619BB17D1C1703FA06F66C42331345CB";
-        internal const string PatcherHash = "BE34CAD37CAF491ED5F6EFA76F6E670AE4DAE053D178A5A4F019251C5E884B2C";
+        internal const string ManifestHash = "AB122BFB4C83B67D405DA11877E8FE51D67574BC16D8F7F4D92245AE4CBEBB1A";
+        internal const string PatcherHash = "043D01A09F0186413C7C1C312A4E953DF57086FF85616DC27301EE9D91792551";
         internal const int ManagedFileCount = 48;
         internal const string ResourceName = "ScrapMechanicVR.Payload.zip";
     }
@@ -612,7 +612,8 @@ namespace ScrapMechanicVRPatcher
             return "\"" + value.Replace("\"", "\\\"") + "\"";
         }
 
-        internal static CommandResult RunVisible(string action, string gameRoot, bool elevated)
+        internal static CommandResult RunVisible(string action, string gameRoot, bool elevated,
+            bool allowUnsupportedGameBuild)
         {
             PackageManager.EnsureExtracted();
             string logDirectory = Path.Combine(PackageManager.StateRoot, "logs");
@@ -624,6 +625,7 @@ namespace ScrapMechanicVRPatcher
                 "$log=" + PowerShellLiteral(logPath) + "; try { & " +
                 PowerShellLiteral(PackageManager.PatcherPath) + " -Action " +
                 PowerShellLiteral(action) + " -GamePath " + PowerShellLiteral(gameRoot) +
+                (allowUnsupportedGameBuild ? " -AllowUnsupportedGameBuild" : String.Empty) +
                 " *>&1 | Tee-Object -FilePath $log; exit 0 } catch { " +
                 "$errorLine=('ERROR: ' + $_.Exception.Message); " +
                 "$detail=($_ | Format-List * -Force | Out-String); " +
@@ -674,7 +676,8 @@ namespace ScrapMechanicVRPatcher
                    Environment.NewLine + Environment.NewLine + "Detailed log: " + result.LogPath;
         }
 
-        internal static CommandResult RunCaptured(string action, string gameRoot)
+        internal static CommandResult RunCaptured(string action, string gameRoot,
+            bool allowUnsupportedGameBuild)
         {
             PackageManager.EnsureExtracted();
             string logDirectory = Path.Combine(PackageManager.StateRoot, "logs");
@@ -688,6 +691,7 @@ namespace ScrapMechanicVRPatcher
                 "$log=" + PowerShellLiteral(logPath) + "; try { & " +
                 PowerShellLiteral(PackageManager.PatcherPath) + " -Action " +
                 PowerShellLiteral(action) + " -GamePath " + PowerShellLiteral(gameRoot) +
+                (allowUnsupportedGameBuild ? " -AllowUnsupportedGameBuild" : String.Empty) +
                 " *>&1 | Out-File -LiteralPath $log -Encoding Unicode; exit 0 } catch { " +
                 "$errorLine=('ERROR: ' + $_.Exception.Message); " +
                 "$detail=($_ | Format-List * -Force | Out-String); " +
@@ -716,13 +720,14 @@ namespace ScrapMechanicVRPatcher
             return "'" + value.Replace("'", "''") + "'";
         }
 
-        internal static void StartDetached(string gameRoot)
+        internal static void StartDetached(string gameRoot, bool allowUnsupportedGameBuild)
         {
             PackageManager.EnsureExtracted();
             string command =
                 "$ErrorActionPreference='Stop'; " + WindowsPowerShellBootstrap() +
                 "try { & " + PowerShellLiteral(PackageManager.PatcherPath) +
                 " -Action Start -GamePath " + PowerShellLiteral(gameRoot) +
+                (allowUnsupportedGameBuild ? " -AllowUnsupportedGameBuild" : String.Empty) +
                 "; exit 0 } catch { Write-Host ''; Write-Host $_ -ForegroundColor Red; " +
                 "[void](Read-Host 'VR launch failed. Press Enter to close'); exit 1 }";
             string encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(command));
@@ -1173,7 +1178,7 @@ namespace ScrapMechanicVRPatcher
                 ? "●  GAME     Not found — choose the folder containing Data, Survival, and Release"
                 : compatible
                     ? "●  GAME     Supported Steam build " + BuildInfo.GameBuild
-                    : "●  GAME     Unsupported build — no files will be modified";
+                    : "●  GAME     Unsupported build — installation requires a risk warning and confirmation";
             gameStatus.ForeColor = compatible ? Success : Danger;
 
             string runtime = GameLocator.ActiveOpenXrRuntime();
@@ -1187,9 +1192,9 @@ namespace ScrapMechanicVRPatcher
                         : "●  OPENXR   Runtime ready — Start VR checks the headset connection";
             openXrStatus.ForeColor = lastHeadsetReady == true ? Success : Warning;
 
-            bool installed = compatible && GameLocator.LooksInstalled(root);
-            bool managedInstall = compatible && GameLocator.HasManagedInstall(root);
-            bool traces = compatible && GameLocator.HasVrTraces(root);
+            bool installed = valid && GameLocator.LooksInstalled(root);
+            bool managedInstall = valid && GameLocator.HasManagedInstall(root);
+            bool traces = valid && GameLocator.HasVrTraces(root);
             string managedVersion = managedInstall ? GameLocator.ManagedVersion(root) : String.Empty;
             bool verificationForRoot = String.Equals(lastVerificationRoot, root, StringComparison.OrdinalIgnoreCase);
             if (installed && managedInstall)
@@ -1210,9 +1215,9 @@ namespace ScrapMechanicVRPatcher
                 ? Success : traces || managedInstall ? Warning : MutedText;
 
             installButton.Text = "INSTALL VR MOD";
-            installButton.Enabled = compatible;
+            installButton.Enabled = valid;
             startButton.Enabled = installed;
-            uninstallButton.Enabled = compatible && (managedInstall || traces);
+            uninstallButton.Enabled = valid && (managedInstall || traces);
             logsButton.Enabled = valid || Directory.Exists(Path.Combine(PackageManager.StateRoot, "logs"));
             bindingsButton.Enabled = valid && File.Exists(Path.Combine(root, "Release", "ScrapMechanicVR.ini"));
         }
@@ -1222,10 +1227,11 @@ namespace ScrapMechanicVRPatcher
             if (automaticVerificationRunning)
                 return;
             string root = gamePath.Text.Trim();
-            if (!GameLocator.IsGameRoot(root) ||
-                !String.Equals(GameLocator.GameHash(root), BuildInfo.GameExeHash, StringComparison.OrdinalIgnoreCase))
+            if (!GameLocator.IsGameRoot(root))
                 return;
 
+            bool compatible = String.Equals(GameLocator.GameHash(root), BuildInfo.GameExeHash,
+                StringComparison.OrdinalIgnoreCase);
             bool currentFiles = GameLocator.LooksInstalled(root);
             bool managedInstall = GameLocator.HasManagedInstall(root);
             if (!currentFiles || !managedInstall)
@@ -1244,7 +1250,7 @@ namespace ScrapMechanicVRPatcher
                 automaticVerificationRunning = true;
                 SetBusy(true);
                 Append("Automatically verifying all " + BuildInfo.ManagedFileCount + " installed VR files...");
-                CommandResult result = PatcherRunner.RunCaptured("Verify", root);
+                CommandResult result = PatcherRunner.RunCaptured("Verify", root, !compatible);
                 lastVerificationRoot = root;
                 lastVerificationPassed = result.ExitCode == 0;
                 Append(result.Output);
@@ -1281,6 +1287,30 @@ namespace ScrapMechanicVRPatcher
         private void InstallClicked(object sender, EventArgs e)
         {
             string root = gamePath.Text.Trim();
+            string gameHash = GameLocator.GameHash(root);
+            bool compatible = String.Equals(gameHash, BuildInfo.GameExeHash,
+                StringComparison.OrdinalIgnoreCase);
+            if (!compatible)
+            {
+                string warning =
+                    "WARNING: THIS SCRAP MECHANIC BUILD IS NOT SUPPORTED OR TESTED\n\n" +
+                    "The native VR mod uses version-specific engine hooks. Installing it on an unknown build may cause a black screen, broken controls or rendering, crashes, or failure to start. Compatibility is not guaranteed.\n\n" +
+                    "Only continue if you believe this is a small game patch that did not change the hooked engine code. The installer will keep checking every managed game file and will refuse to overwrite unknown modified files. ScrapMechanic.exe and save files are never modified.\n\n" +
+                    "Supported Steam build: " + BuildInfo.GameBuild + "\n" +
+                    "Supported executable SHA-256:\n" + BuildInfo.GameExeHash + "\n\n" +
+                    "Detected executable SHA-256:\n" + gameHash + "\n\n" +
+                    "Do you understand the risk and still want to continue?";
+                if (MessageBox.Show(this, warning,
+                    "UNSUPPORTED GAME BUILD — MANUAL OVERRIDE",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                {
+                    Append("Unsupported-build installation cancelled before any files were changed.");
+                    return;
+                }
+                Append("Unsupported-build warning accepted. Per-file safety checks remain enabled.");
+            }
+
             bool managedInstall = GameLocator.HasManagedInstall(root);
             bool traces = GameLocator.HasVrTraces(root);
             string existing = managedInstall
@@ -1291,7 +1321,9 @@ namespace ScrapMechanicVRPatcher
                     : "No existing VR mod was detected.";
             if (MessageBox.Show(this,
                 existing + "\n\nAfter approval, the installer will:\n" +
-                "1. Verify the supported game and all embedded files.\n" +
+                (compatible
+                    ? "1. Verify the supported game and all embedded files.\n"
+                    : "1. Apply the approved unsupported-build override while verifying all embedded and managed files.\n") +
                 "2. Remove any managed older/current VR version using its exact backups.\n" +
                 "3. Back up required originals and install " + BuildInfo.ManagedFileCount + " files for " + BuildInfo.Version + ".\n" +
                 "4. Automatically verify the completed installation and refresh the launch shortcuts.\n\n" +
@@ -1305,8 +1337,10 @@ namespace ScrapMechanicVRPatcher
             try
             {
                 SetBusy(true);
-                Append("Install approved. Verifying the package, inspecting the existing version, and requesting installation privileges...");
-                CommandResult result = PatcherRunner.RunVisible("Install", root, true);
+                Append(compatible
+                    ? "Install approved. Verifying the package, inspecting the existing version, and requesting installation privileges..."
+                    : "Unsupported-build install approved. Verifying the package and every managed file before requesting installation privileges...");
+                CommandResult result = PatcherRunner.RunVisible("Install", root, true, !compatible);
                 Append(result.Output);
                 if (result.ExitCode != 0)
                 {
@@ -1323,8 +1357,11 @@ namespace ScrapMechanicVRPatcher
                 lastVerificationPassed = true;
                 Append("Installation and automatic post-install verification passed. Desktop and Start Menu launchers were refreshed.");
                 MessageBox.Show(this,
-                    BuildInfo.Version + " is installed and all " + BuildInfo.ManagedFileCount + " managed files passed verification.\n\nStart your OpenXR runtime, connect the headset, then click Start VR. The game will not launch until OpenXR reports a connected headset.",
-                    "Installation complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    BuildInfo.Version + " is installed and all " + BuildInfo.ManagedFileCount + " managed files passed verification.\n\n" +
+                    (compatible ? String.Empty : "This remains an untested game build. If VR shows a black screen, crashes, or behaves incorrectly, uninstall the mod and report the new game build.\n\n") +
+                    "Start your OpenXR runtime, connect the headset, then click Start VR. The game will not launch until OpenXR reports a connected headset.",
+                    compatible ? "Installation complete" : "Unsupported-build installation complete",
+                    MessageBoxButtons.OK, compatible ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
             }
             catch (Win32Exception ex)
             {
@@ -1368,7 +1405,9 @@ namespace ScrapMechanicVRPatcher
                     throw new InvalidOperationException("Start VR was stopped because no OpenXR headset is ready: " + headsetDetail + ". Connect and wake the headset, then try again.");
                 GameLocator.Save(root);
                 Append("OpenXR reports a connected headset. Starting Scrap Mechanic Chapter 2 through Steam...");
-                PatcherRunner.StartDetached(root);
+                bool compatible = String.Equals(GameLocator.GameHash(root), BuildInfo.GameExeHash,
+                    StringComparison.OrdinalIgnoreCase);
+                PatcherRunner.StartDetached(root, !compatible);
             }
             catch (Exception ex)
             {
@@ -1402,7 +1441,9 @@ namespace ScrapMechanicVRPatcher
             {
                 SetBusy(true);
                 Append("Uninstall approved. Inspecting the installed version, verifying restore data, and requesting privileges...");
-                CommandResult result = PatcherRunner.RunVisible("Uninstall", root, true);
+                bool compatible = String.Equals(GameLocator.GameHash(root), BuildInfo.GameExeHash,
+                    StringComparison.OrdinalIgnoreCase);
+                CommandResult result = PatcherRunner.RunVisible("Uninstall", root, true, !compatible);
                 Append(result.Output);
                 if (result.ExitCode != 0)
                 {
@@ -1519,7 +1560,7 @@ namespace ScrapMechanicVRPatcher
             if (!GameLocator.IsGameRoot(root))
                 throw new InvalidOperationException("Scrap Mechanic was not discovered in any registered Steam library.");
 
-            CommandResult result = PatcherRunner.RunCaptured(action, root);
+            CommandResult result = PatcherRunner.RunCaptured(action, root, false);
             Directory.CreateDirectory(PackageManager.StateRoot);
             string logPath = Path.Combine(PackageManager.StateRoot,
                 "installer-" + action.ToLowerInvariant() + "-test.log");
@@ -1593,7 +1634,9 @@ namespace ScrapMechanicVRPatcher
                     string headsetDetail;
                     if (!OpenXrProbe.HeadsetAvailableWithTimeout(out headsetDetail))
                         throw new InvalidOperationException("Start VR was stopped because no OpenXR headset is ready: " + headsetDetail + ". Connect and wake the headset, then try again.");
-                    PatcherRunner.StartDetached(root);
+                    bool compatible = String.Equals(GameLocator.GameHash(root), BuildInfo.GameExeHash,
+                        StringComparison.OrdinalIgnoreCase);
+                    PatcherRunner.StartDetached(root, !compatible);
                     return;
                 }
                 Application.Run(new MainForm());
