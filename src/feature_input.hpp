@@ -97,6 +97,8 @@ public:
     void on_session_state(XrSessionState state);
     void set_startup_menu(bool visible, bool pointer_active);
     bool sync(XrTime display_time, const XrPosef &head_pose);
+    // Refresh tracked controller poses only, without repeating game input or haptics.
+    void refresh_controller_poses(XrTime display_time);
     bool pulse_haptic(uint32_t hand, float amplitude, uint32_t duration_ms,
                       float frequency = XR_FREQUENCY_UNSPECIFIED);
     void release_injected_input();

@@ -1299,6 +1299,10 @@ end
 
 
 function SurvivalPlayer.sv_clearPerks( self )
+	if self.sv.saved.stats.perks[SurvivalPlayer.Perks.BonusHealth] then
+		self.sv.saved.stats.maxhp = MaxHp
+		self.sv.saved.stats.hp = math.min( self.sv.saved.stats.hp, self.sv.saved.stats.maxhp )
+	end
 	self.sv.saved.stats.perks = {}
 	if self.player.publicData then
 		self.player.publicData.perks = {}

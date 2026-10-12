@@ -40,15 +40,15 @@ static_assert(RESHADE_API_VERSION == 18, "SMVR v1 requires ReShade API 18");
 
 namespace smvr
 {
-constexpr uintptr_t kRenderSetupRva = 0x858E20;
-constexpr uintptr_t kCameraBuildRva = 0x903F70;
-constexpr uintptr_t kFirstPersonCameraCallerRva = 0x861320;
-constexpr uintptr_t kViewmodelSkipBranchRva = 0x861324;
-constexpr uintptr_t kRaycastRva = 0x478340;
-constexpr uintptr_t kPlayerToolRaycastReturnRva = 0x456FF2;
-constexpr uintptr_t kRaycastResultFractionStoreRva = 0x79B3F8;
-constexpr uint32_t kGameImageSize = 0x1C1D000;
-constexpr uint32_t kGameTimestamp = 0x6A7060DD;
+constexpr uintptr_t kRenderSetupRva = 0x85B610;
+constexpr uintptr_t kCameraBuildRva = 0x906290;
+constexpr uintptr_t kFirstPersonCameraCallerRva = 0x863B10;
+constexpr uintptr_t kViewmodelSkipBranchRva = 0x863B14;
+constexpr uintptr_t kRaycastRva = 0x4785C0;
+constexpr uintptr_t kPlayerToolRaycastReturnRva = 0x457DDE;
+constexpr uintptr_t kRaycastResultFractionStoreRva = 0x79E248;
+constexpr uint32_t kGameImageSize = 0x1C24000;
+constexpr uint32_t kGameTimestamp = 0x6AB16723;
 constexpr uintptr_t kFrameRendererOffset = 0x2A0;
 constexpr uintptr_t kLowRendererOffset = 0x8;
 constexpr uintptr_t kDeviceOffset = 0x2F0;
@@ -77,8 +77,8 @@ constexpr uint8_t kRaycastPrefix[] = {
 };
 constexpr uint8_t kPlayerToolRaycastCall[] = {
     0x48,0x8D,0x87,0x30,0x04,0x00,0x00,0x48,0x89,0x44,0x24,0x28,
-    0x4C,0x89,0x6C,0x24,0x20,0x4C,0x8D,0x4C,0x24,0x68,0x4C,0x8D,
-    0x44,0x24,0x58,0x48,0x8B,0xCB,0xE8,0x4E,0x13,0x02,0x00
+    0x4C,0x89,0x6C,0x24,0x20,0x4C,0x8D,0x4C,0x24,0x50,0x4C,0x8D,
+    0x45,0x80,0x48,0x8B,0xCB,0xE8,0xE2,0x07,0x02,0x00
 };
 constexpr uint8_t kRaycastResultFractionStore[] = {
     0x8B,0x47,0x08,0x89,0x83,0xF0,0x00,0x00,0x00
@@ -3164,6 +3164,21 @@ struct OpenXrState
         }
         const float world_heading = world_heading_from_view(
             vr_world_to_view, head_pose, anchor_head);
+        // Invert the exact tracking-to-game rotation used by the hand bridge.
+        // Do not use headset heading: physically looking around must not rotate the sun.
+        const auto tracking_to_world = [&](XrVector3f axis) {
+            return view_vector_to_world(vr_world_to_view,
+                rotate_vector(conjugate(normalize(anchor_head.orientation)), axis));
+        };
+        const XrVector3f tx = tracking_to_world({1,0,0});
+        const XrVector3f ty = tracking_to_world({0,1,0});
+        const XrVector3f tz = tracking_to_world({0,0,1});
+        const auto world_to_tracking = [&](XrVector3f v) {
+            return XrVector3f{tx.x*v.x+tx.y*v.y+tx.z*v.z,
+                ty.x*v.x+ty.y*v.y+ty.z*v.z, tz.x*v.x+tz.y*v.y+tz.z*v.z};
+        };
+        scrapvr::tools::set_material_frame(
+            world_to_tracking({-0.35f, -0.52f, 0.78f}), world_to_tracking({0,0,1}));
         if (state == XR_SESSION_STATE_FOCUSED)
             publish_hand_bridge(anchor_head, vr_world_to_view);
         if (g_feature_startup_menu_enabled)
@@ -3304,6 +3319,18 @@ struct OpenXrState
         // Keep every feature overlay outside the two engine scene calls. In
         // particular, no hand/tool D3D state can leak from the left overlay into
         // the right engine render (clouds, shadows and post passes stay symmetric).
+        // Locate once more after the expensive scene renders, at the SAME predicted
+        // display time. Both eyes consume one pose snapshot; never resync buttons here.
+        if (g_feature_hands_enabled)
+        {
+            g_input.refresh_controller_poses(frame_state.predictedDisplayTime);
+            for (uint32_t hand = 0; hand < 2; ++hand)
+            {
+                const auto &tracked = g_input.hand(hand);
+                if (tracked.active && !tracked.optical)
+                    scrapvr::hands::set_pose(hand, tracked.pose, true, false);
+            }
+        }
         if (g_feature_hands_enabled &&
             (g_input.hand(0).active || g_input.hand(1).active))
         {
@@ -4175,7 +4202,7 @@ extern "C" __declspec(dllexport) BOOL AddonInit(HMODULE addon_module, HMODULE re
     smvr::reset_hand_bridge(true);
     smvr::deactivate_hand_bridge();
     smvr::remove_world_state_bridge();
-    smvr::log_line("SMVR_V1_START enabled=%u game_build=24529696 exe_sha256=5D663BA2...A5B4F5", smvr::g_enabled.load() ? 1u : 0u);
+    smvr::log_line("SMVR_V1_START enabled=%u game_build=25442087 exe_sha256=CF403CF9...B530D", smvr::g_enabled.load() ? 1u : 0u);
     if (!smvr::validate_build()) { smvr::log_line("FAIL stage=validate_build"); return FALSE; }
     if (!reshade::register_addon(addon_module, reshade_module))
     {

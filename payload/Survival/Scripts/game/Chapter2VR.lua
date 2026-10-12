@@ -264,10 +264,58 @@ local function publishWorldState( active )
 	end
 end
 
+-- Low-rate world probes, not per-eye/per-frame raycasts. These approximate
+-- cover; they are not the engine's per-pixel shadow maps.
+local function materialLighting( active )
+	local day, visibility, sky = 1, 1, 1
+	if not active then return day, visibility, sky end
+	local source = "getter"
+	local cycleOk, cycle = pcall( sm.render.getOutdoorLighting )
+	if not cycleOk then cycle = 0.5; source = "fallback" end
+	local readOk, state = pcall( sm.json.open, "$GAME_DATA/NativeVR/lighting_state.json" )
+	local tick = sm.game.getCurrentTick()
+	if readOk and type( state ) == "table" and type( state.tick ) == "number" and
+		tick >= state.tick and tick - state.tick <= 40 and type( state.cycle ) == "number" then
+		cycle = state.cycle
+		source = "renderer_input"
+	end
+	local probeOk, probeError = pcall( function()
+		if type( cycle ) == "number" and cycle == cycle then
+			day = math.max( 0, math.sin( math.max( 0, math.min( 1, cycle ) ) * math.pi ) )
+		end
+		if not sm.render.isOutdoor() then visibility = 0; sky = 0; return end
+		-- Probe at the held tool instead of the desktop camera (which can be
+		-- inside a vehicle or displaced from the headset).
+		local origin = g_vrToolPointerOrigin or sm.camera.getPosition()
+		local player = sm.localPlayer.getPlayer()
+		local ignored = player and player.character or nil
+		local direction = sm.vec3.new( -0.35, -0.52, 0.78 ):normalize()
+		local hit = sm.physics.raycast( origin + direction * 0.15, origin + direction * 64, ignored )
+		visibility = hit and 0 or 1
+		local up = sm.vec3.new( 0, 0, 1 )
+		local covered = sm.physics.raycast( origin + up * 0.15, origin + up * 32, ignored )
+		sky = covered and 0.25 or 1
+	end )
+	if not probeOk and not Chapter2VR.materialProbeError then
+		sm.log.warning( "SCRAPVR_LIGHTING_PROBE " .. tostring( probeError ) )
+		Chapter2VR.materialProbeError = true
+	end
+	if not Chapter2VR.materialLogTick or tick - Chapter2VR.materialLogTick >= 200 then
+		Chapter2VR.materialLogTick = tick
+		sm.log.warning( "SCRAPVR_LIGHTING source=" .. source .. " cycle=" .. tostring( cycle ) ..
+			" day=" .. tostring( day ) .. " visibility=" .. tostring( visibility ) .. " sky=" .. tostring( sky ) .. " probe=" .. tostring( probeOk ) )
+	end
+	return day, visibility, sky
+end
+
 local function publishPlayerState( active, seated, firstPerson, activeItem, activeAdapter,
 	 health, maxHealth, breath, maxBreath, timeMinutes, conscious, waypoints )
 	Chapter2VR.playerStateSequence = ( Chapter2VR.playerStateSequence or 0 ) + 1
+	local daylight, visibility, sky = materialLighting( active )
 	saveBridgePayload( {
+		materialDaylight = daylight,
+		materialVisibility = visibility,
+		materialSky = sky,
 		version = 1,
 		sequence = Chapter2VR.playerStateSequence,
 		active = active == true,

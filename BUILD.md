@@ -28,7 +28,7 @@ Important runtime files:
 - `Release/ScrapMechanicVR-HeldCalibration.exe` and `.ini`: live grouped held-item position/rotation/scale calibration helper. It can be copied to another PC, auto-connects to a running game installation (including when the game starts after the helper), and exports a shareable plain-text pose file.
 - The wrist HUD uses a fixed compact smartwatch pose built into the native renderer; no calibration helper or extra runtime files are required.
 
-The documented executable hash remains the only supported configuration. The 1.4.9 pre-release installer can explicitly override a newer game-build mismatch after a prominent warning, but compatibility is not guaranteed. Do not mix this payload with the legacy branch's native add-on, OpenXR loader, Lua scripts, or installer.
+The documented executable hash remains the only supported configuration. The installer can explicitly override a newer game-build mismatch after a prominent warning, but compatibility is not guaranteed. Do not mix this payload with the legacy branch's native add-on, OpenXR loader, Lua scripts, or installer.
 
 ## One-file installer
 
@@ -40,9 +40,9 @@ The documented executable hash remains the only supported configuration. The 1.4
 
 The public artifact is `dist/ScrapMechanicVR-Installer.exe`. It validates its embedded patcher, manifest, native add-on, branded UI assets, soundtrack, and the managed payload before installation. Its five user actions are Install VR Mod, Uninstall VR Mod, Start VR, Open Logs, and Open Bindings. Install automatically migrates a managed older/current build and verifies the completed installation. Uninstall removes managed current/older builds, restores backups, and verifies the result. Start VR requires the active OpenXR runtime to report a connected headset.
 
-Current version: `1.4.9` pre-release
+Current version: `1.4.10` for Scrap Mechanic `1.0.6.889` / Steam build `25442087`
 
-Installer SHA-256: `CB224ACE16E9BA075627DE53456C596A4AE131513A74B93166AB6958774A1D33` (also recorded in `SHA256SUMS.txt`).
+Installer SHA-256: `FAED86ED01C099554936A7C0F122BA58ACDEFB4CF26977532C6918C2EB7EC0DF` (also recorded in `SHA256SUMS.txt`).
 
 Focused regression checks for palette input, fertilizer ownership, and startup retries:
 

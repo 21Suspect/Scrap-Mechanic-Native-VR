@@ -7,20 +7,20 @@ ElevatorButton.poseWeightCount = 2
 
 function ElevatorButton.server_onCreate( self )
 	self.sv = {}
-	self.sv.goingUp = false
-	self.sv.saved = self.storage:load()
+	self.sv.saved = self.storage:load() or self.params or {}
+	self.sv.saved.tags = self.tags or self.sv.saved.tags
+	self.storage:save( self.sv.saved )
 
-	if self.sv.saved == nil or ( self.params and self.params ~= self.sv.saved ) then
-		self.sv.saved = self.params or { goingUp = true }
-		if self.tags then
-			self.sv.saved.tags = self.tags
-			if isAnyOf( "FLOOR_1", self.tags ) then
-				self.sv.saved.goingUp = true
-			elseif isAnyOf( "FLOOR_2", self.tags ) then
-				self.sv.saved.goingUp = false
-			end
+	self.sv.goingUp = self.sv.saved.goingUp
+	if self.sv.goingUp == nil then
+		local tags = self.sv.saved.tags or {}
+		if isAnyOf( "FLOOR_1", tags ) then
+			self.sv.goingUp = true
+		elseif #intersection( tags, { "FLOOR_2", "MINIDUNGEON" } ) > 0 then
+			self.sv.goingUp = false
+		else
+			self.sv.goingUp = true
 		end
-		self.storage:save( self.sv.saved )
 	end
 end
 
@@ -105,7 +105,7 @@ function ElevatorButton.sv_n_push( self, _, player )
 		end
 	end
 
-	self.network:sendToClients( "cl_push", self.sv.saved.goingUp )
+	self.network:sendToClients( "cl_push", self.sv.goingUp )
 	self.interactable.active = true
 end
 

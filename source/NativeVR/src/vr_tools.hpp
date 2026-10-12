@@ -17,6 +17,14 @@
 namespace scrapvr::tools
 {
 	using LogFunction = void (*)(const char *format, ...);
+	// Directions are transformed from game world into OpenXR tracking space.
+	struct MaterialLighting {
+		float key[4] = { -0.35f, 0.78f, -0.52f, 1.0f };
+		float up[4] = { 0.0f, 1.0f, 0.0f, 1.0f };
+		float environment[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
+	};
+	void set_material_frame(const XrVector3f &key, const XrVector3f &up);
+	MaterialLighting material_lighting();
 	enum class HapticProfile { none, hammer, tool, gun };
 	enum class ContextAction { none, rotate_placement, paint_palette };
 	enum class InteractionLaserKind : uint32_t { none = 0, surface = 1, connection = 2 };

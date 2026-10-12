@@ -14,6 +14,7 @@ Seat.upgradeTextNumberColor = "#c4f42b"
 Seat.bearingGuiTitle = "#{SEAT_UPGRADE_TITLE}"
 Seat.Levels = {
 	[tostring(ITEMS.obj_scrap_seat)] = { maxConnections = 2 },
+	[tostring(ITEMS.obj_rewards_modularsofa01)] = { maxConnections = 2 },
 	[tostring(ITEMS.obj_interactive_seat_01)] = { maxConnections = 2, upgrade = ITEMS.obj_interactive_seat_02, cost = 1, levelNumber = 1 },
 	[tostring(ITEMS.obj_interactive_seat_02)] = { maxConnections = 4, upgrade = ITEMS.obj_interactive_seat_03, cost = 1, levelNumber = 2 },
 	[tostring(ITEMS.obj_interactive_seat_03)] = { maxConnections = 6, upgrade = ITEMS.obj_interactive_seat_04, cost = 1, levelNumber = 3 },
@@ -533,4 +534,3 @@ Saddle.Levels = {
 
 Saddle.tinkerGuiJson = Seat.initTinkerGui( sm.json.open( "$SURVIVAL_DATA/Gui/JsonGuis/SeatUpgrade.gui" ), Saddle.Levels )
 Saddle.tinkerGuiJson.title.Caption = "#{SADDLE_UPGRADE_TITLE}"
-

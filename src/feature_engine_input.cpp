@@ -23,17 +23,17 @@ namespace smvr::features
 {
 namespace
 {
-constexpr uint32_t kExpectedTimestamp = 0x6A7060DD;
-constexpr uint32_t kExpectedImageSize = 0x01C1D000;
+constexpr uint32_t kExpectedTimestamp = 0x6AB16723;
+constexpr uint32_t kExpectedImageSize = 0x01C24000;
 
 // Exact RVAs ported by instruction-level comparison between the archived
-// 0.7.4.778 executable used by the working GitHub mod and Steam build 24529696.
-constexpr uintptr_t kInputManagerPointerRva = 0x01A62708;
-constexpr uintptr_t kKeyboardEventRva = 0x0061A2F0;
-constexpr uintptr_t kMouseDownRva = 0x0061A520;
-constexpr uintptr_t kMouseUpRva = 0x0061A600;
-constexpr uintptr_t kMouseMoveRva = 0x0061A6F0;
-constexpr uintptr_t kQueueEventRva = 0x0061A420;
+// previous supported executable and Steam build 25442087 (1.0.6.889).
+constexpr uintptr_t kInputManagerPointerRva = 0x01A696C0;
+constexpr uintptr_t kKeyboardEventRva = 0x0061A510;
+constexpr uintptr_t kMouseDownRva = 0x0061A740;
+constexpr uintptr_t kMouseUpRva = 0x0061A820;
+constexpr uintptr_t kMouseMoveRva = 0x0061A910;
+constexpr uintptr_t kQueueEventRva = 0x0061A640;
 constexpr size_t kEventQueueOffset = 0x1E0;
 
 using MouseButtonFunction = void (*)(void *, int, int);

@@ -33,7 +33,7 @@ namespace scrapvr::hands
 			bool firing = false;
 			bool precise_fingers = false;
 		};
-		struct HandConstants { Matrix mvp; Matrix model; Matrix bones[kHandBoneCount]; float eye_position[4]; };
+		struct HandConstants { Matrix mvp; Matrix model; Matrix bones[kHandBoneCount]; float eye_position[4]; scrapvr::tools::MaterialLighting lighting = scrapvr::tools::material_lighting(); };
 		struct HudVertex { float position[3]; float uv[2]; };
 		struct HudConstants { Matrix mvp; };
 		struct HudColor { uint8_t r, g, b, a; };
@@ -136,6 +136,7 @@ namespace scrapvr::hands
 			ID3D11DomainShader *domain_shader = nullptr;
 			ID3D11PixelShader *pixel_shader = nullptr;
 			ID3D11Buffer *vertex_constant = nullptr;
+			ID3D11Buffer *pixel_constant = nullptr;
 			ID3D11ShaderResourceView *pixel_resources[3] = {};
 			ID3D11SamplerState *pixel_samplers[3] = {};
 
@@ -155,6 +156,7 @@ namespace scrapvr::hands
 				context->DSGetShader(&domain_shader, nullptr, nullptr);
 				context->PSGetShader(&pixel_shader, nullptr, nullptr);
 				context->VSGetConstantBuffers(0, 1, &vertex_constant);
+				context->PSGetConstantBuffers(0, 1, &pixel_constant);
 				context->PSGetShaderResources(0, 3, pixel_resources);
 				context->PSGetSamplers(0, 3, pixel_samplers);
 				context->GSSetShader(nullptr, nullptr, 0);
@@ -178,10 +180,12 @@ namespace scrapvr::hands
 				context->DSSetShader(domain_shader, nullptr, 0);
 				context->PSSetShader(pixel_shader, nullptr, 0);
 				context->VSSetConstantBuffers(0, 1, &vertex_constant);
+				context->PSSetConstantBuffers(0, 1, &pixel_constant);
 				context->PSSetShaderResources(0, 3, pixel_resources);
 				context->PSSetSamplers(0, 3, pixel_samplers);
 				for (uint32_t index = 0; index < 3; ++index) { release(pixel_samplers[index]); release(pixel_resources[index]); }
 				release(vertex_constant);
+				release(pixel_constant);
 				release(pixel_shader); release(domain_shader); release(hull_shader);
 				release(geometry_shader); release(vertex_shader); release(vertex_buffer);
 				release(input_layout); release(rasterizer); release(depth_state);
@@ -1098,7 +1102,7 @@ namespace scrapvr::hands
 		if (!g_device)
 			return false;
 		const char *shader = R"(
-			cbuffer HandConstants : register(b0) { float4x4 mvp; float4x4 model; float4x4 bones[28]; float4 eye_position; };
+			cbuffer HandConstants : register(b0) { float4x4 mvp; float4x4 model; float4x4 bones[28]; float4 eye_position; float4 material_key; float4 material_up; float4 material_environment; };
 			struct VSIn { float3 position : POSITION; float3 normal : NORMAL; float2 uv : TEXCOORD0; uint4 joints : BLENDINDICES; float4 weights : BLENDWEIGHT; };
 			struct VSOut { float4 position : SV_POSITION; float2 uv : TEXCOORD0; float3 world_normal : TEXCOORD1; float3 world_position : TEXCOORD2; };
 			VSOut vs_main(VSIn input) {
@@ -1114,32 +1118,34 @@ namespace scrapvr::hands
 				float3 base_normal = normalize(input.world_normal);
 				float3 dpdx = ddx(input.world_position), dpdy = ddy(input.world_position);
 				float2 duvdx = ddx(input.uv), duvdy = ddy(input.uv);
-				float3 tangent_raw = dpdy * duvdx.x - dpdx * duvdy.x;
+				float determinant = duvdx.x * duvdy.y - duvdx.y * duvdy.x;
+				float3 tangent_raw = (dpdx * duvdy.y - dpdy * duvdx.y) * (determinant < 0 ? -1.0 : 1.0);
 				float3 fallback_axis = abs(base_normal.y) < 0.9 ? float3(0, 1, 0) : float3(1, 0, 0);
 				float3 tangent = dot(tangent_raw, tangent_raw) > 0.000001 ? normalize(tangent_raw) : normalize(cross(fallback_axis, base_normal));
-				float3 bitangent = normalize(cross(base_normal, tangent));
+				float3 bitangent_raw = (dpdy * duvdx.x - dpdx * duvdy.x) * (determinant < 0 ? -1.0 : 1.0);
+				float3 bitangent = normalize(cross(base_normal, tangent)) * (dot(cross(base_normal, tangent), bitangent_raw) < 0 ? -1.0 : 1.0);
 				float3 map_normal = glove_normal.Sample(glove_sampler, input.uv).xyz * 2.0 - 1.0;
 				float3 detail_normal = normalize(tangent * map_normal.x + bitangent * map_normal.y + base_normal * map_normal.z);
 				float3 n = normalize(lerp(base_normal, detail_normal, 0.42));
 				float3 asg = glove_asg.Sample(glove_sampler, input.uv).rgb;
-				float3 key_direction = normalize(float3(-0.35, 0.78, -0.52));
-				float sky = 0.5 + 0.5 * n.y; float occlusion = lerp(0.55, 1.0, asg.x);
-				float ambient = lerp(0.34, 0.52, sky) * occlusion;
-				float key = 0.38 * saturate(dot(n, key_direction));
-				float fill = 0.09 * saturate(dot(n, normalize(float3(0.65, 0.25, 0.72))));
+				float3 key_direction = normalize(material_key.xyz);
+				float sky = saturate(0.5 + 0.5 * dot(n, normalize(material_up.xyz))); float occlusion = lerp(0.55, 1.0, asg.x);
+				float ambient = lerp(0.20, 0.48, material_up.w) * lerp(0.70, 1.0, sky) * occlusion * lerp(0.75, 1.0, material_environment.x);
+				float key = lerp(0.08, 0.8, material_up.w) * material_key.w * saturate(dot(n, key_direction));
+				float fill = 0.0;
 				float3 view_direction = normalize(eye_position.xyz - input.world_position);
 				float3 half_vector = normalize(key_direction + view_direction);
 				float smoothness = lerp(0.12, 0.82, asg.z);
 				float metalness = asg.y * 0.35;
 				float fresnel = pow(1.0 - saturate(dot(n, view_direction)), 5.0);
-				float specular = pow(saturate(dot(n, half_vector)), lerp(10.0, 92.0, smoothness));
+				float specular = pow(saturate(dot(n, half_vector)), lerp(10.0, 92.0, smoothness)) * material_key.w * lerp(0.15, 1.0, material_up.w);
 				float3 specular_color = lerp(float3(0.04, 0.04, 0.04), color.rgb, metalness);
 				float3 linear_lit = color.rgb * (ambient + key + fill) +
 					specular_color * specular * (0.12 + smoothness * 0.56) + specular_color * fresnel * 0.08;
 				// The OpenXR RTV is R8G8B8A8_UNORM_SRGB. Return linear light and let
 				// the target perform the one required transfer; manual gamma here was
 				// the cause of the pale, bright hand/tool overlays.
-				return float4(saturate((linear_lit - 0.18) * 1.08 + 0.16), 1.0);
+				return float4(saturate(linear_lit), 1.0);
 			}
 		)";
 		const char *hud_shader = R"(
@@ -1398,6 +1404,7 @@ namespace scrapvr::hands
 		context->RSSetViewports(1, &viewport); context->RSSetState(g_rasterizer); context->OMSetDepthStencilState(g_depth_state, 0);
 		context->IASetInputLayout(g_input_layout); context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		context->VSSetShader(g_vertex_shader, nullptr, 0); context->VSSetConstantBuffers(0, 1, &g_constant_buffer);
+		context->PSSetConstantBuffers(0, 1, &g_constant_buffer);
 		ID3D11ShaderResourceView *hand_textures[] = { g_texture, g_normal_texture, g_material_texture };
 		context->PSSetShader(g_pixel_shader, nullptr, 0); context->PSSetShaderResources(0, 3, hand_textures); context->PSSetSamplers(0, 1, &g_sampler);
 		const Matrix view_projection = multiply(projection(eye.fov), inverse_pose(eye.pose));

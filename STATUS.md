@@ -1,14 +1,14 @@
 # Chapter 2 release status
 
-Current release: `1.4.9` pre-release for Scrap Mechanic Patch 1.0.6
+Current candidate: `1.4.10` for Scrap Mechanic `1.0.6.889`
 
 Branch: `main`
 
-Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
+Supported game: Scrap Mechanic `1.0.6.889`, Steam build `25442087`
 
 ## Current build
 
-- The 1.4.9 pre-release permits installation on an untested Scrap Mechanic build only after a prominent default-No warning and a second confirmation. Per-file integrity checks remain active, and the supported Quest 3 / Meta Quest Link payload is unchanged from 1.4.8.
+- The 1.4.10 candidate rebases `SurvivalPlayer.lua`, `ElevatorButton.lua`, `Seat.lua`, and `CarryTool.lua` onto Steam build 25442087 while keeping the validated native renderer and Quest 3 / Meta Quest Link path unchanged.
 - Asymmetric per-eye FOVs now choose a shared render extent large enough for both eyes, fixing the Bigscreen Beyond/SteamVR `eye_camera_build` failure without changing mirrored Quest/Meta projection behavior (issue #28).
 - Headset removal hands rendering and input back to ordinary desktop mode after a short focus transition while pumping empty OpenXR frames; refocusing rebuilds the VR anchor on Meta, VDXR, and SteamVR runtimes (issue #27).
 - The validated native player-state bridge now drives the gameplay/menu marker in base Survival as well as Custom Games, preventing a stale marker from trapping motion-controller input in the floating UI (issue #25).
@@ -54,4 +54,4 @@ Supported game: Scrap Mechanic `1.0.5.876`, Steam build `24529696`
 
 `dist/ScrapMechanicVR-Installer.exe` embeds and validates the managed payload, branded installer artwork, soundtrack, and a verified first-launch game-data cache. It starts music at 50% with a compact volume control and presents Install VR Mod, Uninstall VR Mod, Start VR, Open Logs, and Open Bindings. Install and uninstall detect current/older managed versions, explain the exact operation before asking for approval, migrate or restore safely, and verify automatically. Unknown game builds require an additional explicit warning confirmation while all managed-file hash checks remain enforced. Known prior-release payloads are migrated by exact path and SHA-256, same-version metadata refreshes retain their verified restore authority, and active calibration helpers are reported before any transaction begins. The wrist HUD is fixed in the native renderer, so no HUD calibration helper is installed. Start VR requires a connected headset reported by the active OpenXR runtime.
 
-Installer SHA-256: `CB224ACE16E9BA075627DE53456C596A4AE131513A74B93166AB6958774A1D33`. Installer and payload hashes are recorded in `SHA256SUMS.txt`.
+Installer SHA-256: `FAED86ED01C099554936A7C0F122BA58ACDEFB4CF26977532C6918C2EB7EC0DF` (also recorded in `SHA256SUMS.txt`).

@@ -1123,7 +1123,12 @@ function Sv_DropCarry( params )
 				sm.container.spendFromSlot( params.containerA, 0, params.itemA, params.quantityA, true )
 				if sm.container.endTransaction() then
 					local p = { deathTick = sm.game.getCurrentTick() + DaysInTicks( 30 ), isCattle = true }
-					sm.unit.createUnit( sm.uuid.new( params.characterShape.characterUuid ), spawnPosition, math.random() * 2 * math.pi, p )
+                    local spawnHeading = math.random() * 2 * math.pi
+                    if params.shapePlacement then
+                        local spawnDirection = params.shapePlacement.worldRotation * sm.vec3.new( 0, 0, 1 )
+                        spawnHeading = math.atan2( spawnDirection.y, spawnDirection.x ) - math.pi / 2
+                    end
+                    sm.unit.createUnit( sm.uuid.new( params.characterShape.characterUuid ), spawnPosition, spawnHeading, p )
 				end
 			end
 		end

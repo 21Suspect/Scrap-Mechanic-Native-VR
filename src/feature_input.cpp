@@ -907,6 +907,19 @@ bool InputBridge::sync(XrTime display_time, const XrPosef &head_pose)
     return true;
 }
 
+void InputBridge::refresh_controller_poses(XrTime display_time)
+{
+    for (uint32_t hand = 0; hand < kHandCount; ++hand)
+    {
+        // Leave optical articulation and tracking-source handoff on the once-per-frame
+        // sync path. A failed late locate keeps that frame's earlier valid sample.
+        if (!hands_[hand].active || hands_[hand].optical) continue;
+        update_controller_pose(hand, display_time);
+        if (update_controller_aim_pose(hand, display_time))
+            pointer_pose_active_[hand] = true;
+    }
+}
+
 void InputBridge::update_game_input(const XrPosef &head_pose)
 {
     XrVector2f move{}, turn{};

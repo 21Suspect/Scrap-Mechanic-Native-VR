@@ -35,7 +35,7 @@ namespace scrapvr::tools
 		static_assert(sizeof(PackedCatalogVertex) == 22);
 		static_assert(sizeof(PackedCatalogVertex) == held_item_catalog::packed_vertex_size);
 		struct Matrix { float m[16]; };
-		struct Constants { Matrix mvp; Matrix model; float eye_position[4]; };
+		struct Constants { Matrix mvp; Matrix model; float eye_position[4]; MaterialLighting lighting = material_lighting(); };
 		struct TgaHeader
 		{
 			uint8_t id_length, color_map_type, image_type;
@@ -135,6 +135,7 @@ namespace scrapvr::tools
 		bool g_player_seated = false;
 		bool g_player_first_person = false;
 		WristHudState g_wrist_hud_state{};
+		MaterialLighting g_material_lighting{};
 		bool g_render_suppressed = false;
 		ULONGLONG g_last_poll = 0;
 		ULONGLONG g_player_state_last_valid_ms = 0;
@@ -1401,6 +1402,13 @@ namespace scrapvr::tools
 								else tool = parse_tool(item, adapter, variant);
 							}
 							apply_player_state(tool, variant, catalog_item, item, seated, first_person);
+							double daylight = 1.0, visibility = 1.0, sky_visibility = 1.0;
+							json_number(text, "materialDaylight", daylight);
+							json_number(text, "materialVisibility", visibility);
+							json_number(text, "materialSky", sky_visibility);
+							g_material_lighting.up[3] = std::isfinite(daylight) ? static_cast<float>(std::clamp(daylight, 0.0, 1.0)) : 1.0f;
+							g_material_lighting.key[3] = std::isfinite(visibility) ? static_cast<float>(std::clamp(visibility, 0.0, 1.0)) : 1.0f;
+							g_material_lighting.environment[0] = std::isfinite(sky_visibility) ? static_cast<float>(std::clamp(sky_visibility, 0.0, 1.0)) : 1.0f;
 							// The fields are optional for compatibility with older worlds and
 							// custom modes.  A packet without them simply hides the wrist
 							// panels instead of showing stale values from a previous world.
@@ -1553,7 +1561,7 @@ namespace scrapvr::tools
 		poll_clay_calibration();
 		poll_held_calibration();
 		const char *shader = R"(
-			cbuffer ToolConstants : register(b0) { float4x4 mvp; float4x4 model; float4 eye_position; };
+			cbuffer ToolConstants : register(b0) { float4x4 mvp; float4x4 model; float4 eye_position; float4 material_key; float4 material_up; float4 material_environment; };
 			struct VSIn { float3 position : POSITION; float3 normal : NORMAL; float2 uv : TEXCOORD0; };
 			struct VSOut { float4 position : SV_POSITION; float2 uv : TEXCOORD0; float3 world_normal : TEXCOORD1; float3 world_position : TEXCOORD2; };
 			VSOut vs_main(VSIn input) { VSOut o; float4 local = float4(input.position, 1); float4 world = mul(model, local);
@@ -1563,33 +1571,36 @@ namespace scrapvr::tools
 			float4 shade(VSOut input, float4 c) { float3 base_normal = normalize(input.world_normal);
 				float3 dpdx = ddx(input.world_position), dpdy = ddy(input.world_position);
 				float2 duvdx = ddx(input.uv), duvdy = ddy(input.uv);
-				float3 tangent_raw = dpdy * duvdx.x - dpdx * duvdy.x;
+				float determinant = duvdx.x * duvdy.y - duvdx.y * duvdy.x;
+				float3 tangent_raw = (dpdx * duvdy.y - dpdy * duvdx.y) * (determinant < 0 ? -1.0 : 1.0);
 				float3 fallback_axis = abs(base_normal.y) < 0.9 ? float3(0, 1, 0) : float3(1, 0, 0);
 				float3 tangent = dot(tangent_raw, tangent_raw) > 0.000001 ? normalize(tangent_raw) : normalize(cross(fallback_axis, base_normal));
-				float3 bitangent = normalize(cross(base_normal, tangent));
+				float3 bitangent_raw = (dpdy * duvdx.x - dpdx * duvdy.x) * (determinant < 0 ? -1.0 : 1.0);
+				float3 bitangent = normalize(cross(base_normal, tangent)) * (dot(cross(base_normal, tangent), bitangent_raw) < 0 ? -1.0 : 1.0);
 				float3 mapped_normal = normal_map.Sample(samp, input.uv).xyz * 2.0 - 1.0;
 				float3 detail_normal = normalize(tangent * mapped_normal.x + bitangent * mapped_normal.y + base_normal * mapped_normal.z);
 				// These meshes retain game normals but not the authored tangent stream used
 				// by the desktop viewmodel. Blend reconstructed detail into the stable mesh
 				// normal so paint/tool surfaces gain texture without their lighting inverting.
-				float3 n = normalize(lerp(base_normal, detail_normal, 0.28));
+				float3 n = normalize(lerp(base_normal, detail_normal, 0.75));
 				float3 asg = asg_map.Sample(samp, input.uv).rgb;
-				float3 key_direction = normalize(float3(-0.35, 0.78, -0.52)); float sky = 0.5 + 0.5 * n.y;
-				// Desktop viewmodels receive a camera-relative studio/environment fill in
-				// addition to world lighting. Keep the VR-held equivalent readable at night.
-				float ambient = lerp(0.68, 0.82, sky) * lerp(0.88, 1.0, asg.x);
-				float key = 0.30 * saturate(dot(n, key_direction));
-				float fill = 0.12 * saturate(dot(n, normalize(float3(0.65, 0.25, 0.72))));
+				float3 key_direction = normalize(material_key.xyz); float sky = saturate(0.5 + 0.5 * dot(n, normalize(material_up.xyz)));
+				// World-anchored directional light and low-rate cover probes. Keep a
+				// modest night floor without washing out material color with studio fill.
+				float day = saturate(material_up.w), visibility = saturate(material_key.w);
+				float ambient = lerp(0.18, 0.58, day) * lerp(0.70, 1.0, sky) * lerp(0.65, 1.0, asg.x) * lerp(0.75, 1.0, material_environment.x);
+				float key = lerp(0.10, 0.95, day) * visibility * saturate(dot(n, key_direction));
+				float fill = 0.0;
 				float3 view_direction = normalize(eye_position.xyz - input.world_position);
 				float smoothness = lerp(0.20, 0.72, asg.z);
-				float specular = lerp(0.055, 0.22, max(asg.y, 0.18)) * pow(saturate(dot(n, normalize(key_direction + view_direction))), lerp(14.0, 72.0, smoothness));
-				float rim = pow(1.0 - saturate(dot(n, view_direction)), 5.0) * 0.055;
+				float specular = lerp(0.03, 0.65, asg.y) * pow(saturate(dot(n, normalize(key_direction + view_direction))), lerp(18.0, 128.0, smoothness)) * lerp(0.12, 1.0, day) * visibility;
+				float rim = 0.0;
 				float3 reflected = reflect(-view_direction, n);
-				float studio_height = saturate(reflected.y * 0.5 + 0.5);
+				float studio_height = saturate(dot(reflected, normalize(material_up.xyz)) * 0.5 + 0.5);
 				float3 studio_reflection = lerp(float3(0.08, 0.11, 0.17), float3(0.58, 0.66, 0.80), studio_height);
-				float reflection_strength = lerp(0.09, 0.24, smoothness);
+				float reflection_strength = lerp(0.01, 0.08, smoothness) * asg.y * lerp(0.15, 1.0, day) * material_environment.x;
 				float3 linear_lit = c.rgb * (ambient + key + fill + rim) + specular + studio_reflection * reflection_strength;
-				return float4(saturate((linear_lit - 0.18) * 1.08 + 0.16), c.a); }
+				return float4(saturate(linear_lit), c.a); }
 			float4 ps_main(VSOut input) : SV_TARGET { return shade(input, tex.Sample(samp, input.uv)); }
 			float4 ps_cutout(VSOut input) : SV_TARGET { float4 c = tex.Sample(samp, input.uv);
 				clip(c.a - 0.08); return shade(input, c); }
@@ -1712,6 +1723,7 @@ namespace scrapvr::tools
 		context->RSSetViewports(1, &viewport); context->RSSetState(g_rasterizer); context->OMSetDepthStencilState(g_depth_state, 0);
 		context->IASetInputLayout(g_input_layout); context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		context->VSSetShader(g_vertex_shader, nullptr, 0); context->VSSetConstantBuffers(0, 1, &g_constant_buffer);
+		context->PSSetConstantBuffers(0, 1, &g_constant_buffer);
 		context->PSSetShader(g_pixel_shader, nullptr, 0); context->PSSetSamplers(0, 1, &g_sampler);
 		const Matrix view_projection = multiply(projection(eye.fov), inverse_pose(eye.pose));
 		const auto &calibration = calibration_for(g_active_tool);
@@ -1991,6 +2003,18 @@ namespace scrapvr::tools
 	{
 		poll_active_tool();
 		return g_wrist_hud_state;
+	}
+
+	void set_material_frame(const XrVector3f &key, const XrVector3f &up)
+	{
+		g_material_lighting.key[0] = key.x; g_material_lighting.key[1] = key.y; g_material_lighting.key[2] = key.z;
+		g_material_lighting.up[0] = up.x; g_material_lighting.up[1] = up.y; g_material_lighting.up[2] = up.z;
+	}
+
+	MaterialLighting material_lighting()
+	{
+		poll_active_tool();
+		return g_material_lighting;
 	}
 
 	void set_render_suppressed(bool suppressed)

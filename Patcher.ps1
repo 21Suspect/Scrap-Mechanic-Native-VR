@@ -830,7 +830,10 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
     if ($state.gameExecutableSha256 -and
         $state.gameExecutableSha256.ToUpperInvariant() -ne $Manifest.game.executableSha256.ToUpperInvariant()) {
         $currentExecutableHash = Get-Sha256 (Join-Path $Root $Manifest.game.executable)
-        if ([bool]$state.unsupportedGameBuildOverride -and
+        if ($currentExecutableHash -eq $Manifest.game.executableSha256.ToUpperInvariant()) {
+            Write-Warning "The managed state belongs to an older supported game build [$($state.gameExecutableSha256)]. The current executable exactly matches the newly supported build [$currentExecutableHash], so the verified backup metadata may be used for this upgrade."
+        }
+        elseif ([bool]$state.unsupportedGameBuildOverride -and
             $state.gameExecutableSha256.ToUpperInvariant() -eq $currentExecutableHash) {
             Write-Warning "Using restore state created by an explicitly approved unsupported-build installation [$currentExecutableHash]."
         }

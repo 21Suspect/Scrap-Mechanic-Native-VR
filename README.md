@@ -6,7 +6,7 @@
 
 Native OpenXR VR for the current Scrap Mechanic Chapter 2 / 1.0 release, made by [21Suspect](https://github.com/21Suspect).
 
-**Version 1.4.9 pre-release — prepared for the upcoming Scrap Mechanic Patch 1.0.6.** It keeps the tested 1.4.8 VR payload and Quest 3 / Meta Quest Link behavior unchanged, while allowing installation on a newer untested game build only after a prominent risk warning and explicit confirmation. Compatibility with Patch 1.0.6 is not guaranteed until it has been tested.
+**Version 1.4.10 — updated for Scrap Mechanic 1.0.6.889 (Steam build 25442087).** Includes improved hand/tool lighting, a refreshed icon cache, and late controller-pose sampling. [Release notes and known limitations](docs/release-1.4.10.md).
 
 [![Latest release](https://img.shields.io/github/v/release/21Suspect/Scrap-Mechanic-Native-VR?display_name=tag&sort=semver)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/21Suspect/Scrap-Mechanic-Native-VR/total)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases)
@@ -94,7 +94,7 @@ For held-item tuning, the helper automatically connects to a running Scrap Mecha
 ## Requirements
 
 - Windows 10 or Windows 11, x64.
-- Steam Scrap Mechanic `1.0.5.876`, Steam build `24529696`.
+- Steam Scrap Mechanic `1.0.6.889`, Steam build `25442087`.
 - A 64-bit OpenXR runtime, such as Meta Quest Link, Virtual Desktop VDXR, or SteamVR OpenXR.
 
 ## Legacy game version
@@ -107,7 +107,7 @@ Do not mix files or installers from the legacy and current builds.
 
 Build instructions are in [BUILD.md](BUILD.md). Installer and payload checksums are recorded in [SHA256SUMS.txt](SHA256SUMS.txt).
 
-Installer SHA-256: `CB224ACE16E9BA075627DE53456C596A4AE131513A74B93166AB6958774A1D33`.
+Installer SHA-256: `FAED86ED01C099554936A7C0F122BA58ACDEFB4CF26977532C6918C2EB7EC0DF` (also recorded in `SHA256SUMS.txt`).
 
 If you enjoy the project, you can [buy 21Suspect a coffee](https://buymeacoffee.com/21suspect).
 
