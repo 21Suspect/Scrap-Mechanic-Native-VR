@@ -104,7 +104,13 @@ function Assert-Payload($Manifest) {
     $compiledCache = @($Manifest.files | Where-Object {
         [string]$_.path -ieq 'Cache\Bundle\core_data.cbo'
     })
-    if ($compiledCache.Count -ne 1 -or -not [bool]$compiledCache[0].runtimeMutable -or
+    if ($Manifest.compiledDataCachePolicy -eq 'rebuild') {
+        if ($compiledCache.Count -ne 0 -or
+            (Test-Path -LiteralPath (Join-Path $payloadRoot 'Cache\Bundle\core_data.cbo'))) {
+            $failures += 'installer regression: rebuild policy must not ship a compiled game-data cache'
+        }
+    }
+    elseif ($compiledCache.Count -ne 1 -or -not [bool]$compiledCache[0].runtimeMutable -or
         (Test-PreserveRuntimeMutableOnUpgrade $compiledCache[0])) {
         $failures += 'installer regression: core_data.cbo must be runtime-writable but refreshed on upgrade'
     }
@@ -782,6 +788,15 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
         throw "Install state is incomplete and contains no managed file records: $statePath"
     }
 
+    if ($Manifest.compiledDataCachePolicy -eq 'rebuild') {
+        # Previous releases managed a cache seed. It is generated engine data,
+        # not a game original to restore across patches. Retire just this exact
+        # record; Clear-CompiledDataCache below also invalidates any runtime copy.
+        $state.files = @($state.files | Where-Object {
+            [string]$_.path -ine 'Cache\Bundle\core_data.cbo'
+        })
+    }
+
     $entryByPath = @{}
     $currentEntryByPath = @{}
     $previousEntryByPath = @{}
@@ -827,10 +842,12 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
             [void]$stateIssues.Add("backup root is invalid: $($state.backupRoot)")
         }
     }
+    $gameBuildChanged = $false
     if ($state.gameExecutableSha256 -and
         $state.gameExecutableSha256.ToUpperInvariant() -ne $Manifest.game.executableSha256.ToUpperInvariant()) {
         $currentExecutableHash = Get-Sha256 (Join-Path $Root $Manifest.game.executable)
         if ($currentExecutableHash -eq $Manifest.game.executableSha256.ToUpperInvariant()) {
+            $gameBuildChanged = $true
             Write-Warning "The managed state belongs to an older supported game build [$($state.gameExecutableSha256)]. The current executable exactly matches the newly supported build [$currentExecutableHash], so the verified backup metadata may be used for this upgrade."
         }
         elseif ([bool]$state.unsupportedGameBuildOverride -and
@@ -962,6 +979,27 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
         }
     }
 
+    # A Steam update can replace scripts while the previous mod's restore state
+    # still points to older game originals. Never downgrade those scripts or
+    # bless an old original as the new build's uninstall backup.
+    if ($gameBuildChanged) {
+        $missingCurrentOriginals = @()
+        foreach ($record in $recognizedRecords) {
+            $entry = $currentEntryByPath[[string]$record.path]
+            if (-not $entry -or $entry.originalMayBeMissing) { continue }
+            $target = Join-Path $Root $record.path
+            if ((Test-Path -LiteralPath $target -PathType Leaf) -and
+                (Test-OriginalHash $entry (Get-Sha256 $target))) { continue }
+            $backupInfo = $backupStatus[[string]$record.path]
+            if ($backupInfo -and $backupInfo.Valid -and
+                (Test-OriginalHash $entry ([string]$record.originalSha256))) { continue }
+            $missingCurrentOriginals += [string]$record.path
+        }
+        if ($missingCurrentOriginals.Count -gt 0) {
+            throw "Steam must verify the updated game files before upgrading VR. No old-build backups were restored. Missing current originals:`n$($missingCurrentOriginals -join "`n")"
+        }
+    }
+
     $stamp = Get-Date -Format 'yyyyMMddTHHmmss'
     $key = (Get-StringSha256 $Root.ToLowerInvariant()).Substring(0, 16)
     $quarantineRoot = Join-Path $StateRoot "conflicts\$($Manifest.patchId)-$stamp-$key"
@@ -1016,6 +1054,12 @@ function Uninstall-Patch([string]$Root, $Manifest, [switch]$IgnoreUnknownStateRe
         $target = Join-Path $Root $record.path
         if ($preservedRuntimeRecords.ContainsKey([string]$record.path)) {
             Write-Host "Keeping user runtime configuration $($record.path)"
+            continue
+        }
+        $currentEntry = $currentEntryByPath[[string]$record.path]
+        if ($currentEntry -and (Test-Path -LiteralPath $target -PathType Leaf) -and
+            (Test-OriginalHash $currentEntry (Get-Sha256 $target))) {
+            Write-Host "Keeping current game original $($record.path)" -ForegroundColor Green
             continue
         }
         if ($record.existed) {

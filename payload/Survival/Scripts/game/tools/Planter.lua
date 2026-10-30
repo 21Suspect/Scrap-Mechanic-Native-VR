@@ -154,6 +154,13 @@ function Planter.client_onEquippedUpdate( self, primaryState, secondaryState )
 	local ownerCharacter = playerOwner:getCharacter()
 
 	self.isOverrideAnimationActive = ownerCharacter:hasActiveOverrideAnimation()
+	local anims = ownerCharacter:getActiveAnimations()
+	for _, anim in pairs(anims) do
+		if anim.name == "multiknife_use" then
+			self.isOverrideAnimationActive = true
+			break
+		end
+	end
 	if self.isOverrideAnimationActive then
 		if self.heldEffectFp and self.heldEffectFp:isPlaying() then
 			self.heldEffectFp:stopImmediate()

@@ -40,15 +40,17 @@ static_assert(RESHADE_API_VERSION == 18, "SMVR v1 requires ReShade API 18");
 
 namespace smvr
 {
-constexpr uintptr_t kRenderSetupRva = 0x85B610;
-constexpr uintptr_t kCameraBuildRva = 0x906290;
-constexpr uintptr_t kFirstPersonCameraCallerRva = 0x863B10;
-constexpr uintptr_t kViewmodelSkipBranchRva = 0x863B14;
-constexpr uintptr_t kRaycastRva = 0x4785C0;
-constexpr uintptr_t kPlayerToolRaycastReturnRva = 0x457DDE;
-constexpr uintptr_t kRaycastResultFractionStoreRva = 0x79E248;
-constexpr uint32_t kGameImageSize = 0x1C24000;
-constexpr uint32_t kGameTimestamp = 0x6AB16723;
+// Patch 1.0.7.894, Steam test build 26302409. Entry points and result layouts
+// are checked against the instructions below before installing any hooks.
+constexpr uintptr_t kRenderSetupRva = 0x85E7F0;
+constexpr uintptr_t kCameraBuildRva = 0x908FF0;
+constexpr uintptr_t kFirstPersonCameraCallerRva = 0x866CE0;
+constexpr uintptr_t kViewmodelSkipBranchRva = 0x866CE4;
+constexpr uintptr_t kRaycastRva = 0x4798D0;
+constexpr uintptr_t kPlayerToolRaycastReturnRva = 0x45902E;
+constexpr uintptr_t kRaycastResultFractionStoreRva = 0x7A1592;
+constexpr uint32_t kGameImageSize = 0x1C2C000;
+constexpr uint32_t kGameTimestamp = 0x6AE372FB;
 constexpr uintptr_t kFrameRendererOffset = 0x2A0;
 constexpr uintptr_t kLowRendererOffset = 0x8;
 constexpr uintptr_t kDeviceOffset = 0x2F0;
@@ -73,15 +75,15 @@ constexpr uint8_t kCameraBuildPrefix[] = {
 constexpr uint8_t kViewmodelConditionalBranch[] = { 0x0F,0x84,0x58,0x03,0x00,0x00 };
 constexpr uint8_t kViewmodelUnconditionalSkip[] = { 0xE9,0x59,0x03,0x00,0x00,0x90 };
 constexpr uint8_t kRaycastPrefix[] = {
-    0x48,0x8B,0xC4,0x48,0x89,0x58,0x10,0x48,0x89,0x70,0x18,0x48,0x89,0x78,0x20
+    0x48,0x8B,0xC4,0x48,0x89,0x58,0x10,0x48,0x89,0x70,0x18,0x55,0x57,0x41,0x56
 };
 constexpr uint8_t kPlayerToolRaycastCall[] = {
     0x48,0x8D,0x87,0x30,0x04,0x00,0x00,0x48,0x89,0x44,0x24,0x28,
     0x4C,0x89,0x6C,0x24,0x20,0x4C,0x8D,0x4C,0x24,0x50,0x4C,0x8D,
-    0x45,0x80,0x48,0x8B,0xCB,0xE8,0xE2,0x07,0x02,0x00
+    0x45,0x80,0x48,0x8B,0xCB,0xE8,0xA2,0x08,0x02,0x00
 };
 constexpr uint8_t kRaycastResultFractionStore[] = {
-    0x8B,0x47,0x08,0x89,0x83,0xF0,0x00,0x00,0x00
+    0x8B,0x43,0x08,0x89,0x87,0xF0,0x00,0x00,0x00
 };
 
 using RenderSetupFn = void (__fastcall *)(void *, float, const float *, const float *, void *);
@@ -4202,7 +4204,7 @@ extern "C" __declspec(dllexport) BOOL AddonInit(HMODULE addon_module, HMODULE re
     smvr::reset_hand_bridge(true);
     smvr::deactivate_hand_bridge();
     smvr::remove_world_state_bridge();
-    smvr::log_line("SMVR_V1_START enabled=%u game_build=25442087 exe_sha256=CF403CF9...B530D", smvr::g_enabled.load() ? 1u : 0u);
+    smvr::log_line("SMVR_V1_START enabled=%u game_build=26302409 game_version=1.0.7.894 prerelease=1 exe_sha256=C5D93162...8EEAA", smvr::g_enabled.load() ? 1u : 0u);
     if (!smvr::validate_build()) { smvr::log_line("FAIL stage=validate_build"); return FALSE; }
     if (!reshade::register_addon(addon_module, reshade_module))
     {

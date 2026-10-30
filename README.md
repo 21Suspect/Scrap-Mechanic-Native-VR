@@ -6,7 +6,7 @@
 
 Native OpenXR VR for the current Scrap Mechanic Chapter 2 / 1.0 release, made by [21Suspect](https://github.com/21Suspect).
 
-**Version 1.4.10 — updated for Scrap Mechanic 1.0.6.889 (Steam build 25442087).** Includes improved hand/tool lighting, a refreshed icon cache, and late controller-pose sampling. [Release notes and known limitations](docs/release-1.4.10.md).
+**1.4.11-pre.1 — prerelease for Scrap Mechanic 1.0.7.894 (Steam test build 26302409).** Includes updated native hooks and input-event layout, rebased game scripts, and cache rebuilding on installation. [Prerelease notes and testing status](docs/release-1.4.11-pre.1.md). For Scrap Mechanic 1.0.6, use the [stable v1.4.10 release](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases/tag/v1.4.10).
 
 [![Latest release](https://img.shields.io/github/v/release/21Suspect/Scrap-Mechanic-Native-VR?display_name=tag&sort=semver)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/21Suspect/Scrap-Mechanic-Native-VR/total)](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases)
@@ -17,7 +17,7 @@ Native OpenXR VR for the current Scrap Mechanic Chapter 2 / 1.0 release, made by
 ## Easy installation
 
 1. Close Scrap Mechanic.
-2. Download and run **[ScrapMechanicVR-Installer.exe](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/raw/refs/heads/main/dist/ScrapMechanicVR-Installer.exe)**.
+2. Select Scrap Mechanic's **test** branch in Steam, then download and run **[the 1.0.7 prerelease installer](https://github.com/21Suspect/Scrap-Mechanic-Native-VR/releases/tag/v1.4.11-pre.1)**.
 3. Click **Install VR Mod** and approve the administrator prompt.
 4. Start your OpenXR runtime, connect and wake the headset, then click **Start VR** or use the new desktop shortcut.
 
@@ -94,7 +94,7 @@ For held-item tuning, the helper automatically connects to a running Scrap Mecha
 ## Requirements
 
 - Windows 10 or Windows 11, x64.
-- Steam Scrap Mechanic `1.0.6.889`, Steam build `25442087`.
+- Steam Scrap Mechanic **test branch** `1.0.7.894`, Steam build `26302409` for this prerelease.
 - A 64-bit OpenXR runtime, such as Meta Quest Link, Virtual Desktop VDXR, or SteamVR OpenXR.
 
 ## Legacy game version

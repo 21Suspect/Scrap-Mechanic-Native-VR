@@ -69,7 +69,7 @@ function CreativePlayer.sv_n_unstuck( self )
 end
 
 function CreativePlayer.cl_e_unstuck( self )
-	self.cl.unstuckPopUp = sm.jsonGui.createGui( { isInteractive = true, needsCursor = true } )
+	self.cl.unstuckPopUp = sm.jsonGui.createGui( { isInteractive = true, needsCursor = true, name = "Unstuck" } )
 	self.cl.unstuckPopUp:render( UnstuckPopupGui.root )
 end
 

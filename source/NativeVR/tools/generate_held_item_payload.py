@@ -452,7 +452,7 @@ def patch_carry(text: str) -> str:
     )
     return replace_once(
         text,
-        "\tself:cl_tryTumbleDrop( character, playerCarry, carryUuid, characterShape, playerCarryColor )\n\n"
+        "\tself:cl_tryTumbleDrop( character, playerCarry, carryUuid, characterShape, playerCarryColor )\n"
         "    if primaryState == sm.tool.interactState.start and characterShape or secondaryState == sm.tool.interactState.start  then",
         "\tself:cl_tryTumbleDrop( character, playerCarry, carryUuid, characterShape, playerCarryColor )\n\n"
         "\tlocal _, vrActive = nil, false\n"

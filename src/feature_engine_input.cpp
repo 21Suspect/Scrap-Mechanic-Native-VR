@@ -23,17 +23,18 @@ namespace smvr::features
 {
 namespace
 {
-constexpr uint32_t kExpectedTimestamp = 0x6AB16723;
-constexpr uint32_t kExpectedImageSize = 0x01C24000;
+constexpr uint32_t kExpectedTimestamp = 0x6AE372FB;
+constexpr uint32_t kExpectedImageSize = 0x01C2C000;
 
-// Exact RVAs ported by instruction-level comparison between the archived
-// previous supported executable and Steam build 25442087 (1.0.6.889).
-constexpr uintptr_t kInputManagerPointerRva = 0x01A696C0;
-constexpr uintptr_t kKeyboardEventRva = 0x0061A510;
-constexpr uintptr_t kMouseDownRva = 0x0061A740;
-constexpr uintptr_t kMouseUpRva = 0x0061A820;
-constexpr uintptr_t kMouseMoveRva = 0x0061A910;
-constexpr uintptr_t kQueueEventRva = 0x0061A640;
+// Patch 1.0.7.894 (Steam test build 26302409). The IME update changed the
+// event ABI as well as these RVAs; do not reuse the 1.0.6 event structure.
+constexpr uintptr_t kInputManagerPointerRva = 0x01A71580;
+constexpr uintptr_t kInputManagerLoadRva = 0x00477AAE;
+constexpr uintptr_t kKeyboardEventRva = 0x0061DA60;
+constexpr uintptr_t kMouseDownRva = 0x0061DCD0;
+constexpr uintptr_t kMouseUpRva = 0x0061DDC0;
+constexpr uintptr_t kMouseMoveRva = 0x0061DEB0;
+constexpr uintptr_t kQueueEventRva = 0x0061DBC0;
 constexpr size_t kEventQueueOffset = 0x1E0;
 
 using MouseButtonFunction = void (*)(void *, int, int);
@@ -43,7 +44,8 @@ using QueueEventFunction = void (*)(void *, const void *);
 
 // Binary layout copied by kQueueEventRva. The +0x08 region is an empty MSVC
 // std::wstring in small-string mode (capacity seven); the payload begins at
-// +0x28. This is used only for the wheel event, for which the game exposes no
+// +0x30, after the new zero-initialized +0x28 field. This is used only for the
+// wheel event, for which the game exposes no
 // separate wrapper in this build.
 struct alignas(8) NativeInputEvent
 {
@@ -52,11 +54,13 @@ struct alignas(8) NativeInputEvent
     uint16_t inline_text[8]{};
     uint64_t text_size = 0;
     uint64_t text_capacity = 7;
+    uint64_t text_context = 0;
     int32_t data[6]{};
 };
-static_assert(sizeof(NativeInputEvent) == 0x40);
+static_assert(sizeof(NativeInputEvent) == 0x48);
 static_assert(offsetof(NativeInputEvent, inline_text) == 0x08);
-static_assert(offsetof(NativeInputEvent, data) == 0x28);
+static_assert(offsetof(NativeInputEvent, text_context) == 0x28);
+static_assert(offsetof(NativeInputEvent, data) == 0x30);
 
 bool readable_address(const void *address, size_t length)
 {
@@ -118,40 +122,48 @@ bool EngineInputQueue::validate_build_layout()
     // included, since their targets are independently checked below.
     const bool keyboard_ok =
         bytes_equal(base, kKeyboardEventRva, 0x00,
-            std::array<uint8_t, 18>{0x81,0xFA,0xFF,0x00,0x00,0x00,0x0F,0x84,0x1F,
+            std::array<uint8_t, 18>{0x81,0xFA,0xFF,0x00,0x00,0x00,0x0F,0x84,0x49,
                 0x01,0x00,0x00,0x55,0x53,0x56,0x57,0x41,0x56}) &&
-        bytes_equal(base, kKeyboardEventRva, 0x71,
-            std::array<uint8_t, 4>{0x44,0x89,0x75,0xCF}) &&
-        bytes_equal(base, kKeyboardEventRva, 0xAD,
-            std::array<uint8_t, 7>{0x48,0x8D,0x8F,0xE0,0x01,0x00,0x00});
+        bytes_equal(base, kKeyboardEventRva, 0xC8,
+            std::array<uint8_t, 4>{0x44,0x89,0x75,0xBF}) &&
+        bytes_equal(base, kKeyboardEventRva, 0xD7,
+            std::array<uint8_t, 7>{0x48,0x8D,0x8B,0xE0,0x01,0x00,0x00});
     const bool down_ok =
         bytes_equal(base, kMouseDownRva, 0x00,
-            std::array<uint8_t, 6>{0x40,0x53,0x48,0x83,0xEC,0x70}) &&
-        bytes_equal(base, kMouseDownRva, 0x4B,
-            std::array<uint8_t, 21>{0xC7,0x44,0x24,0x20,0x01,0x00,0x00,0x00,
-                0x89,0x5C,0x24,0x48,0x89,0x54,0x24,0x4C,0x44,0x89,0x44,0x24,0x50}) &&
-        bytes_equal(base, kMouseDownRva, 0x60,
+            std::array<uint8_t, 11>{0x4C,0x8B,0xDC,0x53,0x48,0x81,0xEC,0x80,0x00,0x00,0x00}) &&
+        bytes_equal(base, kMouseDownRva, 0x50,
+            std::array<uint8_t, 20>{0xC7,0x44,0x24,0x20,0x01,0x00,0x00,0x00,
+                0x89,0x5C,0x24,0x50,0x89,0x54,0x24,0x54,0x45,0x89,0x43,0xD0}) &&
+        bytes_equal(base, kMouseDownRva, 0x64,
             std::array<uint8_t, 7>{0x48,0x81,0xC1,0xE0,0x01,0x00,0x00});
     const bool up_ok =
         bytes_equal(base, kMouseUpRva, 0x00,
-            std::array<uint8_t, 6>{0x40,0x53,0x48,0x83,0xEC,0x70}) &&
-        bytes_equal(base, kMouseUpRva, 0x4B,
-            std::array<uint8_t, 25>{0xC7,0x44,0x24,0x20,0x01,0x00,0x00,0x00,
-                0xC7,0x44,0x24,0x48,0x01,0x00,0x00,0x00,0x89,0x54,0x24,0x4C,
-                0x44,0x89,0x44,0x24,0x50}) &&
-        bytes_equal(base, kMouseUpRva, 0x64,
+            std::array<uint8_t, 11>{0x4C,0x8B,0xDC,0x53,0x48,0x81,0xEC,0x80,0x00,0x00,0x00}) &&
+        bytes_equal(base, kMouseUpRva, 0x50,
+            std::array<uint8_t, 24>{0xC7,0x44,0x24,0x20,0x01,0x00,0x00,0x00,
+                0xC7,0x44,0x24,0x50,0x01,0x00,0x00,0x00,0x89,0x54,0x24,0x54,
+                0x45,0x89,0x43,0xD0}) &&
+        bytes_equal(base, kMouseUpRva, 0x68,
             std::array<uint8_t, 7>{0x48,0x81,0xC1,0xE0,0x01,0x00,0x00});
     const bool move_ok =
         bytes_equal(base, kMouseMoveRva, 0x00,
-            std::array<uint8_t, 8>{0x4C,0x8B,0xDC,0x53,0x48,0x83,0xEC,0x70}) &&
-        bytes_equal(base, kMouseMoveRva, 0x58,
+            std::array<uint8_t, 11>{0x4C,0x8B,0xDC,0x53,0x48,0x81,0xEC,0x80,0x00,0x00,0x00}) &&
+        bytes_equal(base, kMouseMoveRva, 0x5F,
             std::array<uint8_t, 8>{0xC7,0x44,0x24,0x20,0x03,0x00,0x00,0x00}) &&
-        bytes_equal(base, kMouseMoveRva, 0x7B,
+        bytes_equal(base, kMouseMoveRva, 0x82,
             std::array<uint8_t, 7>{0x48,0x81,0xC1,0xE0,0x01,0x00,0x00});
     const bool queue_ok = bytes_equal(base, kQueueEventRva, 0x00,
         std::array<uint8_t, 20>{0x48,0x89,0x5C,0x24,0x10,0x48,0x89,0x6C,0x24,0x18,
-            0x48,0x89,0x74,0x24,0x20,0x57,0x48,0x83,0xEC,0x20});
-    const bool pointer_ok = readable_address(base + kInputManagerPointerRva, sizeof(void *));
+            0x48,0x89,0x74,0x24,0x20,0x57,0x48,0x83,0xEC,0x20}) &&
+        bytes_equal(base, kQueueEventRva, 0x5B,
+            std::array<uint8_t, 5>{0xB9,0x48,0x00,0x00,0x00}) &&
+        bytes_equal(base, kQueueEventRva, 0x96,
+            std::array<uint8_t, 22>{0x48,0x8B,0x46,0x28,0x48,0x89,0x43,0x28,
+                0x0F,0x10,0x46,0x30,0x0F,0x11,0x43,0x30,
+                0x8B,0x46,0x40,0x89,0x43,0x40});
+    const bool pointer_ok = readable_address(base + kInputManagerPointerRva, sizeof(void *)) &&
+        bytes_equal(base, kInputManagerLoadRva, 0x00,
+            std::array<uint8_t, 7>{0x48,0x8B,0x0D,0xCB,0x9A,0x5F,0x01});
     layout_valid_ = keyboard_ok && down_ok && up_ok && move_ok && queue_ok && pointer_ok;
     if (!layout_valid_ && !invalid_logged_)
     {

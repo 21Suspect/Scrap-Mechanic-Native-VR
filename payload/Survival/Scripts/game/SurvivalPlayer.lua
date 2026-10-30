@@ -289,7 +289,7 @@ function SurvivalPlayer.sv_n_unstuck( self )
 end
 
 function SurvivalPlayer.cl_e_unstuck( self )
-	self.cl.unstuckPopUp = sm.jsonGui.createGui( { isInteractive = true, needsCursor = true } )
+	self.cl.unstuckPopUp = sm.jsonGui.createGui( { isInteractive = true, needsCursor = true, name = "Unstuck" } )
 	self.cl.unstuckPopUp:render( UnstuckPopupGui.root )
 end
 
@@ -1247,6 +1247,9 @@ function SurvivalPlayer.sv_e_feed( self, params )
 				self.sv.saved.hasRevivalItem = true
 				self.player:sendCharacterEvent( "baguette" )
 				self.network:setClientData( self.sv.saved )
+				if params.fromBabywoc then
+					sm.achievement.seti( "63192fc7-41ae-4a7c-8d1e-294012bcdf32", 1, { self.player.id } )
+				end
 			end
 		end
 	end

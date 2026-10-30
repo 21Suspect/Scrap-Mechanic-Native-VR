@@ -66,11 +66,9 @@ function SurvivalGame.server_onCreate( self )
 		self.sv.saved.data = self.data
 		printf( "Seed: %.0f", self.sv.saved.data.seed )
 		self.sv.saved.overworld = sm.world.createWorld( "$SURVIVAL_DATA/Scripts/game/worlds/Overworld.lua", "Overworld", { dev = self.sv.saved.data.dev }, self.sv.saved.data.seed )
-	else
-		if self.sv.saved.overworld and not sm.exists( self.sv.saved.overworld ) then
-			-- Load overworld to create TileStorageKeys
-			sm.world.loadWorld( self.sv.saved.overworld )
-		end
+	elseif self.sv.saved.overworld and not sm.exists( self.sv.saved.overworld ) then
+		-- Load overworld to create TileStorageKeys
+		sm.world.loadWorld( self.sv.saved.overworld )
 	end
 	self.sv.saved.lootTier = self.sv.saved.lootTier or 1
 	g_lootTier = self.sv.saved.lootTier
@@ -152,10 +150,6 @@ end
 function SurvivalGame.server_onRefresh( self )
 	g_craftingRecipeSets = nil
 	self:loadCraftingRecipes()
-end
-
-function SurvivalGame.server_onUnload( self )
-	TileStorageManager.Sv_Save()
 end
 
 function SurvivalGame.client_onCreate( self )
@@ -1752,7 +1746,6 @@ function SurvivalGame.sv_onChatCommand( self, params, player )
 
 
 
-
 	else
 		params.player = player
 		if sm.exists( player.character ) then
@@ -1900,38 +1893,10 @@ function SurvivalGame.sv_banPlayer( self, name )
 	end
 end
 
-function SurvivalGame.sv_e_createUndergroundElevatorDestination( self, params )
-	print( "------------------------------------------------" )
-	print( "Creating underground elevator destination" )
-	print( params )
-	print( "------------------------------------------------" )
-
-	assert( params.depth, "Underground elevator destination depth is nil" )
-	assert( params.elevatorName, "Underground elevator name is nil" )
-	assert( params.connectionTag, "Underground elevator connection tag is nil" )
-
-	if params.depth == 0 then
-		if not sm.exists( self.sv.saved.overworld ) then
-			sm.world.loadWorld( self.sv.saved.overworld )
-		end
-		UndergroundElevatorManager.Sv_LoadDestinationWorldCell( self.sv.saved.overworld, params.elevatorName, params.connectionTag )
-		return
-	end
-
-	if self.sv.undergroundWorlds[params.depth] then
-		print( "Underground world already exists, loading..." )
-		if not sm.exists( self.sv.undergroundWorlds[params.depth] ) then
-			sm.world.loadWorld( self.sv.undergroundWorlds[params.depth] )
-		end
-	else
-		local def = UNDERGROUND_DEFS[params.depth]
-		local world = sm.world.createWorld( def.script.file, def.script.class, { depth = params.depth, worldFilePath = def.world }, math.random( 1073741823 ) )
-		self.sv.undergroundWorlds[params.depth] = world
-		sm.storage.save( STORAGE_CHANNEL_UNDERGROUND_WORLDS, self.sv.undergroundWorlds )
-	end
-	UndergroundElevatorManager.Sv_LoadDestinationWorldCell( self.sv.undergroundWorlds[params.depth], params.elevatorName, params.connectionTag )
+function SurvivalGame.sv_e_addUndergroundWorld( self, params )
+	self.sv.undergroundWorlds[params.depth] = params.world
+	sm.storage.save( STORAGE_CHANNEL_UNDERGROUND_WORLDS, self.sv.undergroundWorlds )
 end
-
 
 function SurvivalGame.sv_createNewPlayer( self, world, x, y, player )
 	local params = { player = player, x = x, y = y }

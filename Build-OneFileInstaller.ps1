@@ -13,7 +13,7 @@ if (-not (Test-Path -LiteralPath $csc -PathType Leaf)) {
 }
 
 $manifest = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'manifest.json') | ConvertFrom-Json
-if ($manifest.game.executableSha256 -ne 'CF403CF9D3E465E05298C8E6082F4D664C32140EBCC4696A64200E367ABB530D') {
+if ($manifest.game.executableSha256 -ne 'C5D93162DB87605CBB70598B347634F555A2F7C3658225963C5ED8F97F68EEAA') {
     throw 'Refusing to build: the guarded game executable hash changed unexpectedly.'
 }
 

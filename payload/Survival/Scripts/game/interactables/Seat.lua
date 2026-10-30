@@ -7,7 +7,7 @@ Seat = class()
 Seat.maxChildCount = 10
 Seat.connectionOutput = sm.interactable.connectionType.seated
 Seat.colorNormal = sm.color.new( 0x0da02aff )
-Seat.colorHighlight = sm.color.new( 0x0da02aff )
+Seat.colorHighlight = sm.color.new( 0x20b53dff )
 Seat.upgradeCostItem = ITEMS.obj_consumable_component
 Seat.upgradeTextDefaultColor = "#9f9e9e"
 Seat.upgradeTextNumberColor = "#c4f42b"
@@ -128,6 +128,15 @@ local function ScrapVrSeatGunActionFiltered( controllerAction, state )
 	end
 	ScrapVrSeatGunActionDown = nextDown
 	return true
+end
+
+function Seat.server_onCreate( self )
+	-- Seats with containers is a bug.
+	for i = 0, 15 do
+		if self.shape.interactable:getContainer( i ) then
+			self.shape.interactable:removeContainer( i )
+		end
+	end
 end
 
 function Seat.server_onFixedUpdate( self )
