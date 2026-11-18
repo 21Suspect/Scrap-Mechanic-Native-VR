@@ -1,10 +1,10 @@
 {
   "snapshot": "v1.4.11",
-  "status": "chapter2-release-candidate",
+  "status": "chapter2-stable",
   "legacyBranch": "legacy-pre-1.0",
   "chapter2Branch": "main",
   "localFeatureBranch": "compat/sm-1.0.7-public",
-  "localFeatureStatus": "public-build-validation",
+  "localFeatureStatus": "public-build-tested",
   "game": {
     "steamAppId": 387990,
     "steamBuildId": 26702088,
@@ -18,7 +18,7 @@
     "runtimeFov": "exact",
     "thirdSceneRender": false,
     "mirrorSource": "already-rendered-left-eye",
-    "runtimeValidation": "PENDING_HEADSET_TEST"
+    "runtimeValidation": "PASS_META_OPENXR_STEREO_FRAMES"
   },
   "source": {
     "path": "src/native_vr.cpp",
@@ -39,7 +39,7 @@
     "path": "payload/Release/smvr_native_vr_v1.addon64",
     "size": 8493056,
     "sha256": "3D445F3A985B7E4545DEAB60F52EFA6C5D8C56CBFA44B5C5447D433E95D2C8F3",
-    "headsetConfirmed": false,
+    "headsetConfirmed": true,
     "source": {
       "nativeVrSha256": "C442BC974E56A73320EC5A3D1B211D7A21937506E2C3923173BA787F319F86BA",
       "featureInputSha256": "5EDE8DE0F2D2378550CFE5BC04FCDE53750768D8BAB1857427A4B81F14D7C3A4",
@@ -118,18 +118,20 @@
     "userSettingsPreservation": "PASS",
     "retiredCacheInvalidation": "PASS",
     "installerSelfTest": "PASS",
-    "headsetConfirmed": false,
+    "headsetConfirmed": true,
     "gameStartup": "PASS_DESKTOP_MAIN_MENU_WITH_MOD_LOADED",
     "localGameInstalled": true,
     "cacheColdStartup": "PASS_MAIN_MENU_AFTER_98_SECOND_LOADING_SCREEN",
-    "openXrRuntime": "META_RUNTIME_AVAILABLE_NO_HEADSET"
+    "openXrRuntime": "PASS_META_STEREO_FRAME_SUBMISSION",
+    "headsetGameplay": "PASS_USER_CONFIRMED",
+    "engineInputRoute": "ACTIVE_ON_PUBLIC_BUILD"
   },
   "installer": {
     "version": "1.4.11-chapter2-20261118",
     "path": "dist/ScrapMechanicVR-Installer.exe",
     "selfTest": "PASS",
-    "published": false,
-    "releaseChannel": "candidate",
+    "published": true,
+    "releaseChannel": "stable",
     "releaseTag": "v1.4.11"
   }
 }

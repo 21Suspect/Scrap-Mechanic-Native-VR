@@ -40,7 +40,7 @@ The documented executable hash remains the only supported configuration. The ins
 
 The public artifact is `dist/ScrapMechanicVR-Installer.exe`. It validates its embedded patcher, manifest, native add-on, branded UI assets, soundtrack, and the managed payload before installation. Its five user actions are Install VR Mod, Uninstall VR Mod, Start VR, Open Logs, and Open Bindings. Install automatically migrates a managed older/current build and verifies the completed installation. Uninstall removes managed current/older builds, restores backups, and verifies the result. Start VR requires the active OpenXR runtime to report a connected headset.
 
-Current candidate: `1.4.11` for Scrap Mechanic `1.0.7a.903` / public Steam build `26702088`
+Current release: `1.4.11` for Scrap Mechanic `1.0.7a.903` / public Steam build `26702088`
 
 The installer SHA-256 is recorded in `SHA256SUMS.txt`.
 

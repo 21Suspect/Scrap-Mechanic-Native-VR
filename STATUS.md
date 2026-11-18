@@ -1,8 +1,8 @@
 # Chapter 2 release status
 
-Current candidate: `1.4.11` for Scrap Mechanic `1.0.7a.903`, public Steam build `26702088`.
+Current release: `1.4.11` for Scrap Mechanic `1.0.7a.903`, public Steam build `26702088`.
 
-The candidate passes the native build, executable layout checks, Lua and shader regressions, installer self-test, and isolated install and uninstall checks. See `snapshot.json` for runtime validation.
+The candidate passes the native build, executable layout checks, Lua and shader regressions, installer self-test, and isolated install and uninstall checks. The maintainer confirmed VR gameplay, and the runtime log confirmed stereo frame submission through Meta OpenXR. See `snapshot.json` for validation details.
 
 ## Inherited baseline features (require retesting on 1.0.7)
 
@@ -50,6 +50,6 @@ The candidate passes the native build, executable layout checks, Lua and shader 
 
 ## Installer
 
-`dist/ScrapMechanicVR-Installer.exe` embeds and validates the managed payload, branded installer artwork and soundtrack. The 1.0.7 prerelease invalidates the old game-data cache for rebuilding on first launch. It starts music at 50% with a compact volume control and presents Install VR Mod, Uninstall VR Mod, Start VR, Open Logs, and Open Bindings. Install and uninstall detect current/older managed versions, explain the exact operation before asking for approval, migrate or restore safely, and verify automatically. Unknown game builds require an additional explicit warning confirmation while all managed-file hash checks remain enforced. Known prior-release payloads are migrated by exact path and SHA-256, same-version metadata refreshes retain their verified restore authority, and active calibration helpers are reported before any transaction begins. The wrist HUD is fixed in the native renderer, so no HUD calibration helper is installed. Start VR requires a connected headset reported by the active OpenXR runtime.
+`dist/ScrapMechanicVR-Installer.exe` embeds and validates the managed payload, branded installer artwork and soundtrack. The 1.0.7 installer invalidates the old game-data cache for rebuilding on first launch. It starts music at 50% with a compact volume control and presents Install VR Mod, Uninstall VR Mod, Start VR, Open Logs, and Open Bindings. Install and uninstall detect current/older managed versions, explain the exact operation before asking for approval, migrate or restore safely, and verify automatically. Unknown game builds require an additional explicit warning confirmation while all managed-file hash checks remain enforced. Known prior-release payloads are migrated by exact path and SHA-256, same-version metadata refreshes retain their verified restore authority, and active calibration helpers are reported before any transaction begins. The wrist HUD is fixed in the native renderer, so no HUD calibration helper is installed. Start VR requires a connected headset reported by the active OpenXR runtime.
 
 Installer SHA-256: see `SHA256SUMS.txt`.
