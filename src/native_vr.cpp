@@ -40,17 +40,17 @@ static_assert(RESHADE_API_VERSION == 18, "SMVR v1 requires ReShade API 18");
 
 namespace smvr
 {
-// Patch 1.0.7.894, Steam test build 26302409. Entry points and result layouts
+// Patch 1.0.7a.903, Steam public build 26702088. Entry points and result layouts
 // are checked against the instructions below before installing any hooks.
-constexpr uintptr_t kRenderSetupRva = 0x85E7F0;
-constexpr uintptr_t kCameraBuildRva = 0x908FF0;
-constexpr uintptr_t kFirstPersonCameraCallerRva = 0x866CE0;
-constexpr uintptr_t kViewmodelSkipBranchRva = 0x866CE4;
-constexpr uintptr_t kRaycastRva = 0x4798D0;
-constexpr uintptr_t kPlayerToolRaycastReturnRva = 0x45902E;
-constexpr uintptr_t kRaycastResultFractionStoreRva = 0x7A1592;
+constexpr uintptr_t kRenderSetupRva = 0x85EC70;
+constexpr uintptr_t kCameraBuildRva = 0x909470;
+constexpr uintptr_t kFirstPersonCameraCallerRva = 0x867160;
+constexpr uintptr_t kViewmodelSkipBranchRva = 0x867164;
+constexpr uintptr_t kRaycastRva = 0x479890;
+constexpr uintptr_t kPlayerToolRaycastReturnRva = 0x458FEE;
+constexpr uintptr_t kRaycastResultFractionStoreRva = 0x7A1A12;
 constexpr uint32_t kGameImageSize = 0x1C2C000;
-constexpr uint32_t kGameTimestamp = 0x6AE372FB;
+constexpr uint32_t kGameTimestamp = 0x6AFAF484;
 constexpr uintptr_t kFrameRendererOffset = 0x2A0;
 constexpr uintptr_t kLowRendererOffset = 0x8;
 constexpr uintptr_t kDeviceOffset = 0x2F0;
@@ -4204,7 +4204,7 @@ extern "C" __declspec(dllexport) BOOL AddonInit(HMODULE addon_module, HMODULE re
     smvr::reset_hand_bridge(true);
     smvr::deactivate_hand_bridge();
     smvr::remove_world_state_bridge();
-    smvr::log_line("SMVR_V1_START enabled=%u game_build=26302409 game_version=1.0.7.894 prerelease=1 exe_sha256=C5D93162...8EEAA", smvr::g_enabled.load() ? 1u : 0u);
+    smvr::log_line("SMVR_V1_START enabled=%u game_build=26702088 game_version=1.0.7a.903 exe_sha256=3A377C46...D603", smvr::g_enabled.load() ? 1u : 0u);
     if (!smvr::validate_build()) { smvr::log_line("FAIL stage=validate_build"); return FALSE; }
     if (!reshade::register_addon(addon_module, reshade_module))
     {

@@ -21,6 +21,37 @@ CreativeGame.enableAmmoConsumption = false
 CreativeGame.enableUpgrade = true
 CreativeGame.enableRecipes = false
 
+local UnanchorPopupGui = {}
+UnanchorPopupGui.root = sm.json.open( "$GAME_DATA/Gui/JsonGuis/PopUp_YN.gui" )
+UnanchorPopupGui.index = IndexWidgets( UnanchorPopupGui.root )
+UnanchorPopupGui.index["Title"].Caption = "#{MENU_YN_TITLE_ARE_YOU_SURE}"
+UnanchorPopupGui.index["Message"].Caption = "#{MENU_YN_MESSAGE_UNANCHOR}"
+UnanchorPopupGui.index["Yes"].onClick = "cl_e_unanchorYes"
+UnanchorPopupGui.index["No"].onClick = "cl_e_unanchorNo"
+
+-- Replace the alert icon with a preview of the creation and push the rest of the popup down to make room
+local UnanchorPreviewHeight = 140
+local UnanchorPreviewOffset = 90
+for i, child in ipairs( UnanchorPopupGui.root.Childs ) do
+	if child.Name == "Icon" then
+		UnanchorPopupGui.root.Childs[i] = {
+			Childs = {},
+			Name = "Preview",
+			NeedKey = false,
+			NeedMouse = true,
+			Skin = "Canvas",
+			Type = "PreviewBox",
+			height = UnanchorPreviewHeight,
+			width = 266,
+			x = 40,
+			y = 40
+		}
+	else
+		child.y = child.y + UnanchorPreviewOffset
+	end
+end
+UnanchorPopupGui.root.height = UnanchorPopupGui.root.height + UnanchorPreviewOffset
+
 local TimeSyncInterval = 400
 local WeatherConditions = {
 	rain = "Rain",
@@ -148,6 +179,7 @@ function CreativeGame.client_onCreate( self )
 	sm.game.bindChatCommand( "/weather", { { "string", "condition", false, { "rain", "thunder", "clear", "cloudy", "drizzle" } } }, "cl_onChatCommand", "Sets the weather condition" )
 	sm.game.bindChatCommand( "/day", {}, "cl_onChatCommand", "Sets time of day to day" )
 	sm.game.bindChatCommand( "/night", {}, "cl_onChatCommand", "Sets time of day to night" )
+	sm.game.bindChatCommand( "/unanchor", {}, "cl_onChatCommand", "Unanchors the aimed creation from the ground" )
 
 
 
@@ -262,6 +294,39 @@ function CreativeGame.cl_onClearConfirmButtonClick( self, name )
 	self.cl.confirmClearGui = nil
 end
 
+function CreativeGame.cl_openUnanchorPopup( self, body )
+	self:cl_e_unanchorNo()
+	self.cl.unanchorBody = body
+	self.cl.unanchorPopUp = sm.jsonGui.createGui( { isInteractive = true, needsCursor = true, name = "Unanchor" } )
+	self.cl.unanchorPopUp:render( UnanchorPopupGui.root )
+	local previewBox = self.cl.unanchorPopUp:getWidget( "Preview" )
+	local blueprint = sm.creation.exportToTable( body )
+	if previewBox and type( blueprint ) == "table" and blueprint.bodies ~= nil then
+		previewBox:setPreview( blueprint )
+	end
+end
+
+function CreativeGame.cl_e_unanchorYes( self )
+	if self.cl.unanchorBody and sm.exists( self.cl.unanchorBody ) then
+		self.network:sendToServer( "sv_n_unanchor", { body = self.cl.unanchorBody } )
+	end
+	self:cl_e_unanchorNo()
+end
+
+function CreativeGame.cl_e_unanchorNo( self )
+	self.cl.unanchorBody = nil
+	if self.cl.unanchorPopUp then
+		self.cl.unanchorPopUp:close()
+		self.cl.unanchorPopUp = nil
+	end
+end
+
+function CreativeGame.sv_n_unanchor( self, params )
+	if sm.exists( params.body ) then
+		params.body:makeCreationDynamic()
+	end
+end
+
 function CreativeGame.sv_clear( self, _, player )
 	if player.character and sm.exists( player.character ) then
 		sm.event.sendToWorld( player.character:getWorld(), "sv_e_clear" )
@@ -278,6 +343,23 @@ function CreativeGame.cl_onChatCommand( self, params )
 			params.aimPosition = sm.localPlayer.getRaycastStart() + sm.localPlayer.getDirection() * range
 		end
 		self.network:sendToServer( "sv_n_onChatCommand", params )
+	elseif params[1] == "/unanchor" then
+		local rayCastValid, rayCastResult = sm.localPlayer.getRaycast( 100 )
+		if rayCastValid and rayCastResult.type == "body" then
+			local body = rayCastResult:getBody()
+			local hasStaticBody = false
+			for _, creationBody in ipairs( body:getCreationBodies() ) do
+				if creationBody:isStatic() then
+					hasStaticBody = true
+					break
+				end
+			end
+			if hasStaticBody then
+				self:cl_openUnanchorPopup( body )
+			else
+				sm.gui.chatMessage( "This creation is not anchored" )
+			end
+		end
 	elseif params[1] == "/allowclear" then
 		local clearEnabled = not self.clearEnabled
 		if type( params[2] ) == "boolean" then

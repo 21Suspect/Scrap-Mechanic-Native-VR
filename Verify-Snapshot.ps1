@@ -99,11 +99,11 @@ if ($GamePath) {
     $exe = Join-Path $GamePath 'Release\ScrapMechanic.exe'
     if (-not (Test-Path -LiteralPath $exe)) { throw "Game executable not found: $exe" }
     $gameHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $exe).Hash
-    $expectedGame = 'C5D93162DB87605CBB70598B347634F555A2F7C3658225963C5ED8F97F68EEAA'
+    $expectedGame = '3A377C463531F4F75A41F5465266110F80799AA648E61F17E34CB1B9BF67D603'
     if ($gameHash -ne $expectedGame) {
         throw "Unsupported ScrapMechanic.exe: expected $expectedGame, got $gameHash"
     }
 }
 
 Write-Host "Snapshot payload and source hashes verified for branch $branch."
-if ($GamePath) { Write-Host "Supported Scrap Mechanic build verified: Steam test build 26302409 (1.0.7.894)." }
+if ($GamePath) { Write-Host "Supported Scrap Mechanic build verified: Steam public build 26702088 (1.0.7a.903)." }

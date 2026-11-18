@@ -23,30 +23,32 @@ namespace smvr::features
 {
 namespace
 {
-constexpr uint32_t kExpectedTimestamp = 0x6AE372FB;
+constexpr uint32_t kExpectedTimestamp = 0x6AFAF484;
 constexpr uint32_t kExpectedImageSize = 0x01C2C000;
 
-// Patch 1.0.7.894 (Steam test build 26302409). The IME update changed the
-// event ABI as well as these RVAs; do not reuse the 1.0.6 event structure.
-constexpr uintptr_t kInputManagerPointerRva = 0x01A71580;
-constexpr uintptr_t kInputManagerLoadRva = 0x00477AAE;
-constexpr uintptr_t kKeyboardEventRva = 0x0061DA60;
-constexpr uintptr_t kMouseDownRva = 0x0061DCD0;
-constexpr uintptr_t kMouseUpRva = 0x0061DDC0;
-constexpr uintptr_t kMouseMoveRva = 0x0061DEB0;
-constexpr uintptr_t kQueueEventRva = 0x0061DBC0;
-constexpr size_t kEventQueueOffset = 0x1E0;
+// Patch 1.0.7a.903 (Steam public build 26702088).
+constexpr uintptr_t kInputManagerPointerRva = 0x01A71648;
+constexpr uintptr_t kInputManagerLoadRva = 0x0047824B;
+constexpr uintptr_t kKeyboardEventRva = 0x0061DF20;
+constexpr uintptr_t kMouseDownRva = 0x0061DA40;
+constexpr uintptr_t kMouseUpRva = 0x0061DB30;
+constexpr uintptr_t kMouseMoveRva = 0x0061DC20;
+constexpr uintptr_t kQueueEventRva = 0x0061D930;
+constexpr size_t kEventQueueOffset = 0x1F0;
+constexpr size_t kCursorXOffset = 0x20;
+constexpr size_t kCursorYOffset = 0x24;
+constexpr uint32_t kKeyEvent = 0;
+constexpr uint32_t kWheelEvent = 3;
+constexpr uintptr_t kWheelBuilderRva = 0x0061E557;
 
 using MouseButtonFunction = void (*)(void *, int, int);
 using MouseMoveFunction = void (*)(void *, int, int, int, int, int);
-using KeyboardEventFunction = void (*)(void *, int, int, int, bool, uint16_t, int);
 using QueueEventFunction = void (*)(void *, const void *);
 
 // Binary layout copied by kQueueEventRva. The +0x08 region is an empty MSVC
 // std::wstring in small-string mode (capacity seven); the payload begins at
-// +0x30, after the new zero-initialized +0x28 field. This is used only for the
-// wheel event, for which the game exposes no
-// separate wrapper in this build.
+// +0x30, after the zero-initialized +0x28 field. Keyboard and wheel
+// input both use the queue directly.
 struct alignas(8) NativeInputEvent
 {
     uint32_t type = 0;
@@ -122,36 +124,32 @@ bool EngineInputQueue::validate_build_layout()
     // included, since their targets are independently checked below.
     const bool keyboard_ok =
         bytes_equal(base, kKeyboardEventRva, 0x00,
-            std::array<uint8_t, 18>{0x81,0xFA,0xFF,0x00,0x00,0x00,0x0F,0x84,0x49,
-                0x01,0x00,0x00,0x55,0x53,0x56,0x57,0x41,0x56}) &&
-        bytes_equal(base, kKeyboardEventRva, 0xC8,
-            std::array<uint8_t, 4>{0x44,0x89,0x75,0xBF}) &&
-        bytes_equal(base, kKeyboardEventRva, 0xD7,
-            std::array<uint8_t, 7>{0x48,0x8D,0x8B,0xE0,0x01,0x00,0x00});
+            std::array<uint8_t, 12>{0x48,0x89,0x5C,0x24,0x18,0x55,0x56,0x57,0x41,0x56,0x41,0x57}) &&
+        bytes_equal(base, kKeyboardEventRva, 0xC3,
+            std::array<uint8_t, 12>{0x83,0xF0,0x01,0x89,0x45,0xAF,0x89,0x7D,0xB3,0x89,0x5D,0xB7}) &&
+        bytes_equal(base, kKeyboardEventRva, 0x154,
+            std::array<uint8_t, 11>{0x48,0x8D,0x8E,0xF0,0x01,0x00,0x00,0x48,0x8D,0x55,0xCF});
     const bool down_ok =
         bytes_equal(base, kMouseDownRva, 0x00,
             std::array<uint8_t, 11>{0x4C,0x8B,0xDC,0x53,0x48,0x81,0xEC,0x80,0x00,0x00,0x00}) &&
         bytes_equal(base, kMouseDownRva, 0x50,
-            std::array<uint8_t, 20>{0xC7,0x44,0x24,0x20,0x01,0x00,0x00,0x00,
-                0x89,0x5C,0x24,0x50,0x89,0x54,0x24,0x54,0x45,0x89,0x43,0xD0}) &&
+            std::array<uint8_t, 20>{0xC7,0x44,0x24,0x20,0x02,0x00,0x00,0x00,0x89,0x5C,0x24,0x50,0x89,0x54,0x24,0x54,0x45,0x89,0x43,0xD0}) &&
         bytes_equal(base, kMouseDownRva, 0x64,
-            std::array<uint8_t, 7>{0x48,0x81,0xC1,0xE0,0x01,0x00,0x00});
+            std::array<uint8_t, 7>{0x48,0x81,0xC1,0xF0,0x01,0x00,0x00});
     const bool up_ok =
         bytes_equal(base, kMouseUpRva, 0x00,
             std::array<uint8_t, 11>{0x4C,0x8B,0xDC,0x53,0x48,0x81,0xEC,0x80,0x00,0x00,0x00}) &&
         bytes_equal(base, kMouseUpRva, 0x50,
-            std::array<uint8_t, 24>{0xC7,0x44,0x24,0x20,0x01,0x00,0x00,0x00,
-                0xC7,0x44,0x24,0x50,0x01,0x00,0x00,0x00,0x89,0x54,0x24,0x54,
-                0x45,0x89,0x43,0xD0}) &&
+            std::array<uint8_t, 24>{0xC7,0x44,0x24,0x20,0x02,0x00,0x00,0x00,0xC7,0x44,0x24,0x50,0x01,0x00,0x00,0x00,0x89,0x54,0x24,0x54,0x45,0x89,0x43,0xD0}) &&
         bytes_equal(base, kMouseUpRva, 0x68,
-            std::array<uint8_t, 7>{0x48,0x81,0xC1,0xE0,0x01,0x00,0x00});
+            std::array<uint8_t, 7>{0x48,0x81,0xC1,0xF0,0x01,0x00,0x00});
     const bool move_ok =
         bytes_equal(base, kMouseMoveRva, 0x00,
             std::array<uint8_t, 11>{0x4C,0x8B,0xDC,0x53,0x48,0x81,0xEC,0x80,0x00,0x00,0x00}) &&
         bytes_equal(base, kMouseMoveRva, 0x5F,
-            std::array<uint8_t, 8>{0xC7,0x44,0x24,0x20,0x03,0x00,0x00,0x00}) &&
+            std::array<uint8_t, 8>{0xC7,0x44,0x24,0x20,0x04,0x00,0x00,0x00}) &&
         bytes_equal(base, kMouseMoveRva, 0x82,
-            std::array<uint8_t, 7>{0x48,0x81,0xC1,0xE0,0x01,0x00,0x00});
+            std::array<uint8_t, 7>{0x48,0x81,0xC1,0xF0,0x01,0x00,0x00});
     const bool queue_ok = bytes_equal(base, kQueueEventRva, 0x00,
         std::array<uint8_t, 20>{0x48,0x89,0x5C,0x24,0x10,0x48,0x89,0x6C,0x24,0x18,
             0x48,0x89,0x74,0x24,0x20,0x57,0x48,0x83,0xEC,0x20}) &&
@@ -163,12 +161,14 @@ bool EngineInputQueue::validate_build_layout()
                 0x8B,0x46,0x40,0x89,0x43,0x40});
     const bool pointer_ok = readable_address(base + kInputManagerPointerRva, sizeof(void *)) &&
         bytes_equal(base, kInputManagerLoadRva, 0x00,
-            std::array<uint8_t, 7>{0x48,0x8B,0x0D,0xCB,0x9A,0x5F,0x01});
-    layout_valid_ = keyboard_ok && down_ok && up_ok && move_ok && queue_ok && pointer_ok;
+            std::array<uint8_t, 7>{0x48,0x8B,0x0D,0xF6,0x93,0x5F,0x01});
+    const bool wheel_ok = bytes_equal(base, kWheelBuilderRva, 0x3F,
+        std::array<uint8_t, 7>{0xC7,0x45,0xC7,0x03,0x00,0x00,0x00});
+    layout_valid_ = keyboard_ok && down_ok && up_ok && move_ok && queue_ok && pointer_ok && wheel_ok;
     if (!layout_valid_ && !invalid_logged_)
     {
         invalid_logged_ = true;
-        log_line("VR_UI_ENGINE_INPUT_REJECTED build_layout_mismatch keyboard=%u down=%u up=%u move=%u queue=%u pointer=%u win32_fallback=0",
+        log_line("VR_UI_ENGINE_INPUT_REJECTED build_layout_mismatch keyboard=%u down=%u up=%u move=%u queue=%u pointer=%u wheel=%u win32_fallback=0",
             keyboard_ok?1u:0u,down_ok?1u:0u,up_ok?1u:0u,move_ok?1u:0u,
             queue_ok?1u:0u,pointer_ok?1u:0u);
     }
@@ -243,9 +243,14 @@ bool EngineInputQueue::queue_key(uint32_t virtual_key, bool down)
     if (extended) scan_code |= 0x80;
 
     auto *base = reinterpret_cast<uint8_t *>(GetModuleHandleW(nullptr));
-    reinterpret_cast<KeyboardEventFunction>(base + kKeyboardEventRva)(
-        manager, static_cast<int>(virtual_key), scan_code,
-        static_cast<int>(keyboard_modifiers_), extended, 0, down ? 0 : 1);
+    NativeInputEvent event{};
+    event.type = kKeyEvent;
+    event.data[0] = down ? 0 : 1;
+    event.data[1] = static_cast<int>(virtual_key);
+    event.data[2] = scan_code;
+    event.data[3] = static_cast<int>(keyboard_modifiers_);
+    reinterpret_cast<QueueEventFunction>(base + kQueueEventRva)(
+        reinterpret_cast<uint8_t *>(manager) + kEventQueueOffset, &event);
     return true;
 }
 
@@ -256,8 +261,8 @@ bool EngineInputQueue::queue_mouse_delta(int delta_x, int delta_y,
     if (!manager || client_width <= 0 || client_height <= 0) return false;
     const auto *bytes = reinterpret_cast<const uint8_t *>(manager);
     int current_x = 0, current_y = 0;
-    std::memcpy(&current_x, bytes + 0x30, sizeof(current_x));
-    std::memcpy(&current_y, bytes + 0x34, sizeof(current_y));
+    std::memcpy(&current_x, bytes + kCursorXOffset, sizeof(current_x));
+    std::memcpy(&current_y, bytes + kCursorYOffset, sizeof(current_y));
     const int client_x = std::clamp(current_x + delta_x, 0, client_width - 1);
     const int client_y = std::clamp(current_y + delta_y, 0, client_height - 1);
     return queue_mouse_move(delta_x, delta_y, client_x, client_y);
@@ -279,7 +284,7 @@ bool EngineInputQueue::queue_mouse_wheel(int delta)
     void *manager = input_manager();
     if (!manager || delta == 0) return false;
     NativeInputEvent event{};
-    event.type = 2;
+    event.type = kWheelEvent;
     event.data[0] = delta;
     event.data[1] = 0;
     auto *base = reinterpret_cast<uint8_t *>(GetModuleHandleW(nullptr));

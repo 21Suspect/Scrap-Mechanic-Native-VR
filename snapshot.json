@@ -1,28 +1,28 @@
 {
-  "snapshot": "v1.4.11-pre.1",
-  "status": "chapter2-prerelease",
+  "snapshot": "v1.4.11",
+  "status": "chapter2-release-candidate",
   "legacyBranch": "legacy-pre-1.0",
   "chapter2Branch": "main",
-  "localFeatureBranch": "compat/sm-1.0.7",
-  "localFeatureStatus": "prerelease-built-static-and-isolated-install-validated",
+  "localFeatureBranch": "compat/sm-1.0.7-public",
+  "localFeatureStatus": "public-build-validation",
   "game": {
     "steamAppId": 387990,
-    "steamBuildId": 26302409,
-    "fileVersion": "1.0.7.894",
+    "steamBuildId": 26702088,
+    "fileVersion": "1.0.7a.903",
     "executable": "Release/ScrapMechanic.exe",
-    "size": 28964352,
-    "sha256": "C5D93162DB87605CBB70598B347634F555A2F7C3658225963C5ED8F97F68EEAA"
+    "size": 28964864,
+    "sha256": "3A377C463531F4F75A41F5465266110F80799AA648E61F17E34CB1B9BF67D603"
   },
   "rendering": {
     "eyeCount": 2,
     "runtimeFov": "exact",
     "thirdSceneRender": false,
     "mirrorSource": "already-rendered-left-eye",
-    "runtimeValidation": "PENDING_1.0.7_HEADSET_TEST"
+    "runtimeValidation": "PENDING_HEADSET_TEST"
   },
   "source": {
     "path": "src/native_vr.cpp",
-    "sha256": "EC9ABDF254EE79FC8879D406409DCF7165FE6B3EC440C8F1A091E5AF21FFE208",
+    "sha256": "C442BC974E56A73320EC5A3D1B211D7A21937506E2C3923173BA787F319F86BA",
     "reshadeApi": 18,
     "reshadeCommit": "4a50d1eddace85734871d91792ff214f13f66c01",
     "minhookCommit": "c3fcafdc10146beb5919319d0683e44e3c30d537",
@@ -31,20 +31,20 @@
   },
   "testedArtifact": {
     "path": "payload/Release/smvr_native_vr_v1.addon64",
-    "size": 8492544,
-    "sha256": "A99295AB5CA3B4A4CC541911A9F9F5D50E200C46E1D4939A9A769A9AA90A2362"
+    "size": 8493056,
+    "sha256": "3D445F3A985B7E4545DEAB60F52EFA6C5D8C56CBFA44B5C5447D433E95D2C8F3"
   },
   "localCandidateArtifact": {
-    "version": "1.4.11-pre.1-chapter2-20261030",
+    "version": "1.4.11-chapter2-20261118",
     "path": "payload/Release/smvr_native_vr_v1.addon64",
-    "size": 8492544,
-    "sha256": "A99295AB5CA3B4A4CC541911A9F9F5D50E200C46E1D4939A9A769A9AA90A2362",
+    "size": 8493056,
+    "sha256": "3D445F3A985B7E4545DEAB60F52EFA6C5D8C56CBFA44B5C5447D433E95D2C8F3",
     "headsetConfirmed": false,
     "source": {
-      "nativeVrSha256": "EC9ABDF254EE79FC8879D406409DCF7165FE6B3EC440C8F1A091E5AF21FFE208",
+      "nativeVrSha256": "C442BC974E56A73320EC5A3D1B211D7A21937506E2C3923173BA787F319F86BA",
       "featureInputSha256": "5EDE8DE0F2D2378550CFE5BC04FCDE53750768D8BAB1857427A4B81F14D7C3A4",
       "featureInputHeaderSha256": "315FC18EC9E5B07482613BF46A637116B087A76273A8CB6DBF683FFC736A7700",
-      "engineInputSha256": "D288C864BAD72502216CB077C45EA5BAAD3CE398F0B0A2CD62F4FC4D021DE86B",
+      "engineInputSha256": "BF9AA62BFFC0EC1B84A1247B8C52B3C287DE636F6CC8822B27EA5AC65073F881",
       "engineInputHeaderSha256": "50AC9FA66C0D470876C0C4DA6BE64C49B4EDF013259DD94914B6E97063C82E91",
       "startupMenuSha256": "42312CFF17C832F1B7CC35EE267D6A7E58DE0DE2F6CF87E1AC370E3979E58BC5",
       "startupMenuHeaderSha256": "F6EF5A8FA44A5B85ECCD7CAACE6F9476D13D1CE05E465B728F4DCDFEED449EA5",
@@ -96,7 +96,7 @@
       },
       "installerHeadsetProbeTestSha256": "D03F35D835A1B71138B95A1C4C0B3A824F8EE9658911ED9557B0F0718A72FE07",
       "installerSourceSha256": "B8CEF32E526465717054AA68FA00A59A977F9488E86A4597A05784953FDA6BC3",
-      "installerBuildScriptSha256": "4C6D8185AC9E686EB469C28D0D0653A70A0CBB04F5937BE1AF526AE97A8F4300",
+      "installerBuildScriptSha256": "9EF7F9B0C17C27BC1FEA7FF02B734483C673842EDD4EDF5BCC69A7193422F126",
       "vrHandsHeaderSha256": "57EC178664EE88F5AD7CCEC3CDB2FF749C773466E9FDC853004BA462BEE011FC",
       "uiTriggerGateSha256": "C05A2C3A40E867151AA1DAEDD001204B1CCC170679C839228B8A832233505F7D",
       "launchRetryPolicySha256": "7C7FA8B320F5FA0FD7DB331A2A92B54AC52AFC3BABFB5E3106B7208FCAC20B82",
@@ -104,10 +104,10 @@
     }
   },
   "validation": {
-    "date": "2026-10-30",
+    "date": "2026-11-18",
     "installerManagedFiles": 49,
     "nativeReleaseBuild": "PASS",
-    "nativeHookAndInputLayout": "PASS_EXACT_1.0.7.894_BINARY",
+    "nativeHookAndInputLayout": "PASS_EXACT_1.0.7a.903_BINARY",
     "asymmetricProjectionMath": "PASS",
     "luaSyntax": "PASS",
     "lightingBridge": "PASS",
@@ -116,20 +116,20 @@
     "installerInstallVerify": "PASS_ISOLATED_49_FILES",
     "installerUninstallRestore": "PASS_ISOLATED_ORIGINAL_HASHES",
     "userSettingsPreservation": "PASS",
-    "crossBuildOriginalPreservation": "PASS",
     "retiredCacheInvalidation": "PASS",
     "installerSelfTest": "PASS",
     "headsetConfirmed": false,
-    "gameStartup": "NOT_RUN",
-    "localGameInstalled": false,
-    "installerOpenXrProbe": "PASS_HEADSET_CONNECTED_NOT_A_GAMEPLAY_TEST"
+    "gameStartup": "PASS_DESKTOP_MAIN_MENU_WITH_MOD_LOADED",
+    "localGameInstalled": true,
+    "cacheColdStartup": "PASS_MAIN_MENU_AFTER_98_SECOND_LOADING_SCREEN",
+    "openXrRuntime": "META_RUNTIME_AVAILABLE_NO_HEADSET"
   },
   "installer": {
-    "version": "1.4.11-pre.1-chapter2-20261030",
+    "version": "1.4.11-chapter2-20261118",
     "path": "dist/ScrapMechanicVR-Installer.exe",
     "selfTest": "PASS",
     "published": false,
-    "releaseChannel": "prerelease",
-    "releaseTag": "v1.4.11-pre.1"
+    "releaseChannel": "candidate",
+    "releaseTag": "v1.4.11"
   }
 }

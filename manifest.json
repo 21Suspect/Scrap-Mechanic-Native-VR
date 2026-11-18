@@ -1,13 +1,13 @@
 {
   "formatVersion": 1,
   "patchId": "scrap-mechanic-native-vr-chapter2",
-  "patchVersion": "1.4.11-pre.1-chapter2-20261030",
+  "patchVersion": "1.4.11-chapter2-20261118",
   "description": "Scrap Mechanic Chapter 2 native OpenXR VR with OpenXR 1.1 Meta Touch, legacy Oculus Touch, Valve Index, and generic controller profiles, optional Quest optical hands, Custom Game content bridging, complete held-item geometry, grouped held-item pose calibration, hand-aimed world actions with a laser-free target marker, barrel-aimed weapons, binding-aware lift and inventory shortcuts, spatial live game menus, native queued keyboard and pointer input, transparent composition, restrained haptics, guarded right-trigger-plus-grip force-build, and always-visible fixed smartwatch-style wrist vitals, underwater oxygen, time, and world-space compass HUDs with live waypoint markers",
   "game": {
     "appId": "387990",
-    "buildId": "26302409",
+    "buildId": "26702088",
     "executable": "Release\\ScrapMechanic.exe",
-    "executableSha256": "C5D93162DB87605CBB70598B347634F555A2F7C3658225963C5ED8F97F68EEAA"
+    "executableSha256": "3A377C463531F4F75A41F5465266110F80799AA648E61F17E34CB1B9BF67D603"
   },
   "directories": [
     "Release\\smvr-empty\\cache",
@@ -17,11 +17,14 @@
   "files": [
     {
       "path": "Data\\Scripts\\game\\CreativeGame.lua",
-      "patchedSha256": "43768874675B4C9D1238EAA3E341B1599B3755C383730570FB7DE5D1DCFAB321",
+      "patchedSha256": "21AE3EDCC5D120DF80BBC1C5C3DE0C90ADCA870AF561AD88CE101A8CA568EC39",
       "originalSha256": [
-        "D74FFD3CF8AE6D4E84DC59CA7E3F18FF06D5627F24DACDA5B9CB11F291CD7A67"
+        "2B21373BE0B4EB594D9780FDC918BE51DD24ADF3DE577BFC660AC2A0A28EEE04"
       ],
-      "module": "vr-authoritative-lighting"
+      "module": "vr-authoritative-lighting",
+      "historicalPatchedSha256": [
+        "43768874675B4C9D1238EAA3E341B1599B3755C383730570FB7DE5D1DCFAB321"
+      ]
     },
     {
       "path": "Survival\\Scripts\\game\\SurvivalGame.lua",
@@ -82,7 +85,7 @@
     },
     {
       "path": "Release\\smvr_native_vr_v1.addon64",
-      "patchedSha256": "A99295AB5CA3B4A4CC541911A9F9F5D50E200C46E1D4939A9A769A9AA90A2362",
+      "patchedSha256": "3D445F3A985B7E4545DEAB60F52EFA6C5D8C56CBFA44B5C5447D433E95D2C8F3",
       "originalMayBeMissing": true,
       "module": "chapter2-native-openxr",
       "historicalPatchedSha256": [
@@ -129,6 +132,7 @@
         "9ED60D15D3606DE887C8CEAC22574435D67F391E6630C7AB442A8BA0BFFBC8EC",
         "A059E530E42875452D67606504AB6D6EF9BE31AA751E878F82229BCDB835141C",
         "A2BFEC95DABF1EDE052B3F6D7F6C1BC3B327C6AFC404F02439409A2C6825235B",
+        "A99295AB5CA3B4A4CC541911A9F9F5D50E200C46E1D4939A9A769A9AA90A2362",
         "AC6B07A02D780583CA6E8902CAAF041D6506464F7E13A61B9F53F885E9F833C8",
         "B39443F9B47FAEE1C41E082F4CC06EF7B4A5D43E9E853AAE6C04B39CEBCBABA0",
         "B8C8A6688411F0BF44448652671579DE4D6804D94A8FA190AC104D56656E18BA",

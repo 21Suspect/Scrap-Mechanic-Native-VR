@@ -1,14 +1,8 @@
 # Chapter 2 release status
 
-Current candidate: `1.4.11-pre.1` for Scrap Mechanic `1.0.7.894`
+Current candidate: `1.4.11` for Scrap Mechanic `1.0.7a.903`, public Steam build `26702088`.
 
-Branch: `compat/sm-1.0.7`; stable `main` remains on 1.4.10.
-
-Target game: Scrap Mechanic `1.0.7.894`, Steam test build `26302409`.
-
-## Prerelease validation
-
-The native build, executable hook/input checks, Lua/shader regressions and isolated 49-file installer round trip pass. The installer preserves current game originals across an upgrade and retires the old compiled cache seed. Actual game startup, cache rebuilding and headset gameplay have not yet been verified on 1.0.7. See [prerelease notes](docs/release-1.4.11-pre.1.md) and `snapshot.json` for current validation.
+The candidate passes the native build, executable layout checks, Lua and shader regressions, installer self-test, and isolated install and uninstall checks. See `snapshot.json` for runtime validation.
 
 ## Inherited baseline features (require retesting on 1.0.7)
 

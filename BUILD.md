@@ -40,7 +40,7 @@ The documented executable hash remains the only supported configuration. The ins
 
 The public artifact is `dist/ScrapMechanicVR-Installer.exe`. It validates its embedded patcher, manifest, native add-on, branded UI assets, soundtrack, and the managed payload before installation. Its five user actions are Install VR Mod, Uninstall VR Mod, Start VR, Open Logs, and Open Bindings. Install automatically migrates a managed older/current build and verifies the completed installation. Uninstall removes managed current/older builds, restores backups, and verifies the result. Start VR requires the active OpenXR runtime to report a connected headset.
 
-Current prerelease: `1.4.11-pre.1` for Scrap Mechanic `1.0.7.894` / Steam test build `26302409`
+Current candidate: `1.4.11` for Scrap Mechanic `1.0.7a.903` / public Steam build `26702088`
 
 The installer SHA-256 is recorded in `SHA256SUMS.txt`.
 
@@ -58,7 +58,7 @@ python tools/tests/test_fertilizer_effect.py --lua-dll '<game directory>/Release
 
 The Lua test executes the shipped fertilizer script with mocked tool owners. The C++ tests exercise the production input gate and launch retry policy. These checks do not replace an in-headset multiplayer or VDXR test.
 
-This prerelease uses `compiledDataCachePolicy: rebuild`. It retires the previous release's cache seed and invalidates `Cache/Bundle/core_data.cbo` on install/uninstall. The engine must rebuild it from 1.0.7 files on first launch; user-authored INI files remain preserved. Earlier builds used a seed to avoid cold-cache startup problems, so first-launch rebuilding is specifically awaiting runtime verification on 1.0.7.
+This installer uses `compiledDataCachePolicy: rebuild`. It retires the previous release's cache seed and invalidates `Cache/Bundle/core_data.cbo` on install/uninstall. The engine must rebuild it from 1.0.7 files on first launch; user-authored INI files remain preserved. The first launch can take longer as the game rebuilds its cache.
 
 For the 1.0.7 native ABI checks, install Python `pefile` and run:
 
@@ -67,7 +67,7 @@ python tools/tests/test_game_107_layout.py '<game directory>/Release/ScrapMechan
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/tests/test_upgrade_restore.ps1
 ```
 
-The executable test verifies the guarded render/camera/raycast entry points, call targets, result fraction offset and all 16 input instruction guards. The new input event is 0x48 bytes, with its payload at +0x30; 1.0.6's 0x40-byte event is incompatible. Headset validation is separate from these checks.
+The executable test verifies the guarded render/camera/raycast entry points, call targets, result fraction offset and all 17 input instruction guards. The new input event is 0x48 bytes, with its payload at +0x30; 1.0.6's 0x40-byte event is incompatible. Headset validation is separate from these checks.
 
 ## Release checks
 
@@ -79,4 +79,4 @@ Before publishing:
 4. Build the one-file installer and run its self-test.
 5. Run `Verify-Snapshot.ps1`.
 6. Regenerate `SHA256SUMS.txt` and keep `snapshot.json` validation specific to this candidate.
-7. Publish `v1.4.11-pre.1` from `compat/sm-1.0.7` with GitHub's prerelease flag and `make_latest: false`. Keep `main` and the stable 1.4.10 release unchanged.
+7. Run a game and headset smoke test on Steam build 26702088 before publishing `v1.4.11`.

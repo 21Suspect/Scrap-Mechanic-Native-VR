@@ -24,15 +24,15 @@ namespace ScrapMechanicVRPatcher
 {
     internal static class BuildInfo
     {
-        internal const string Version = "1.4.11-pre.1-chapter2-20261030";
-        internal const string GameBuild = "26302409";
-        internal const string GameExeHash = "C5D93162DB87605CBB70598B347634F555A2F7C3658225963C5ED8F97F68EEAA";
-        internal const string AddonHash = "A99295AB5CA3B4A4CC541911A9F9F5D50E200C46E1D4939A9A769A9AA90A2362";
+        internal const string Version = "1.4.11-chapter2-20261118";
+        internal const string GameBuild = "26702088";
+        internal const string GameExeHash = "3A377C463531F4F75A41F5465266110F80799AA648E61F17E34CB1B9BF67D603";
+        internal const string AddonHash = "3D445F3A985B7E4545DEAB60F52EFA6C5D8C56CBFA44B5C5447D433E95D2C8F3";
         internal const string DxgiHash = "EC9245D05C11751F2AC0D2256E6921AD8FB36BE9172EF6D587856591EB729A25";
         internal const string LoaderHash = "018C6519AFBDEADE6DA9E7D59C406068DD58674D87A65AE27353484A05E6674A";
         internal const string MusicHash = "02E8E98721A899C2731ED8AFDF6378DB98DC09BB87FA5896FBA911CE5D875660";
         internal const string LogoHash = "C692A16C8CB01B94618951C09F64A156D7DD6A71D349B91E023B018165504C34";
-        internal const string ManifestHash = "94DFF28B99985A6BC995C72A6B018C3A5849751954AF3AE41039A5BD8248595F";
+        internal const string ManifestHash = "422CBDD9D77A9A921BBFF88BD3682F97259BD9EC0351FB6AA272FD0BFC97FB56";
         internal const string PatcherHash = "435DAA682075B6A2588C881CD51DAAA9583AA4FCCBDD6438FD42714E7D57DFE3";
         internal const int ManagedFileCount = 49;
         internal const string ResourceName = "ScrapMechanicVR.Payload.zip";
